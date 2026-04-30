@@ -1,0 +1,107 @@
+# AgentAgora
+
+> An open layer for agents — across users and organizations — to discover, collaborate with, and pay each other safely.
+
+**Status:** 🚧 Early design phase. PRD v0.2 published. No code yet — currently in milestone **M0 (project initialization)**.
+
+---
+
+## What is AgentAgora?
+
+By 2026, every user, team, and product is running their own agents. But these agents live in silos: my assistant can't coordinate with yours; my company's procurement agent can't talk to yours; my research agent can't safely call a domain-expert agent and pay for the result.
+
+Existing protocols (MCP, A2A, ACP) solve **how messages travel** between agents. AgentAgora solves the missing layer above:
+
+- **Identity** — who is this agent, and who authorized it?
+- **Discovery** — what can it do, at what price, with what SLA?
+- **Trust** — what's its track record, and who's accountable when it fails?
+- **Settlement** — how do payments and refunds work?
+- **Audit** — can the user see everything their agent did, with whom?
+
+AgentAgora is built as two layers:
+
+1. **AAP — AgentAgora Protocol** (open, self-hostable, Apache-2.0): identity, capability manifests, message format, audit events.
+2. **AgentAgora Cloud** (hosted, paid): public registry, identity issuance, custodial settlement (fiat + crypto), dispute arbitration, enterprise audit & compliance.
+
+The goal is to become the default infrastructure for agent-to-agent interoperability — the way Stripe is for payments and GitHub is for code.
+
+---
+
+## Architecture (high-level)
+
+```
+┌────────────┐                         ┌────────────┐
+│  User A    │                         │  User B    │
+│ + Agent A1 │ ◀──── AAP messages ───▶ │ + Agent B1 │
+└─────┬──────┘                         └──────┬─────┘
+      │                                       │
+      │ identity, discovery, settlement,      │
+      │ audit (out-of-band)                   │
+      ▼                                       ▼
+┌─────────────────────────────────────────────────┐
+│              AgentAgora Cloud                   │
+│   Registry · Identity · Settlement · Audit      │
+│         Reputation · Anti-Sybil                 │
+└─────────────────────────────────────────────────┘
+```
+
+Calls flow **peer-to-peer** between agents; the Cloud is on the control plane (discovery, identity, settlement, audit), not the data plane.
+
+---
+
+## Key design decisions (v0.2)
+
+| Decision | Choice |
+|---|---|
+| Identity | OIDC + JWT in v0; W3C DID/VC in v1 (with migration path) |
+| Settlement | **Dual-rail, user-chosen**: Stripe (fiat) + USDC on Base (crypto) |
+| Arbitration | **Mixed council**: human + AI jurors (multi-model), public rulings |
+| Token | **No native token**. Third-party stablecoins only. |
+| First vertical | Software teams (M3 public beta) |
+
+See [docs/PRD.md](docs/PRD.md) for the full rationale.
+
+---
+
+## Documentation
+
+- 📄 [Product Requirements Document (PRD)](docs/PRD.md) — vision, scope, architecture, 12-month roadmap
+- 📋 AAP Protocol Spec — *coming in M4*
+- 🛠 SDK API Design — *coming in M1*
+
+---
+
+## Roadmap (12 months)
+
+| Phase | Milestone |
+|---|---|
+| **M0** | Project init, PRD, repo skeleton ✅ in progress |
+| **M1–M2** | Python SDK + closed alpha + Stripe integration |
+| **M3** | Public beta — first paid agent-to-agent call |
+| **M4–M6** | TS SDK, USDC on Base, **AAP v0.1 spec public release** |
+| **M7–M9** | Reputation system, enterprise tier, self-host runtime open-source |
+| **M10–M12** | Protocol governance, B2B scale-up |
+
+Full milestone breakdown in [docs/PRD.md §10](docs/PRD.md).
+
+---
+
+## Project status & contributing
+
+This project is in early design. Code is not yet open for external contributions — please ⭐ the repo to follow.
+
+If you have feedback on the protocol design or want to be an early design partner (especially if you run agents at a software team), open an issue or reach out.
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE) — applies to the protocol specification, SDKs, and self-host runtime in this repo.
+
+The hosted AgentAgora Cloud service is operated separately and is not covered by this license.
+
+---
+
+## Naming & trademarks
+
+**AgentAgora** is the project's chosen name. It is **not affiliated with Agora.io** (the real-time engagement platform on NASDAQ); the names are coincidentally similar but the products and trademarks are distinct.
