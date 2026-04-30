@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentagora"
+version = "0.0.1.dev0"
+description = "Python SDK for AgentAgora — the open layer for agents to discover, collaborate with, and pay each other."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    { name = "AgentAgora contributors" },
+]
+keywords = ["agents", "ai-agents", "agent-protocol", "aap", "interop"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "cryptography>=42.0",
+    "pyjwt[crypto]>=2.8",
+]
+
+[project.optional-dependencies]
+stripe = ["stripe>=8.0"]
+crypto = ["web3>=6.0", "eth-account>=0.10"]
+all = ["stripe>=8.0", "web3>=6.0", "eth-account>=0.10"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+agentagora = "agentagora.cli.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/agentagora/agentagora"
+Documentation = "https://github.com/agentagora/agentagora/tree/main/docs"
+Issues = "https://github.com/agentagora/agentagora/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentagora"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
