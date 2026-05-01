@@ -9,9 +9,21 @@
  *   - Local audit directory
  */
 
-import type { ConversationStatus } from "@agentagora/protocol";
+import {
+  AAP_VERSION,
+  type ConversationStatus,
+  ErrorCodes,
+  Methods,
+  type RpcErrorResponseEnvelope,
+  type RpcRequestEnvelope,
+  type RpcSuccessResponseEnvelope,
+} from "@agentagora/protocol";
+import { makeId, makeTimestamp } from "./_internal/ids.js";
 import type { ConversationSnapshot } from "./conversation.js";
+import { AAPError } from "./errors.js";
+import type { RegistryResolver } from "./registry.js";
 import type { SettlementChannel } from "./settlement/index.js";
+import { signEnvelope, verifyEnvelope } from "./signing.js";
 import type { Transport } from "./transport.js";
 
 export interface SpendCap {
@@ -24,8 +36,20 @@ export interface AgentAgoraClientOptions {
   token: string;
   /** Registry base URL. Default: https://agentagora.ai */
   registry?: string;
-  /** Pluggable transport. Default: HttpTransport. */
+  /**
+   * Resolver for verifying signatures on inbound responses.
+   * Required for `.call()`. Production code uses a registry-backed
+   * resolver; tests use `InMemoryRegistry`.
+   */
+  registryResolver?: RegistryResolver;
+  /** Pluggable transport. Required for `.call()`. */
   transport?: Transport;
+  /** AID this client uses as `aap.from` when signing outbound calls. */
+  fromAid?: string;
+  /** Ed25519 private key used to sign outbound envelopes. */
+  signingKey?: Uint8Array;
+  /** Stable identifier for the signing key. Required if `signingKey` set. */
+  signingKeyId?: string;
   /** Pre-configured settlement channels. */
   settlement?: SettlementChannel[];
   /** Local audit directory (Node only; ignored on Workers). */
@@ -49,6 +73,9 @@ export class AgentAgoraClient {
   constructor(options: AgentAgoraClientOptions) {
     if (!options.token) {
       throw new Error("AgentAgoraClient: `token` is required");
+    }
+    if (options.signingKey && !options.signingKeyId) {
+      throw new Error("AgentAgoraClient: `signingKeyId` is required when `signingKey` is set");
     }
     this.options = {
       registry: "https://agentagora.ai",
@@ -78,12 +105,65 @@ export class AgentAgoraClient {
   // ----- Calling agents -----
 
   async call<T = unknown>(
-    _aid: string,
-    _capability: string,
-    _input: Record<string, unknown>,
-    _options?: CallOptions,
+    aid: string,
+    capabilityName: string,
+    input: Record<string, unknown> = {},
+    _options: CallOptions = {},
   ): Promise<T> {
-    throw new Error("AgentAgoraClient.call — implemented in M1 task #6");
+    const transport = this.options.transport;
+    const resolver = this.options.registryResolver;
+    const signingKey = this.options.signingKey;
+    const signingKeyId = this.options.signingKeyId;
+    const fromAid = this.options.fromAid;
+
+    if (!transport) {
+      throw new Error("AgentAgoraClient.call: `transport` is required");
+    }
+    if (!resolver) {
+      throw new Error("AgentAgoraClient.call: `registryResolver` is required");
+    }
+    if (!signingKey || !signingKeyId) {
+      throw new Error("AgentAgoraClient.call: `signingKey` and `signingKeyId` are required");
+    }
+    if (!fromAid) {
+      throw new Error("AgentAgoraClient.call: `fromAid` is required");
+    }
+
+    const conversationId = makeId("conv_");
+    const requestId = makeId("req_");
+
+    const request: RpcRequestEnvelope = {
+      jsonrpc: "2.0",
+      id: requestId,
+      method: Methods.Invoke,
+      params: { capability: capabilityName, input },
+      aap: {
+        version: AAP_VERSION,
+        conversation_id: conversationId,
+        timestamp: makeTimestamp(),
+        nonce: makeId(),
+        from: fromAid as never,
+        to: aid as never,
+        signature: { alg: "EdDSA", key_id: signingKeyId, value: "" },
+      },
+    };
+
+    await signEnvelope(request, { privateKey: signingKey, keyId: signingKeyId });
+
+    const response = await transport.send(request);
+
+    // Verify the response's signature against the responder's public key.
+    const responderKey = await resolver.resolvePublicKey(aid);
+    const valid = await verifyEnvelope(response, responderKey);
+    if (!valid) {
+      throw new AAPError(ErrorCodes.Unauthorized, "response signature verification failed");
+    }
+
+    if ("error" in response) {
+      throw AAPError.fromRpc((response as RpcErrorResponseEnvelope).error);
+    }
+
+    return (response as RpcSuccessResponseEnvelope).result as T;
   }
 
   async callRich(
@@ -92,7 +172,9 @@ export class AgentAgoraClient {
     _input: Record<string, unknown>,
     _options?: CallOptions,
   ): Promise<ConversationSnapshot> {
-    throw new Error("AgentAgoraClient.callRich — implemented in M1 task #6");
+    throw new Error(
+      "AgentAgoraClient.callRich — implemented in M1 task #6 (audit-log integration)",
+    );
   }
 
   // ----- Discovery -----

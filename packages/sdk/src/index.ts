@@ -37,8 +37,10 @@ export {
   SLABreachError,
   UnauthorizedError,
 } from "./errors.js";
-export type { Transport } from "./transport.js";
-export { HttpTransport } from "./transport.js";
+export type { AgentHandler, Transport } from "./transport.js";
+export { HttpTransport, MockTransport } from "./transport.js";
+export type { RegistryResolver } from "./registry.js";
+export { InMemoryRegistry } from "./registry.js";
 export { AgentAgoraClient } from "./client.js";
 export type { AgentAgoraClientOptions, CallOptions, SpendCap } from "./client.js";
 export {

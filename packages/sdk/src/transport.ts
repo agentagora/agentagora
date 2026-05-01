@@ -34,3 +34,42 @@ export class HttpTransport implements Transport {
     throw new Error("HttpTransport.send — implemented in M1 task #7");
   }
 }
+
+/**
+ * Handler signature used by MockTransport: an in-process function
+ * that takes a request envelope and returns a response envelope.
+ */
+export type AgentHandler = (envelope: RpcRequestEnvelope) => Promise<RpcResponseEnvelope>;
+
+/**
+ * In-memory transport for tests and demos. Routes envelopes to
+ * handlers registered for `envelope.aap.to`.
+ *
+ * Lets two agents owned by separate clients exchange messages without
+ * any HTTP, while still exercising the full sign / verify / dispatch
+ * pipeline.
+ */
+export class MockTransport implements Transport {
+  private readonly handlers = new Map<string, AgentHandler>();
+
+  registerAgent(aid: string, handler: AgentHandler): void {
+    this.handlers.set(aid, handler);
+  }
+
+  unregisterAgent(aid: string): void {
+    this.handlers.delete(aid);
+  }
+
+  hasAgent(aid: string): boolean {
+    return this.handlers.has(aid);
+  }
+
+  async send(envelope: RpcRequestEnvelope): Promise<RpcResponseEnvelope> {
+    const target = envelope.aap.to;
+    const handler = this.handlers.get(target);
+    if (!handler) {
+      throw new Error(`MockTransport: no handler registered for ${target}`);
+    }
+    return handler(envelope);
+  }
+}

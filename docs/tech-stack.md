@@ -12,9 +12,9 @@ This document is the single source of truth for technology choices. Other docs (
 
 ## 1. TL;DR
 
-- **Primary language: TypeScript** (≥ 5.5).
-- **Secondary language: Python** (≥ 3.10) — community SDK, ships after M5.
-- **Runtime targets**: Node ≥ 20 LTS, Bun ≥ 1.1, Deno ≥ 2, **Cloudflare Workers**, Vercel Edge. Web-standard APIs preferred over runtime-specific ones.
+- **Primary language: TypeScript** (≥ 5.9).
+- **Secondary language: Python** (≥ 3.12) — community SDK, ships after M5.
+- **Runtime targets**: Node ≥ 24 LTS, Bun ≥ 1.2, Deno ≥ 2, **Cloudflare Workers**, Vercel Edge. Web-standard APIs preferred over runtime-specific ones.
 - **HTTP framework**: [Hono](https://hono.dev) everywhere (SDK server side, Cloud platform, examples).
 - **Schema validation**: [Zod](https://zod.dev) v3 (will move to v4 when stable).
 - **Crypto**: [`@noble/ed25519`](https://github.com/paulmillr/noble-ed25519) + [`canonicalize`](https://www.npmjs.com/package/canonicalize) (RFC 8785 JCS).
@@ -68,12 +68,14 @@ The TypeScript SDK and Cloud Platform code MUST run on every target below withou
 
 | Runtime | Min version | Tier |
 |---|---|---|
-| Node.js | 20 LTS | Tier 1 — primary dev target |
-| Bun | 1.1 | Tier 1 — alternative runtime |
+| Node.js | 24 LTS | Tier 1 — primary dev target |
+| Bun | 1.2 | Tier 1 — alternative runtime |
 | Deno | 2.0 | Tier 1 |
 | Cloudflare Workers | current | Tier 1 — Cloud Platform default |
 | Vercel Edge Functions | current | Tier 1 |
 | Browser (modern evergreen) | — | Tier 2 — *client-side calling only*, cannot host an agent |
+
+**Version policy**: pin to the **second-newest stable line** for hosted runtimes (currently Node 24 LTS, not bleeding-edge Node 25). Bump as new LTS lines stabilize. Legacy support windows: 12 months after a version drops out of LTS, then deprecated.
 
 **Rule**: a feature that doesn't work on Cloudflare Workers cannot ship in the SDK. This forces us to stay on Web Standards and rules out Node-only modules (`fs`, `child_process`, native bindings).
 

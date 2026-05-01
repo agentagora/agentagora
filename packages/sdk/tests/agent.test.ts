@@ -6,6 +6,7 @@ describe("createAgent", () => {
   it("builds an agent with at least one capability", () => {
     const a = createAgent({
       name: "code-review",
+      namespace: "weijt606",
       accepts: ["stripe-fiat"],
       capabilities: {
         review_pr: capability({
@@ -28,14 +29,16 @@ describe("createAgent", () => {
     expect(() =>
       createAgent({
         name: "broken",
+        namespace: "test",
         capabilities: {},
       }),
     ).toThrow(/at least one capability/);
   });
 
-  it("serve() throws NotImplemented in v0.0.1", async () => {
+  it("serve() without a transport throws NotImplemented in v0.0.1", async () => {
     const a = createAgent({
       name: "x",
+      namespace: "test",
       capabilities: {
         ping: capability({
           input: z.object({}),
@@ -45,7 +48,7 @@ describe("createAgent", () => {
         }),
       },
     });
-    await expect(a.serve()).rejects.toThrow(/Agent.serve/);
+    await expect(a.serve()).rejects.toThrow(/HTTP transport not yet implemented/);
   });
 });
 
