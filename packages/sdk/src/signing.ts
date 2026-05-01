@@ -5,7 +5,12 @@
  * including Cloudflare Workers — no Node `crypto` dependency).
  */
 
-import type { RpcRequestEnvelope, RpcResponseEnvelope, Signature } from "@agentagora/protocol";
+import type {
+  AuditEvent,
+  RpcRequestEnvelope,
+  RpcResponseEnvelope,
+  Signature,
+} from "@agentagora/protocol";
 import * as ed from "@noble/ed25519";
 import { canonicalizeForSigning } from "./canonical.js";
 
@@ -87,6 +92,49 @@ export async function verifyEnvelope(
 
   const cloned = JSON.parse(JSON.stringify(envelope)) as typeof envelope;
   cloned.aap.signature = { alg: sig.alg, key_id: sig.key_id, value: "" };
+  const bytes = canonicalizeForSigning(cloned);
+  try {
+    return await ed.verifyAsync(sigBytes, bytes, publicKey);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sign an audit event in place.
+ *
+ * Computes the signature over the JCS canonicalization of the event
+ * with `signature.value` cleared, then writes the signature back into
+ * `event.signature`.
+ */
+export async function signAuditEvent(
+  event: AuditEvent,
+  options: { privateKey: Uint8Array; keyId: string },
+): Promise<AuditEvent> {
+  event.signature = { ...PLACEHOLDER_SIG, key_id: options.keyId };
+  const bytes = canonicalizeForSigning(event);
+  const sig = await ed.signAsync(bytes, options.privateKey);
+  event.signature = {
+    alg: "EdDSA",
+    key_id: options.keyId,
+    value: b64uEncode(sig),
+  };
+  return event;
+}
+
+/**
+ * Verify an audit event's signature against a public key.
+ * Returns `true` iff the signature is valid.
+ */
+export async function verifyAuditEvent(event: AuditEvent, publicKey: Uint8Array): Promise<boolean> {
+  if (!event.signature?.value) return false;
+  const sigBytes = b64uDecode(event.signature.value);
+  const cloned = JSON.parse(JSON.stringify(event)) as AuditEvent;
+  cloned.signature = {
+    alg: cloned.signature.alg,
+    key_id: cloned.signature.key_id,
+    value: "",
+  };
   const bytes = canonicalizeForSigning(cloned);
   try {
     return await ed.verifyAsync(sigBytes, bytes, publicKey);

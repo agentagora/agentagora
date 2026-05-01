@@ -21,6 +21,6 @@ export interface ConversationSnapshot {
   readonly currency: string | undefined;
   readonly channel: string | undefined;
   readonly result: unknown;
-  readonly error: { code: number; message: string } | undefined;
+  readonly error: { code: number; message: string; data?: Record<string, unknown> } | undefined;
   readonly audit: AuditLog;
 }

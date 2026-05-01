@@ -22,7 +22,9 @@ export {
   b64uEncode,
   generatePrivateKey,
   publicKeyFrom,
+  signAuditEvent,
   signEnvelope,
+  verifyAuditEvent,
   verifyEnvelope,
 } from "./signing.js";
 export { AuditLog, hashEvent } from "./audit.js";

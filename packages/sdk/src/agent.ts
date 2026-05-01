@@ -25,6 +25,7 @@
 
 import {
   AAP_VERSION,
+  AuditEventTypes,
   ErrorCodes,
   Methods,
   type Privacy,
@@ -34,7 +35,9 @@ import {
   type RpcSuccessResponseEnvelope,
 } from "@agentagora/protocol";
 import type { z } from "zod";
+import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
+import { AuditLog } from "./audit.js";
 import type { RegistryResolver } from "./registry.js";
 import { signEnvelope, verifyEnvelope } from "./signing.js";
 import type { MockTransport, Transport } from "./transport.js";
@@ -125,6 +128,11 @@ export interface Agent {
    * direct in-process invocation by transports and for testing.
    */
   handle(envelope: RpcRequestEnvelope): Promise<RpcResponseEnvelope>;
+  /**
+   * Look up the (responder-side) audit log for a conversation this
+   * agent participated in. Returns undefined if unknown.
+   */
+  getAuditLog(conversationId: string): AuditLog | undefined;
 }
 
 interface ServeContext {
@@ -139,12 +147,26 @@ class AgentImpl implements Agent {
   readonly aid: string;
   readonly options: AgentOptions;
   private context: ServeContext | undefined;
+  private readonly auditLogs = new Map<string, AuditLog>();
 
   constructor(options: AgentOptions) {
     this.name = options.name;
     this.options = options;
     const registry = options.registry ?? "agentagora";
     this.aid = `aid:${registry}:${options.namespace}/${options.name}`;
+  }
+
+  getAuditLog(conversationId: string): AuditLog | undefined {
+    return this.auditLogs.get(conversationId);
+  }
+
+  private logFor(conversationId: string): AuditLog {
+    let log = this.auditLogs.get(conversationId);
+    if (!log) {
+      log = new AuditLog(conversationId);
+      this.auditLogs.set(conversationId, log);
+    }
+    return log;
   }
 
   async serve(serveOptions: ServeOptions = {}): Promise<void> {
@@ -236,6 +258,16 @@ class AgentImpl implements Agent {
       );
     }
 
+    // Audit: invocation started.
+    const log = this.logFor(envelope.aap.conversation_id);
+    await writeEvent(log, {
+      type: AuditEventTypes.InvocationStarted,
+      actorAid: this.aid,
+      privateKey: signingKey,
+      keyId: signingKeyId,
+      data: { capability: capName, from: envelope.aap.from },
+    });
+
     // 5. Run handler.
     let raw: unknown;
     try {
@@ -258,6 +290,15 @@ class AgentImpl implements Agent {
         { issues: outputResult.error.issues },
       );
     }
+
+    // Audit: invocation completed.
+    await writeEvent(log, {
+      type: AuditEventTypes.InvocationCompleted,
+      actorAid: this.aid,
+      privateKey: signingKey,
+      keyId: signingKeyId,
+      data: { capability: capName },
+    });
 
     // 7. Build & sign success response.
     const response: RpcSuccessResponseEnvelope = {

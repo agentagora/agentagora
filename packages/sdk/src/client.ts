@@ -11,14 +11,18 @@
 
 import {
   AAP_VERSION,
+  AuditEventTypes,
   type ConversationStatus,
+  ConversationStatuses,
   ErrorCodes,
   Methods,
   type RpcErrorResponseEnvelope,
   type RpcRequestEnvelope,
   type RpcSuccessResponseEnvelope,
 } from "@agentagora/protocol";
+import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
+import { AuditLog } from "./audit.js";
 import type { ConversationSnapshot } from "./conversation.js";
 import { AAPError } from "./errors.js";
 import type { RegistryResolver } from "./registry.js";
@@ -69,6 +73,7 @@ export interface CallOptions {
 
 export class AgentAgoraClient {
   private readonly options: AgentAgoraClientOptions;
+  private readonly auditLogs = new Map<string, AuditLog>();
 
   constructor(options: AgentAgoraClientOptions) {
     if (!options.token) {
@@ -104,34 +109,64 @@ export class AgentAgoraClient {
 
   // ----- Calling agents -----
 
+  /**
+   * Call a capability and return the result directly. Throws an
+   * AAPError subclass on RPC error or signature failure.
+   */
   async call<T = unknown>(
     aid: string,
     capabilityName: string,
     input: Record<string, unknown> = {},
-    _options: CallOptions = {},
+    options: CallOptions = {},
   ): Promise<T> {
+    const snapshot = await this.callRich(aid, capabilityName, input, options);
+    if (snapshot.error) {
+      throw AAPError.fromRpc(snapshot.error);
+    }
+    return snapshot.result as T;
+  }
+
+  /**
+   * Call a capability and return a full ConversationSnapshot — result,
+   * status, audit log, etc. Does NOT throw on RPC errors; inspect the
+   * returned snapshot's `error` field instead. Still throws on
+   * signature verification failure (a security-critical condition).
+   */
+  async callRich(
+    aid: string,
+    capabilityName: string,
+    input: Record<string, unknown> = {},
+    _options: CallOptions = {},
+  ): Promise<ConversationSnapshot> {
     const transport = this.options.transport;
     const resolver = this.options.registryResolver;
     const signingKey = this.options.signingKey;
     const signingKeyId = this.options.signingKeyId;
     const fromAid = this.options.fromAid;
 
-    if (!transport) {
-      throw new Error("AgentAgoraClient.call: `transport` is required");
-    }
-    if (!resolver) {
-      throw new Error("AgentAgoraClient.call: `registryResolver` is required");
-    }
+    if (!transport) throw new Error("AgentAgoraClient.call: `transport` is required");
+    if (!resolver) throw new Error("AgentAgoraClient.call: `registryResolver` is required");
     if (!signingKey || !signingKeyId) {
       throw new Error("AgentAgoraClient.call: `signingKey` and `signingKeyId` are required");
     }
-    if (!fromAid) {
-      throw new Error("AgentAgoraClient.call: `fromAid` is required");
-    }
+    if (!fromAid) throw new Error("AgentAgoraClient.call: `fromAid` is required");
 
     const conversationId = makeId("conv_");
     const requestId = makeId("req_");
+    const log = new AuditLog(conversationId);
+    this.auditLogs.set(conversationId, log);
+    const startedAt = new Date();
 
+    // Audit: conversation opened.
+    await writeEvent(log, {
+      type: AuditEventTypes.ConversationOpened,
+      actorAid: fromAid,
+      privateKey: signingKey,
+      keyId: signingKeyId,
+      data: { responder: aid, capability: capabilityName },
+    });
+
+    // Build, sign, send the request.
     const request: RpcRequestEnvelope = {
       jsonrpc: "2.0",
       id: requestId,
@@ -147,34 +182,72 @@ export class AgentAgoraClient {
         signature: { alg: "EdDSA", key_id: signingKeyId, value: "" },
       },
     };
-
     await signEnvelope(request, { privateKey: signingKey, keyId: signingKeyId });
 
     const response = await transport.send(request);
 
-    // Verify the response's signature against the responder's public key.
+    // Verify the responder's signature.
     const responderKey = await resolver.resolvePublicKey(aid);
     const valid = await verifyEnvelope(response, responderKey);
     if (!valid) {
+      // Hard failure — do not write further audit (we cannot trust
+      // anything from the responder in this state).
       throw new AAPError(ErrorCodes.Unauthorized, "response signature verification failed");
     }
 
+    let snapshotError:
+      | { code: number; message: string; data?: Record<string, unknown> }
+      | undefined;
+    let result: unknown;
+    let status: ConversationStatus;
+
     if ("error" in response) {
-      throw AAPError.fromRpc((response as RpcErrorResponseEnvelope).error);
+      const wireErr = (response as RpcErrorResponseEnvelope).error;
+      snapshotError = wireErr;
+      status = ConversationStatuses.Cancelled;
+    } else {
+      result = (response as RpcSuccessResponseEnvelope).result;
+      status = ConversationStatuses.Archived;
+      // Audit: acknowledged. Only on success — failure paths do not
+      // emit ack because the initiator hasn't accepted any work.
+      await writeEvent(log, {
+        type: AuditEventTypes.Acknowledged,
+        actorAid: fromAid,
+        privateKey: signingKey,
+        keyId: signingKeyId,
+        data: { responder: aid },
+      });
     }
 
-    return (response as RpcSuccessResponseEnvelope).result as T;
+    // Audit: conversation archived (always, regardless of outcome).
+    await writeEvent(log, {
+      type: AuditEventTypes.ConversationArchived,
+      actorAid: fromAid,
+      privateKey: signingKey,
+      keyId: signingKeyId,
+      data: snapshotError ? { status, error: snapshotError } : { status },
+    });
+
+    return {
+      id: conversationId,
+      initiator: fromAid,
+      responder: aid,
+      capability: capabilityName,
+      status,
+      startedAt,
+      endedAt: new Date(),
+      priceAmount: undefined,
+      currency: undefined,
+      channel: undefined,
+      result,
+      error: snapshotError,
+      audit: log,
+    };
   }
 
-  async callRich(
-    _aid: string,
-    _capability: string,
-    _input: Record<string, unknown>,
-    _options?: CallOptions,
-  ): Promise<ConversationSnapshot> {
-    throw new Error(
-      "AgentAgoraClient.callRich — implemented in M1 task #6 (audit-log integration)",
-    );
+  /** Look up the local (initiator-side) audit log for a conversation. */
+  getAuditLog(conversationId: string): AuditLog | undefined {
+    return this.auditLogs.get(conversationId);
   }
 
   // ----- Discovery -----
