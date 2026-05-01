@@ -63,3 +63,37 @@ jobs:
 
       - name: Test all packages
         run: pnpm test
+
+      # Bundle-size budget — guards the "must run on Cloudflare Workers"
+      # constraint in docs/tech-stack.md §8 principle #1. The worker-agent
+      # example bundles the whole SDK; if the SDK accidentally pulls in a
+      # Node-only dep or grows unbounded, this step fails before merge.
+      - name: Bundle-size guard (worker-agent)
+        run: pnpm --filter "@agentagora/example-worker-agent" check
+
+      - name: Enforce bundle-size budget (≤ 250 KiB raw, ≤ 60 KiB gzip)
+        env:
+          BUNDLE_RAW_LIMIT_KIB: 250
+          BUNDLE_GZIP_LIMIT_KIB: 60
+        run: |
+          set -euo pipefail
+          BUNDLE=apps/examples/worker-agent/.wrangler/dry-run/index.js
+          if [ ! -f "$BUNDLE" ]; then
+            echo "::error::Expected bundle at $BUNDLE — wrangler dry-run did not produce it"
+            ls -la apps/examples/worker-agent/.wrangler/dry-run/ || true
+            exit 1
+          fi
+          RAW_BYTES=$(wc -c < "$BUNDLE")
+          GZIP_BYTES=$(gzip -c "$BUNDLE" | wc -c)
+          RAW_KIB=$(( (RAW_BYTES + 1023) / 1024 ))
+          GZIP_KIB=$(( (GZIP_BYTES + 1023) / 1024 ))
+          echo "Worker bundle: ${RAW_KIB} KiB raw, ${GZIP_KIB} KiB gzipped"
+          if [ "$RAW_KIB" -gt "$BUNDLE_RAW_LIMIT_KIB" ]; then
+            echo "::error::Worker bundle ${RAW_KIB} KiB exceeds raw budget ${BUNDLE_RAW_LIMIT_KIB} KiB"
+            exit 1
+          fi
+          if [ "$GZIP_KIB" -gt "$BUNDLE_GZIP_LIMIT_KIB" ]; then
+            echo "::error::Worker bundle ${GZIP_KIB} KiB gzipped exceeds budget ${BUNDLE_GZIP_LIMIT_KIB} KiB"
+            exit 1
+          fi
+          echo "::notice::Bundle within budget (${RAW_KIB}/${BUNDLE_RAW_LIMIT_KIB} KiB raw, ${GZIP_KIB}/${BUNDLE_GZIP_LIMIT_KIB} KiB gzip)"
