@@ -61,6 +61,10 @@ target/
 *.dll
 *.exe
 
+# ===== Cloudflare Wrangler =====
+.wrangler/
+.dev.vars
+
 # ===== Logs & runtime =====
 *.log
 logs/

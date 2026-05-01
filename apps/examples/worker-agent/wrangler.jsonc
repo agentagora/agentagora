@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agentagora-worker-example",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "observability": {
+    "enabled": true
+  }
+  // No nodejs_compat flag needed — the @agentagora/sdk runtime path
+  // uses only Web Standard APIs (crypto.getRandomValues, btoa/atob,
+  // fetch, Response.json, JSON.parse). All deps (@noble/ed25519,
+  // @noble/hashes, canonicalize, zod) are pure JS.
+}

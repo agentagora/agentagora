@@ -2,17 +2,31 @@
 
 > An open layer for agents — across users and organizations — to discover, collaborate with, and pay each other safely.
 
-**Status:** 🚧 Pre-alpha. PRD v0.3, AAP spec v0.1 (internal), TypeScript SDK with end-to-end happy path over real HTTP. Currently in milestone **M1**. First closed alpha targeted M3.
+**Status:** 🚧 Pre-alpha. PRD v0.3, AAP spec v0.1 (internal), TypeScript SDK with end-to-end happy path running over real HTTP **and** Cloudflare Workers. **M1 complete.** First closed alpha targeted M3.
 
-## Try the demo
+## Try the demos
 
 ```bash
 pnpm install
 pnpm --filter "@agentagora/sdk" build
+```
+
+**Two agents talking over HTTP** (one process, both sides):
+
+```bash
 pnpm --filter "@agentagora/example-two-agents" demo
 ```
 
-Spins up two agents in one process — one as an HTTP server, the other as a client — and shows the signed envelopes and dual-side audit logs verifying end-to-end. See [apps/examples/two-agents/](apps/examples/two-agents/).
+Shows signed envelopes and dual-side audit logs verifying end-to-end. → [apps/examples/two-agents/](apps/examples/two-agents/)
+
+**Same agent, deployed as a Cloudflare Worker** (the proof of "web standards only"):
+
+```bash
+pnpm --filter "@agentagora/example-worker-agent" check   # dry-run build
+pnpm --filter "@agentagora/example-worker-agent" dev     # local Worker on :8787
+```
+
+Same SDK code, no Node-specific dependencies, no compatibility flags. → [apps/examples/worker-agent/](apps/examples/worker-agent/)
 
 ---
 

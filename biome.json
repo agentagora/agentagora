@@ -12,6 +12,7 @@
       "**/.venv/**",
       "**/.next/**",
       "**/.turbo/**",
+      "**/.wrangler/**",
       "sdk/python/**",
       "**/*.md",
       "pnpm-lock.yaml"
