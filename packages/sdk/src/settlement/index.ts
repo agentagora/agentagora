@@ -45,5 +45,12 @@ export interface SettlementChannel {
   status(escrow: EscrowHandle): Promise<EscrowStatus>;
 }
 
-export { StripeChannel } from "./stripe.js";
+export {
+  type StripeChannelFromKeyOptions,
+  type StripeChannelOptions,
+  type StripeLike,
+  StripeChannel,
+  createStripeChannelFromKey,
+  stripeChannelFromEnv,
+} from "./stripe.js";
 export { UsdcBaseChannel } from "./usdc-base.js";

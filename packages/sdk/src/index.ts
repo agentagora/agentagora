@@ -68,7 +68,9 @@ export type {
 } from "./agent.js";
 export type { ConversationSnapshot } from "./conversation.js";
 export {
+  createStripeChannelFromKey,
   StripeChannel,
+  stripeChannelFromEnv,
   UsdcBaseChannel,
 } from "./settlement/index.js";
 export type {
@@ -76,6 +78,9 @@ export type {
   EscrowState,
   EscrowStatus,
   SettlementChannel,
+  StripeChannelFromKeyOptions,
+  StripeChannelOptions,
+  StripeLike,
 } from "./settlement/index.js";
 
 // Re-export the protocol types so users only need one import.
