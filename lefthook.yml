@@ -1,0 +1,27 @@
+# Lefthook git hooks. Install with `pnpm exec lefthook install` after
+# cloning. See https://lefthook.dev for syntax.
+#
+# Philosophy:
+#   - pre-commit: cheap, fast, only-staged checks (≤ 2 sec)
+#   - pre-push: full project gates (lint + typecheck + test, ~10-15 sec)
+#
+# Skip a single commit's hooks with `git commit --no-verify`. Don't
+# normalize this — every skip is one less guarantee that main is green.
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+pre-push:
+  parallel: false
+  commands:
+    lint:
+      run: pnpm lint
+    typecheck:
+      run: pnpm typecheck
+    test:
+      run: pnpm test

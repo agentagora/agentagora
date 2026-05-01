@@ -52,6 +52,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Dependency vulnerability scan. `--audit-level=moderate` ignores
+      # low-severity advisories that are typically dev-only or noisy.
+      # Bump to `high` once the dep tree is stable enough to expect
+      # zero moderates.
+      - name: Audit dependencies (pnpm audit)
+        run: pnpm audit --audit-level=moderate --prod
+        continue-on-error: true
+
       - name: Lint (biome)
         run: pnpm lint
 
@@ -63,6 +71,13 @@ jobs:
 
       - name: Test all packages
         run: pnpm test
+
+      # Coverage is informational only for now (no thresholds, no
+      # upload). Once we have a settled baseline we can promote it
+      # to a gate. Emits a per-package summary table to the run log.
+      - name: Coverage (informational)
+        run: pnpm -r test --coverage --coverage.reporter=text-summary
+        continue-on-error: true
 
       # Bundle-size budget — guards the "must run on Cloudflare Workers"
       # constraint in docs/tech-stack.md §8 principle #1. The worker-agent

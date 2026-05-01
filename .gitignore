@@ -65,6 +65,11 @@ target/
 .wrangler/
 .dev.vars
 
+# ===== Test coverage =====
+coverage/
+**/coverage/
+*.lcov
+
 # ===== Logs & runtime =====
 *.log
 logs/

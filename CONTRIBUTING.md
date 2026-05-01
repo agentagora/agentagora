@@ -49,6 +49,15 @@ pnpm --filter "@agentagora/example-worker-agent" dev     # local on :8787
 - **pnpm**: 10 or newer
 - **TypeScript**: 5.9 (workspace-pinned; do not update without coordination)
 
+### Git hooks
+
+`pnpm install` auto-installs lefthook git hooks. They enforce:
+
+- **pre-commit** (~1 s): Biome lint + auto-format on staged files only.
+- **pre-push** (~10–15 s): full `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+
+Skip a single commit's hooks with `git commit --no-verify` — but every skip is one less guarantee that `main` is green; treat it as exceptional.
+
 ## Commit conventions
 
 We use [Conventional Commits](https://www.conventionalcommits.org/), broadly:
