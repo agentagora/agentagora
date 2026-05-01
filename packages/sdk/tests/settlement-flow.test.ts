@@ -13,19 +13,8 @@
 
 import { AuditEventTypes, ConversationStatuses } from "@agentagora/protocol";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
-import {
-  AgentAgoraClient,
-  type EscrowHandle,
-  type EscrowStatus,
-  InMemoryRegistry,
-  MockTransport,
-  type SettlementChannel,
-  capability,
-  createAgent,
-  generatePrivateKey,
-  publicKeyFrom,
-} from "../src/index.js";
+import type { EscrowHandle, EscrowStatus, SettlementChannel } from "../src/index.js";
+import { makeTwoAgentRig } from "./_fixtures.js";
 
 class FakeChannel implements SettlementChannel {
   readonly id: string;
@@ -71,69 +60,16 @@ class FakeChannel implements SettlementChannel {
   }
 }
 
-async function setup(channels?: SettlementChannel[]) {
-  const transport = new MockTransport();
-  const registry = new InMemoryRegistry();
-
-  const bobKey = generatePrivateKey();
-  const bobAgent = createAgent({
-    name: "echo",
-    namespace: "bob",
-    accepts: ["fake-fiat"],
-    capabilities: {
-      ping: capability({
-        input: z.object({ message: z.string() }),
-        output: z.object({ reply: z.string() }),
-        price: { amount: "0.50", currency: "USD" },
-        handler: ({ message }) => ({ reply: `pong: ${message}` }),
-      }),
-      crash: capability({
-        input: z.object({}),
-        output: z.object({ ok: z.boolean() }),
-        price: { amount: "0.50", currency: "USD" },
-        handler: () => {
-          throw new Error("intentional");
-        },
-      }),
-    },
-  });
-  registry.register(bobAgent.aid, await publicKeyFrom(bobKey));
-  await bobAgent.serve({
-    transport,
-    registry,
-    signingKey: bobKey,
-    signingKeyId: `${bobAgent.aid}#k1`,
-  });
-
-  const aliceKey = generatePrivateKey();
-  const aliceAid = "aid:agentagora:alice/orchestrator";
-  registry.register(aliceAid, await publicKeyFrom(aliceKey));
-
-  const aliceClient = new AgentAgoraClient({
-    token: "test",
-    transport,
-    registryResolver: registry,
-    fromAid: aliceAid,
-    signingKey: aliceKey,
-    signingKeyId: `${aliceAid}#k1`,
-    settlement: channels,
-  });
-
-  return { aliceClient, bobAgent, transport, registry };
-}
-
 describe("settlement integration — happy path", () => {
   it("escrow funded → captured; status=settled; snapshot has price+channel", async () => {
     const fake = new FakeChannel();
-    const { aliceClient, bobAgent } = await setup([fake]);
+    const { aliceClient, bobAgent } = await makeTwoAgentRig({ channels: [fake] });
 
     const conv = await aliceClient.callRich(
       bobAgent.aid,
       "ping",
       { message: "hi" },
-      {
-        pay: { amount: "0.50", currency: "USD" },
-      },
+      { pay: { amount: "0.50", currency: "USD" } },
     );
 
     expect(conv.status).toBe(ConversationStatuses.Settled);
@@ -159,15 +95,13 @@ describe("settlement integration — happy path", () => {
 describe("settlement integration — failure path", () => {
   it("escrow funded → refunded; status=cancelled; chain still verifies", async () => {
     const fake = new FakeChannel();
-    const { aliceClient, bobAgent } = await setup([fake]);
+    const { aliceClient, bobAgent } = await makeTwoAgentRig({ channels: [fake] });
 
     const conv = await aliceClient.callRich(
       bobAgent.aid,
       "crash",
       {},
-      {
-        pay: { amount: "0.50", currency: "USD" },
-      },
+      { pay: { amount: "0.50", currency: "USD" } },
     );
 
     expect(conv.status).toBe(ConversationStatuses.Cancelled);
@@ -189,7 +123,7 @@ describe("settlement integration — failure path", () => {
 describe("settlement integration — back-compat & errors", () => {
   it("call without options.pay does not invoke any channel", async () => {
     const fake = new FakeChannel();
-    const { aliceClient, bobAgent } = await setup([fake]);
+    const { aliceClient, bobAgent } = await makeTwoAgentRig({ channels: [fake] });
 
     const conv = await aliceClient.callRich(bobAgent.aid, "ping", { message: "hi" });
     expect(fake.events).toEqual([]);
@@ -199,15 +133,13 @@ describe("settlement integration — back-compat & errors", () => {
   });
 
   it("options.pay with no channels configured throws", async () => {
-    const { aliceClient, bobAgent } = await setup();
+    const { aliceClient, bobAgent } = await makeTwoAgentRig();
     await expect(
       aliceClient.callRich(
         bobAgent.aid,
         "ping",
         { message: "hi" },
-        {
-          pay: { amount: "0.50", currency: "USD" },
-        },
+        { pay: { amount: "0.50", currency: "USD" } },
       ),
     ).rejects.toThrow(/no SettlementChannel configured/);
   });
@@ -215,15 +147,13 @@ describe("settlement integration — back-compat & errors", () => {
   it("options.pay.channel selects the matching channel by id", async () => {
     const a = new FakeChannel("fake-fiat");
     const b = new FakeChannel("usdc-base");
-    const { aliceClient, bobAgent } = await setup([a, b]);
+    const { aliceClient, bobAgent } = await makeTwoAgentRig({ channels: [a, b] });
 
     await aliceClient.callRich(
       bobAgent.aid,
       "ping",
       { message: "hi" },
-      {
-        pay: { amount: "1.00", currency: "USD", channel: "usdc-base" },
-      },
+      { pay: { amount: "1.00", currency: "USD", channel: "usdc-base" } },
     );
     expect(a.events).toEqual([]);
     expect(b.events).toHaveLength(2);
@@ -231,15 +161,13 @@ describe("settlement integration — back-compat & errors", () => {
 
   it("options.pay.channel mismatch throws", async () => {
     const a = new FakeChannel("fake-fiat");
-    const { aliceClient, bobAgent } = await setup([a]);
+    const { aliceClient, bobAgent } = await makeTwoAgentRig({ channels: [a] });
     await expect(
       aliceClient.callRich(
         bobAgent.aid,
         "ping",
         { message: "hi" },
-        {
-          pay: { amount: "1.00", currency: "USD", channel: "usdc-base" },
-        },
+        { pay: { amount: "1.00", currency: "USD", channel: "usdc-base" } },
       ),
     ).rejects.toThrow(/matching id "usdc-base"/);
   });
