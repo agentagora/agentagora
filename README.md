@@ -70,6 +70,7 @@ Full rationale:
 ## Documentation
 
 - 🚩 [Manifesto](docs/manifesto.md) — what we believe and why ([中文](docs/manifesto.zh-CN.md))
+- 📣 [One-pager](docs/one-pager.md) — ready-to-paste pitches (tweet, thread, Show HN, cold email)
 - 📄 [Product Requirements Document (PRD)](docs/PRD.md) — vision, scope, 12-month roadmap
 - 🏗 [Tech Stack & Architecture](docs/tech-stack.md) — language, runtime, framework choices
 - 📋 [AAP Protocol Spec v0.1](docs/AAP-spec.md) — internal draft; public release at M6
