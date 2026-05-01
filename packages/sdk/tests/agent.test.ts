@@ -48,7 +48,7 @@ describe("createAgent", () => {
         }),
       },
     });
-    await expect(a.serve()).rejects.toThrow(/HTTP transport not yet implemented/);
+    await expect(a.serve()).rejects.toThrow(/registry/);
   });
 });
 

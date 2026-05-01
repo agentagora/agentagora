@@ -2,12 +2,12 @@
  * Transport abstraction.
  *
  * The wire-level transport is pluggable so that:
- *   - Tests can route messages in-memory (MockTransport, in tests/)
- *   - Production uses HTTP (HttpTransport — implemented in M1 task #7)
+ *   - Tests and demos route messages in-memory via MockTransport
+ *   - Production uses HttpTransport over fetch
  *   - Future runtimes can plug in (gRPC, WebSocket, etc.)
  *
  * v0.1 only requires request/response. Streaming progress events
- * use a separate `EventTransport` interface added in M1 task #6.
+ * use a separate `EventTransport` interface added in a later task.
  */
 
 import type { RpcRequestEnvelope, RpcResponseEnvelope } from "@agentagora/protocol";
@@ -17,21 +17,96 @@ export interface Transport {
    * Send a signed AAP request envelope to the responder identified
    * in `envelope.aap.to` and return the signed response envelope.
    *
-   * Resolves the target endpoint internally (via injected resolver
+   * The responder is resolved internally (via an injected resolver
    * or by caller-side resolution before calling).
    */
   send(envelope: RpcRequestEnvelope): Promise<RpcResponseEnvelope>;
 }
 
-export class HttpTransport implements Transport {
-  private readonly endpointResolver: (toAid: string) => Promise<string>;
+/**
+ * Resolves an AID to a network endpoint URL. For HttpTransport,
+ * this controls where outbound calls are addressed.
+ *
+ * In production, an HTTP-based resolver fetches the agent's manifest
+ * from the registry and returns its `endpoints.rpc`. For tests and
+ * demos, `StaticEndpointResolver` lets you wire endpoints directly.
+ */
+export interface EndpointResolver {
+  resolveEndpoint(aid: string): Promise<string>;
+}
 
-  constructor(options: { endpointResolver: (toAid: string) => Promise<string> }) {
-    this.endpointResolver = options.endpointResolver;
+/** Test- and demo-only resolver backed by a static map. */
+export class StaticEndpointResolver implements EndpointResolver {
+  private readonly endpoints: Map<string, string>;
+
+  constructor(initial: Record<string, string> = {}) {
+    this.endpoints = new Map(Object.entries(initial));
   }
 
-  async send(_envelope: RpcRequestEnvelope): Promise<RpcResponseEnvelope> {
-    throw new Error("HttpTransport.send — implemented in M1 task #7");
+  set(aid: string, url: string): void {
+    this.endpoints.set(aid, url);
+  }
+
+  async resolveEndpoint(aid: string): Promise<string> {
+    const url = this.endpoints.get(aid);
+    if (!url) {
+      throw new Error(`StaticEndpointResolver: no endpoint registered for ${aid}`);
+    }
+    return url;
+  }
+}
+
+export interface HttpTransportOptions {
+  endpointResolver: EndpointResolver;
+  /** Optional fetch override for tests. Defaults to global fetch. */
+  fetch?: typeof fetch;
+  /** Per-request timeout in ms. Default 30000. */
+  timeoutMs?: number;
+}
+
+/**
+ * Production transport. Delivers envelopes over HTTPS via the
+ * Web-standard `fetch` API (works on Node, Bun, Deno, Cloudflare
+ * Workers, and any runtime with a global `fetch`).
+ */
+export class HttpTransport implements Transport {
+  private readonly resolver: EndpointResolver;
+  private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+
+  constructor(options: HttpTransportOptions) {
+    this.resolver = options.endpointResolver;
+    this.fetchImpl = options.fetch ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 30_000;
+  }
+
+  async send(envelope: RpcRequestEnvelope): Promise<RpcResponseEnvelope> {
+    const url = await this.resolver.resolveEndpoint(envelope.aap.to);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify(envelope),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `HttpTransport.send: HTTP ${response.status} ${response.statusText} from ${url}`,
+      );
+    }
+    return (await response.json()) as RpcResponseEnvelope;
   }
 }
 

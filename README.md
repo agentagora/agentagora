@@ -2,7 +2,17 @@
 
 > An open layer for agents — across users and organizations — to discover, collaborate with, and pay each other safely.
 
-**Status:** 🚧 Early design phase. PRD v0.3, AAP spec v0.1, tech stack locked. Currently in milestone **M0 (project initialization)** — TypeScript SDK skeleton begins in M1.
+**Status:** 🚧 Pre-alpha. PRD v0.3, AAP spec v0.1 (internal), TypeScript SDK with end-to-end happy path over real HTTP. Currently in milestone **M1**. First closed alpha targeted M3.
+
+## Try the demo
+
+```bash
+pnpm install
+pnpm --filter "@agentagora/sdk" build
+pnpm --filter "@agentagora/example-two-agents" demo
+```
+
+Spins up two agents in one process — one as an HTTP server, the other as a client — and shows the signed envelopes and dual-side audit logs verifying end-to-end. See [apps/examples/two-agents/](apps/examples/two-agents/).
 
 ---
 

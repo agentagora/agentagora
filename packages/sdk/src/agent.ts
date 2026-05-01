@@ -91,21 +91,20 @@ export interface AgentOptions {
 }
 
 export interface ServeOptions {
-  /** HTTP host (real-transport mode only). */
-  host?: string;
-  /** HTTP port (real-transport mode only). */
-  port?: number;
-  /** Path prefix where AAP routes are mounted. Defaults to "/aap/v1". */
-  basePath?: string;
   /**
-   * Pluggable transport. Pass a `MockTransport` for in-memory tests.
-   * If omitted, the agent starts a real HTTP server (M1 task #7;
-   * currently unimplemented).
+   * Pluggable transport. If a `MockTransport` is provided, the agent
+   * registers itself as the handler for in-memory routing.
+   *
+   * If omitted, the agent enters "configured but not actively
+   * listening" mode — wire up an HTTP server yourself by passing
+   * `agent.fetchHandler()` to your runtime's HTTP server (e.g.
+   * `@hono/node-server`'s `serve`, `Bun.serve`, `Deno.serve`, or
+   * Cloudflare Workers' `export default { fetch: ... }`).
    */
   transport?: Transport;
   /**
-   * Resolver for verifying signatures on inbound envelopes. Required
-   * when `transport` is provided.
+   * Resolver for verifying signatures on inbound envelopes. Always
+   * required.
    */
   registry?: RegistryResolver;
   /** Ed25519 private key the agent uses to sign responses. Required. */
@@ -133,6 +132,12 @@ export interface Agent {
    * agent participated in. Returns undefined if unknown.
    */
   getAuditLog(conversationId: string): AuditLog | undefined;
+  /**
+   * Returns a Web-standard fetch handler that this agent can be served
+   * behind on any runtime that accepts one (Node via @hono/node-server,
+   * Bun, Deno, Cloudflare Workers).
+   */
+  fetchHandler(): (request: Request) => Promise<Response>;
 }
 
 interface ServeContext {
@@ -141,6 +146,14 @@ interface ServeContext {
   signingKey: Uint8Array;
   signingKeyId: string;
 }
+
+/** Sentinel transport used when an agent is configured for HTTP-only
+ *  inbound (no outbound transport needed on the agent side). */
+const noOpTransport: Transport = {
+  async send() {
+    throw new Error("Agent transport is not configured for outbound calls");
+  },
+};
 
 class AgentImpl implements Agent {
   readonly name: string;
@@ -171,23 +184,57 @@ class AgentImpl implements Agent {
 
   async serve(serveOptions: ServeOptions = {}): Promise<void> {
     const { transport, registry, signingKey, signingKeyId } = serveOptions;
+    if (!registry) {
+      throw new Error("Agent.serve: `registry` is required");
+    }
+    if (!signingKey || !signingKeyId) {
+      throw new Error("Agent.serve: `signingKey` and `signingKeyId` are required");
+    }
+    this.context = {
+      transport: transport ?? noOpTransport,
+      registry,
+      signingKey,
+      signingKeyId,
+    };
     if (transport) {
-      if (!registry) {
-        throw new Error("Agent.serve: `registry` is required when `transport` is provided");
-      }
-      if (!signingKey || !signingKeyId) {
-        throw new Error("Agent.serve: `signingKey` and `signingKeyId` are required");
-      }
-      this.context = { transport, registry, signingKey, signingKeyId };
-      // If the transport is a MockTransport (or any transport with
-      // registerAgent), wire ourselves in.
       const mock = transport as MockTransport;
       if (typeof mock.registerAgent === "function") {
         mock.registerAgent(this.aid, (env) => this.handle(env));
       }
-      return;
     }
-    throw new Error("Agent.serve: HTTP transport not yet implemented (M1 task #7)");
+  }
+
+  /**
+   * Returns a Web-standard fetch handler that this agent can be
+   * served behind on any runtime: Node (`@hono/node-server`'s
+   * `serve`), Bun (`Bun.serve`), Deno (`Deno.serve`), Cloudflare
+   * Workers (`export default { fetch: ... }`).
+   *
+   * The handler accepts POST requests with a JSON-encoded
+   * `RpcRequestEnvelope` body and returns a JSON `RpcResponseEnvelope`.
+   */
+  fetchHandler(): (request: Request) => Promise<Response> {
+    if (!this.context) {
+      throw new Error(`agent ${this.aid} is not serving — call serve() first`);
+    }
+    const handle = (env: RpcRequestEnvelope) => this.handle(env);
+    return async (request: Request): Promise<Response> => {
+      if (request.method === "GET") {
+        // Liveness ping for ops; no AAP semantics.
+        return Response.json({ aid: this.aid, ok: true });
+      }
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405 });
+      }
+      let envelope: RpcRequestEnvelope;
+      try {
+        envelope = (await request.json()) as RpcRequestEnvelope;
+      } catch {
+        return new Response("invalid JSON body", { status: 400 });
+      }
+      const response = await handle(envelope);
+      return Response.json(response);
+    };
   }
 
   async stop(): Promise<void> {
