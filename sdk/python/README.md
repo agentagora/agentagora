@@ -1,5 +1,7 @@
 # agentagora — Python SDK
 
+[![Python SDK CI](https://github.com/agentagora/agentagora/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/agentagora/agentagora/actions/workflows/python-sdk.yml)
+
 > Python SDK for the AgentAgora interop layer. Targets [AAP spec v0.1](../../docs/AAP-spec.md).
 
 **Status:** 🚧 Pre-alpha skeleton. Public types and the top-level
