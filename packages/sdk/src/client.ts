@@ -26,7 +26,7 @@ import { AuditLog } from "./audit.js";
 import type { ConversationSnapshot } from "./conversation.js";
 import { AAPError } from "./errors.js";
 import type { RegistryResolver } from "./registry.js";
-import type { SettlementChannel } from "./settlement/index.js";
+import type { EscrowHandle, SettlementChannel } from "./settlement/index.js";
 import { signEnvelope, verifyEnvelope } from "./signing.js";
 import type { Transport } from "./transport.js";
 
@@ -65,9 +65,21 @@ export interface AgentAgoraClientOptions {
 
 export interface CallOptions {
   timeoutMs?: number;
-  maxPrice?: string;
-  /** Force a specific settlement channel id. */
-  channel?: string;
+  /**
+   * If set, escrow funds via a configured SettlementChannel before
+   * invoking. On a successful response, capture is called; on failure,
+   * a refund is issued. Either way, audit events
+   * (`aap.escrow.funded` / `.captured` / `.refunded`) are written.
+   */
+  pay?: {
+    amount: string;
+    currency: string;
+    /**
+     * Restrict to a specific channel id (e.g., "stripe-fiat").
+     * If omitted, the first configured SettlementChannel is used.
+     */
+    channel?: string;
+  };
   onProgress?: (progress: { percent: number; message: string }) => void;
 }
 
@@ -136,7 +148,7 @@ export class AgentAgoraClient {
     aid: string,
     capabilityName: string,
     input: Record<string, unknown> = {},
-    _options: CallOptions = {},
+    options: CallOptions = {},
   ): Promise<ConversationSnapshot> {
     const transport = this.options.transport;
     const resolver = this.options.registryResolver;
@@ -150,6 +162,21 @@ export class AgentAgoraClient {
       throw new Error("AgentAgoraClient.call: `signingKey` and `signingKeyId` are required");
     }
     if (!fromAid) throw new Error("AgentAgoraClient.call: `fromAid` is required");
+
+    // Resolve settlement channel (optional — only when options.pay set).
+    let channel: SettlementChannel | undefined;
+    if (options.pay) {
+      const wantedId = options.pay.channel;
+      const candidates = this.options.settlement ?? [];
+      channel = wantedId ? candidates.find((c) => c.id === wantedId) : candidates[0];
+      if (!channel) {
+        throw new Error(
+          `AgentAgoraClient.call: options.pay set but no SettlementChannel configured${
+            wantedId ? ` matching id ${JSON.stringify(wantedId)}` : ""
+          }`,
+        );
+      }
+    }
 
     const conversationId = makeId("conv_");
     const requestId = makeId("req_");
@@ -165,6 +192,30 @@ export class AgentAgoraClient {
       keyId: signingKeyId,
       data: { responder: aid, capability: capabilityName },
     });
+
+    // Optional escrow funding — happens before invoke.
+    let escrowHandle: EscrowHandle | undefined;
+    if (channel && options.pay) {
+      escrowHandle = await channel.escrow({
+        payerAid: fromAid,
+        payeeAid: aid,
+        amount: options.pay.amount,
+        currency: options.pay.currency,
+        conversationId,
+      });
+      await writeEvent(log, {
+        type: AuditEventTypes.EscrowFunded,
+        actorAid: fromAid,
+        privateKey: signingKey,
+        keyId: signingKeyId,
+        data: {
+          channelId: channel.id,
+          escrowId: escrowHandle.escrowId,
+          amount: options.pay.amount,
+          currency: options.pay.currency,
+        },
+      });
+    }
 
     // Build, sign, send the request.
     const request: RpcRequestEnvelope = {
@@ -219,6 +270,39 @@ export class AgentAgoraClient {
       });
     }
 
+    // Settle the escrow based on outcome.
+    if (channel && escrowHandle) {
+      if (snapshotError) {
+        const refundTxId = await channel.refund(escrowHandle);
+        await writeEvent(log, {
+          type: AuditEventTypes.EscrowRefunded,
+          actorAid: fromAid,
+          privateKey: signingKey,
+          keyId: signingKeyId,
+          data: {
+            channelId: channel.id,
+            escrowId: escrowHandle.escrowId,
+            refundTxId,
+          },
+        });
+      } else {
+        const captureTxId = await channel.capture(escrowHandle);
+        // Once captured, the conversation is settled, not just archived.
+        status = ConversationStatuses.Settled;
+        await writeEvent(log, {
+          type: AuditEventTypes.EscrowCaptured,
+          actorAid: fromAid,
+          privateKey: signingKey,
+          keyId: signingKeyId,
+          data: {
+            channelId: channel.id,
+            escrowId: escrowHandle.escrowId,
+            captureTxId,
+          },
+        });
+      }
+    }
+
     // Audit: conversation archived (always, regardless of outcome).
     await writeEvent(log, {
       type: AuditEventTypes.ConversationArchived,
@@ -236,9 +320,9 @@ export class AgentAgoraClient {
       status,
       startedAt,
       endedAt: new Date(),
-      priceAmount: undefined,
-      currency: undefined,
-      channel: undefined,
+      priceAmount: options.pay?.amount,
+      currency: options.pay?.currency,
+      channel: channel?.id,
       result,
       error: snapshotError,
       audit: log,
