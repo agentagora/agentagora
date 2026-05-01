@@ -155,12 +155,43 @@ const noOpTransport: Transport = {
   },
 };
 
+/** Per AAP-spec §11.1 — receivers MUST reject envelopes outside this window. */
+const TIMESTAMP_PAST_TOLERANCE_MS = 5 * 60_000; // 5 minutes
+const TIMESTAMP_FUTURE_TOLERANCE_MS = 30_000; // 30 seconds
+
+/** Per AAP-spec §11.1 — nonce uniqueness is enforced per (conversation_id, from).
+ *  Old entries are pruned beyond TIMESTAMP_PAST_TOLERANCE_MS so memory stays bounded. */
+class NonceTracker {
+  private seen = new Map<string, number>();
+
+  check(envelope: RpcRequestEnvelope, nowMs: number): boolean {
+    this.prune(nowMs);
+    const key = `${envelope.aap.conversation_id}\x00${envelope.aap.from}\x00${envelope.aap.nonce}`;
+    if (this.seen.has(key)) return false;
+    this.seen.set(key, nowMs);
+    return true;
+  }
+
+  private prune(nowMs: number): void {
+    const cutoff = nowMs - TIMESTAMP_PAST_TOLERANCE_MS;
+    for (const [k, t] of this.seen) {
+      if (t < cutoff) this.seen.delete(k);
+    }
+  }
+
+  /** Test-only: reset state. Not exposed publicly. */
+  _reset(): void {
+    this.seen.clear();
+  }
+}
+
 class AgentImpl implements Agent {
   readonly name: string;
   readonly aid: string;
   readonly options: AgentOptions;
   private context: ServeContext | undefined;
   private readonly auditLogs = new Map<string, AuditLog>();
+  private readonly nonceTracker = new NonceTracker();
 
   constructor(options: AgentOptions) {
     this.name = options.name;
@@ -251,6 +282,40 @@ class AgentImpl implements Agent {
       throw new Error(`agent ${this.aid} is not serving`);
     }
     const { registry, signingKey, signingKeyId } = this.context;
+
+    // 0a. Timestamp window enforcement (spec §11.1).
+    const nowMs = Date.now();
+    const tsMs = Date.parse(envelope.aap.timestamp);
+    if (Number.isNaN(tsMs)) {
+      return await this.errorResponse(
+        envelope,
+        ErrorCodes.Unauthorized,
+        "invalid envelope timestamp",
+      );
+    }
+    if (tsMs < nowMs - TIMESTAMP_PAST_TOLERANCE_MS) {
+      return await this.errorResponse(
+        envelope,
+        ErrorCodes.Unauthorized,
+        `envelope timestamp too old (more than ${TIMESTAMP_PAST_TOLERANCE_MS / 1000}s in the past)`,
+      );
+    }
+    if (tsMs > nowMs + TIMESTAMP_FUTURE_TOLERANCE_MS) {
+      return await this.errorResponse(
+        envelope,
+        ErrorCodes.Unauthorized,
+        `envelope timestamp too far in the future (more than ${TIMESTAMP_FUTURE_TOLERANCE_MS / 1000}s)`,
+      );
+    }
+
+    // 0b. Nonce uniqueness enforcement (spec §11.1).
+    if (!this.nonceTracker.check(envelope, nowMs)) {
+      return await this.errorResponse(
+        envelope,
+        ErrorCodes.Unauthorized,
+        "nonce already seen for this conversation_id + sender (replay rejected)",
+      );
+    }
 
     // 1. Verify caller's signature.
     let senderKey: Uint8Array;
