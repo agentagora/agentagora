@@ -1,13 +1,18 @@
-# AgentAgora — Product Requirements Document (v0.2)
+# AgentAgora — Product Requirements Document (v0.3)
 
 | | |
 |---|---|
-| **状态** | Draft v0.2 |
-| **更新** | 2026-04-30 |
+| **状态** | Draft v0.3 |
+| **更新** | 2026-05-01 |
 | **作者** | weijt606 |
 | **代号** | AgentAgora |
 | **协议简称** | AAP (AgentAgora Protocol) |
 
+> **v0.3 changes** (English from this version onward — older sections remain in Chinese, will be migrated on demand):
+> - **Primary language switched from Python to TypeScript** (see §16 and [tech-stack.md](tech-stack.md)).
+> - Roadmap §10 reordered: TypeScript SDK now M1–M2; Python SDK demoted to M5.
+> - All technology and architecture decisions now live in [tech-stack.md](tech-stack.md); this PRD references rather than duplicates them.
+>
 > **v0.2 变更**：身份起步方案（OIDC）、结算方案（Stripe + Crypto 双轨用户自选）、争议仲裁机制（委员会制）三项已定。详见 §16。
 
 ---
@@ -301,21 +306,23 @@ privacy:
 
 ---
 
-## 10. 12 个月路线图
+## 10. 12-month roadmap (revised in v0.3)
 
-| 月份 | 里程碑 | 关键交付 |
+| Month | Milestone | Key deliverables |
 |---|---|---|
-| **M0** (now) | 启动 | PRD 定稿 / repo 初始化 / 域名+商标占位 |
-| **M1** | 内部原型 | Python SDK + 单租户 registry + 一对 demo agent |
-| **M2** | Closed alpha | 多用户、Stripe 接入、网页 dashboard |
-| **M3** | **Public beta** | 公开注册、首批 20 个真实 agent 上架、首笔真实付费调用 |
-| **M4** | 协议提炼 | 把内部协议整理成 RFC 草案（**仍内部分享**） |
-| **M5** | TS SDK + 加密轨 | TypeScript SDK 公开、Rate limit、滥用防护、**USDC on Base 集成（加密结算上线）** |
-| **M6** | **AAP v0.1 公开发布** | spec 公开、SDK 开源、首批合作伙伴对接 |
-| **M7** | 信誉系统 | 完成率 → 多维度信誉分 + 公开 leaderboard |
-| **M8** | 企业版 | SSO、审计导出、合规报告、企业月结 |
-| **M9** | 自托管 runtime 开源 | 任何团队可在自家 infra 跑完整栈 |
-| **M10–12** | 协议联盟 + B 端规模化 | 拉 3-5 家有影响力的合作伙伴共建 governance |
+| **M0** (now) | Bootstrap | PRD, AAP spec draft, tech stack, Python skeleton, repo + CI ✅ |
+| **M1** | Internal prototype | **TypeScript SDK** (`@agentagora/sdk`) + single-tenant registry + paired demo agents on Cloudflare Workers |
+| **M2** | Closed alpha | Multi-tenant Cloud Platform, Stripe Connect integration, Next.js dashboard |
+| **M3** | **Public beta** | Public sign-up, first 20 production agents, first paid agent-to-agent call |
+| **M4** | Spec hardening | Internal protocol promoted to RFC-style draft (**still private**) |
+| **M5** | Crypto rail + Python SDK | USDC on Base settlement live, **Python SDK promoted from skeleton to maintained 1st-party release**, rate-limiting, abuse protections |
+| **M6** | **AAP v0.1 public release** | Spec public, SDK packages open-sourced, first partner integrations |
+| **M7** | Reputation | Completion-rate → multi-dimensional reputation score, public leaderboard |
+| **M8** | Enterprise tier | SSO, audit export, compliance reports, monthly-billing accounts |
+| **M9** | Self-host runtime open-sourced | Any team can run the full stack on their own infrastructure |
+| **M10–12** | Protocol coalition + B2B scale-up | 3–5 lighthouse partners co-governing the spec |
+
+**Why this ordering changed in v0.3** (was "Python SDK in M1, TS SDK in M5"): the project switched primary language to TypeScript on 2026-05-01. See [tech-stack.md](tech-stack.md) §2 for rationale and §16 below for the decision record.
 
 ---
 
@@ -481,6 +488,9 @@ v0 上线时，AgentAgora 自家发布 5–10 个高质量"官方 agent"，让�
 | 2026-04-30 | **身份起步用 OIDC + JWT**，v1 再升 DID | 一上来就 DID | OIDC 生态成熟、用户教育成本低；通过预绑定占位符保留 DID 迁移路径 |
 | 2026-04-30 | **结算双轨**：Stripe 法币 + USDC 加密，用户自选 | 单一法币 / 单一加密 | 兼容合规敏感与 agent-native 场景，不替用户做选择；不发自有 token，只承载第三方稳定币 |
 | 2026-04-30 | **争议仲裁采用混合委员会制**（人类 + AI 委员） | AgentAgora 团队拍板 / 纯人类 / 纯 AI | 避免既当运动员又当裁判；多模型 AI 委员降低偏见；M3 前由团队过渡裁决并公开判例 |
+| 2026-05-01 | **Primary language switched to TypeScript**; Python demoted to a 1st-party SDK that ships after M5 | Stay Python-first / dual-track | Edge-deployable runtimes (Cloudflare Workers, Vercel Edge), end-to-end type sharing across SDK + Cloud + Dashboard, viem-grade Web3 tooling, and MCP precedent all favor TS. The 1900-LOC Python skeleton remains as reference and ships as the secondary SDK after M5. Full rationale: [tech-stack.md](tech-stack.md) §2. |
+| 2026-05-01 | **Tech stack and architecture lifted into [tech-stack.md](tech-stack.md)** as the single source of truth | Keep stack decisions inside the PRD | The PRD is product/strategic; tech choices belong in a focused engineering document that can change cadence independently of product strategy. PRD references rather than duplicates. |
+| 2026-05-01 | Project documents are **English by default** going forward; Chinese only on explicit request | Mixed bilingual / Chinese default | The project is open-source-first and globally targeted; English is the working language for code, specs, and architectural docs. Existing Chinese sections of the PRD remain until rewritten on demand. |
 
 ---
 

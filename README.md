@@ -2,7 +2,7 @@
 
 > An open layer for agents — across users and organizations — to discover, collaborate with, and pay each other safely.
 
-**Status:** 🚧 Early design phase. PRD v0.2 published. No code yet — currently in milestone **M0 (project initialization)**.
+**Status:** 🚧 Early design phase. PRD v0.3, AAP spec v0.1, tech stack locked. Currently in milestone **M0 (project initialization)** — TypeScript SDK skeleton begins in M1.
 
 ---
 
@@ -49,25 +49,31 @@ Calls flow **peer-to-peer** between agents; the Cloud is on the control plane (d
 
 ---
 
-## Key design decisions (v0.2)
+## Key design decisions
 
 | Decision | Choice |
 |---|---|
+| **Primary language** | **TypeScript** (≥ 5.5), runtime-agnostic (Node, Bun, Deno, Cloudflare Workers) |
+| Secondary language | Python (≥ 3.10), 1st-party SDK after M5 |
 | Identity | OIDC + JWT in v0; W3C DID/VC in v1 (with migration path) |
 | Settlement | **Dual-rail, user-chosen**: Stripe (fiat) + USDC on Base (crypto) |
 | Arbitration | **Mixed council**: human + AI jurors (multi-model), public rulings |
 | Token | **No native token**. Third-party stablecoins only. |
 | First vertical | Software teams (M3 public beta) |
 
-See [docs/PRD.md](docs/PRD.md) for the full rationale.
+Full rationale:
+- [docs/PRD.md](docs/PRD.md) — product vision and roadmap
+- [docs/tech-stack.md](docs/tech-stack.md) — technology and architecture decisions
 
 ---
 
 ## Documentation
 
-- 📄 [Product Requirements Document (PRD)](docs/PRD.md) — vision, scope, architecture, 12-month roadmap
-- 📋 AAP Protocol Spec — *coming in M4*
-- 🛠 SDK API Design — *coming in M1*
+- 📄 [Product Requirements Document (PRD)](docs/PRD.md) — vision, scope, 12-month roadmap
+- 🏗 [Tech Stack & Architecture](docs/tech-stack.md) — language, runtime, framework choices
+- 📋 [AAP Protocol Spec v0.1](docs/AAP-spec.md) — internal draft; public release at M6
+- 🛠 [SDK API Design (Python — secondary)](docs/sdk-api-python.md) — original Python-first design, kept as reference
+- 🛠 TypeScript SDK API Design — *coming in M1, will become canonical*
 
 ---
 
@@ -75,10 +81,11 @@ See [docs/PRD.md](docs/PRD.md) for the full rationale.
 
 | Phase | Milestone |
 |---|---|
-| **M0** | Project init, PRD, repo skeleton ✅ in progress |
-| **M1–M2** | Python SDK + closed alpha + Stripe integration |
+| **M0** | Project init, PRD, AAP spec draft, tech stack, Python skeleton ✅ |
+| **M1–M2** | TypeScript SDK + closed alpha + Stripe integration |
 | **M3** | Public beta — first paid agent-to-agent call |
-| **M4–M6** | TS SDK, USDC on Base, **AAP v0.1 spec public release** |
+| **M4–M6** | USDC on Base, **AAP v0.1 spec public release** |
+| **M5** | Python SDK promoted to maintained release |
 | **M7–M9** | Reputation system, enterprise tier, self-host runtime open-source |
 | **M10–M12** | Protocol governance, B2B scale-up |
 

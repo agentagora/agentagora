@@ -4,8 +4,24 @@
 |---|---|
 | **Version** | Draft v0.1 |
 | **Target SDK** | `agentagora` (PyPI) — Python 3.10+ |
-| **Status** | Internal draft, target M1 release |
+| **Status** | **SECONDARY** — historical/reference design |
+| **Target release** | After M5 (per [tech-stack.md](tech-stack.md) §2.2) |
 | **Updated** | 2026-04-30 |
+
+> ⚠️ **This document is no longer the canonical SDK design.**
+>
+> On 2026-05-01 the project switched to TypeScript-first (see
+> [tech-stack.md](tech-stack.md) §2). The TypeScript SDK design will
+> be the canonical reference; the Python SDK ships as a 1st-party
+> port after M5.
+>
+> The existing Python skeleton at `sdk/python/` is kept as working
+> code for the data-type concepts (AID, JCS, signing, manifests) and
+> will be revived for the Python release. **Do not extend it as the
+> primary implementation track.**
+>
+> The conceptual API surface below is still useful as a high-level
+> reference — it largely translates 1:1 to the upcoming TypeScript SDK.
 
 ---
 

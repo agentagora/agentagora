@@ -1,11 +1,19 @@
-# agentagora — Python SDK
+# agentagora — Python SDK (secondary)
 
 [![Python SDK CI](https://github.com/agentagora/agentagora/actions/workflows/python-sdk.yml/badge.svg)](https://github.com/agentagora/agentagora/actions/workflows/python-sdk.yml)
 
 > Python SDK for the AgentAgora interop layer. Targets [AAP spec v0.1](../../docs/AAP-spec.md).
 
-**Status:** 🚧 Pre-alpha skeleton. Public types and the top-level
-`AgentAgoraClient` surface are stable; method bodies land in M1.
+> ⚠️ **Status: SECONDARY.** As of 2026-05-01 the project is
+> TypeScript-first (see [docs/tech-stack.md](../../docs/tech-stack.md)
+> §2). This Python skeleton is preserved for the working data-type
+> code (AID parsing, JCS canonicalization, Ed25519 signing, Pydantic
+> manifest models) and will be revived as a 1st-party SDK release
+> **after M5**.
+>
+> **Do not invest new feature work here until the TypeScript SDK
+> reaches M3.** The 33-test suite continues to run in CI to keep the
+> existing code regression-free.
 
 ```bash
 pip install -e .[dev]
@@ -37,7 +45,7 @@ result = await client.call(
 )
 ```
 
-The full design is in [docs/sdk-api.md](../../docs/sdk-api.md).
+The full design is in [docs/sdk-api-python.md](../../docs/sdk-api-python.md) (now marked secondary; canonical SDK design moves to TypeScript per [docs/tech-stack.md](../../docs/tech-stack.md)).
 
 ## Layout
 
