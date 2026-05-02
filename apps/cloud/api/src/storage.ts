@@ -14,8 +14,14 @@ export interface AgentRecord {
   identityJwt: string;
   /** ISO 8601 timestamp of first publish (or last update). */
   publishedAt: string;
-  /** Owner identifier. Mock for v0; real OIDC subject in Phase 3. */
+  /** Owner identifier resolved from the bearer token. */
   publishedBy: string;
+  /**
+   * Ed25519 public key (base64url, 32 raw bytes) bound to this AID
+   * on first publish. Updates must produce a signature that verifies
+   * against this key — TOFU pin defends against bearer-token leaks.
+   */
+  pubkey: string;
 }
 
 export interface SearchFilter {

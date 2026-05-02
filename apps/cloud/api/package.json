@@ -15,6 +15,9 @@
   "dependencies": {
     "@agentagora/protocol": "workspace:*",
     "@hono/zod-validator": "^0.4.2",
+    "@noble/ed25519": "^2.2.3",
+    "@noble/hashes": "^1.7.0",
+    "canonicalize": "^2.0.0",
     "hono": "^4.6.13"
   },
   "devDependencies": {

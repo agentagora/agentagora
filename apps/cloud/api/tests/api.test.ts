@@ -7,10 +7,11 @@
  * no test-order coupling.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { StaticOwnerAuth } from "../src/auth.js";
 import { createApi } from "../src/index.js";
 import { InMemoryStorage } from "../src/storage.js";
+import { type SigningKey, generateSigningKey, signManifest } from "./_signing.js";
 
 const validManifest = {
   manifest_version: 1 as const,
@@ -31,6 +32,12 @@ const validManifest = {
 const ALICE_TOKEN = "tok-alice";
 const BOB_TOKEN = "tok-bob";
 
+let aliceKey: SigningKey;
+
+beforeAll(async () => {
+  aliceKey = await generateSigningKey(1);
+});
+
 function setup() {
   const storage = new InMemoryStorage();
   const ownerAuth = new StaticOwnerAuth({
@@ -46,11 +53,14 @@ async function postJson(
   body: unknown,
   token = ALICE_TOKEN,
 ) {
+  const { pubkey, signature } = await signManifest(body, aliceKey);
   return app.request(path, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${token}`,
+      "x-aap-pubkey": pubkey,
+      "x-aap-signature": signature,
     },
     body: JSON.stringify(body),
   });

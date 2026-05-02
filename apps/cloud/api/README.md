@@ -18,13 +18,25 @@ All requests/responses are JSON. Manifest validation uses the canonical Zod sche
 
 ## Auth (closed alpha)
 
-`POST /v1/agents` requires `Authorization: Bearer <token>`. Tokens are pre-issued via the `OWNER_TOKENS` Worker secret:
+`POST /v1/agents` requires three things per request:
 
-```
-OWNER_TOKENS="alice:tok-A1,bob:tok-B2"
-```
+1. `Authorization: Bearer <token>` — resolved against `OWNER_TOKENS`, format `<ownerId>:<token>,<ownerId>:<token>,...`
+2. `X-AAP-Pubkey: <base64url>` — the publisher's 32-byte Ed25519 public key
+3. `X-AAP-Signature: <base64url>` — Ed25519 signature over the RFC 8785 (JCS) canonical bytes of the JSON body
 
-Each comma-separated pair is `<ownerId>:<token>`. The resolved owner ID becomes the manifest's `published_by` — and updates to an existing AID are restricted to the same owner (cross-owner publish ⇒ `403`). Real OIDC issuance lands in task #4; the route shape stays the same.
+Three rejection paths:
+
+| Failure | Status |
+|---|---|
+| Missing/invalid bearer | `401 unauthorized` |
+| Pubkey/signature header missing or malformed | `400 missing_signature` / `400 malformed_signature` |
+| Signature does not verify | `401 unauthorized` |
+| Bearer is valid but a different owner already published this AID | `403 forbidden` |
+| Same owner re-publishes with a different signing key (TOFU pin) | `403 forbidden` |
+
+The pubkey is bound to the AID on first publish; subsequent updates must produce a signature that verifies against the same key. This is defence in depth: even if a bearer token leaks, the attacker also needs the private signing key.
+
+Real OIDC issuance (task #4) replaces the bearer scheme without changing the route shape.
 
 ```bash
 pnpm --filter @agentagora/cloud-api exec wrangler secret put OWNER_TOKENS
@@ -47,19 +59,13 @@ pnpm --filter @agentagora/cloud-api check # bundle dry-run
 - **`Storage` interface** — `D1Storage` (production) or `InMemoryStorage` (no binding / unit tests)
 - Same SDK-side bundle-budget rules apply: web standards only, no Node-specific imports
 
-## D1 setup (one-time, before first deploy)
+## Deploy
+
+End-to-end provisioning (D1, secrets, smoke test, rollback) lives in [DEPLOY.md](./DEPLOY.md). Day-to-day:
 
 ```bash
-# Provision the production database; paste the printed UUID into
-# wrangler.jsonc → d1_databases[0].database_id.
-pnpm --filter @agentagora/cloud-api exec wrangler d1 create agentagora-cloud
-
-# Apply migrations.
-pnpm --filter @agentagora/cloud-api exec wrangler d1 migrations apply DB --local   # for `wrangler dev`
-pnpm --filter @agentagora/cloud-api exec wrangler d1 migrations apply DB --remote  # for production
+pnpm --filter @agentagora/cloud-api deploy
 ```
-
-Schema lives in `migrations/`. Add new migrations as `migrations/000N_*.sql`; wrangler tracks applied versions in a metadata table.
 
 ## What's NOT in v0.0.2
 
@@ -67,12 +73,3 @@ Schema lives in `migrations/`. Add new migrations as `migrations/000N_*.sql`; wr
 - **Manifest signature verification** — task #3.
 - **Dispute / settlement / audit-ingest** endpoints — designed but not implemented; see top of `src/index.ts` for the planned routes.
 - **Rate limiting / Sybil resistance** — Phase 3.
-
-## Deploy
-
-```bash
-wrangler login
-pnpm --filter @agentagora/cloud-api deploy
-```
-
-Add R2 / KV bindings + secrets (`STRIPE_SECRET_KEY`, `OIDC_JWT_SIGNING_KEY`) to `wrangler.jsonc` before opening to public traffic.

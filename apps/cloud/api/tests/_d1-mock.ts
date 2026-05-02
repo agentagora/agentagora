@@ -11,7 +11,7 @@
  * D1Database binding from `@cloudflare/workers-types`.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +26,7 @@ type StatementSync = import("node:sqlite").StatementSync;
 type DatabaseSyncT = import("node:sqlite").DatabaseSync;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATION_PATH = resolve(__dirname, "../migrations/0001_init.sql");
+const MIGRATIONS_DIR = resolve(__dirname, "../migrations");
 
 class MockPreparedStatement {
   private boundParams: unknown[] = [];
@@ -72,13 +72,16 @@ class MockD1Database {
 }
 
 /**
- * Build a fresh in-memory D1-shaped database with the registry schema
- * applied. Returned as `D1Database` so it drops into D1Storage typing
- * with no casts at the call site.
+ * Build a fresh in-memory D1-shaped database with every migration
+ * applied in order. Returned as `D1Database` so it drops into
+ * D1Storage typing with no casts at the call site.
  */
 export function createMockD1(): D1Database {
   const raw = new DatabaseSync(":memory:");
-  const sql = readFileSync(MIGRATION_PATH, "utf8");
-  raw.exec(sql);
+  for (const file of readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
+    raw.exec(readFileSync(resolve(MIGRATIONS_DIR, file), "utf8"));
+  }
   return new MockD1Database(raw) as unknown as D1Database;
 }

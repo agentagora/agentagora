@@ -12,6 +12,7 @@
 
 import { ManifestSchema } from "@agentagora/protocol";
 import { Hono } from "hono";
+import { b64uDecode, canonicalizeJsonBytes, verifyEd25519 } from "../_crypto.js";
 import type { OwnerAuthenticator } from "../auth.js";
 import type { AgentRecord, Storage } from "../storage.js";
 
@@ -23,8 +24,10 @@ interface RouterDeps {
 export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
   const router = new Hono();
 
-  // Publish or update a manifest. Requires a bearer token; updates
-  // are restricted to the owner that originally published the AID.
+  // Publish or update a manifest. Three checks, in order:
+  //   1. Bearer token resolves to an owner          → 401 if not
+  //   2. Detached Ed25519 signature verifies        → 401 if not
+  //   3. Owner + pubkey match the existing record   → 403 if not
   router.post("/", async (c) => {
     const token = extractBearer(c.req.header("authorization"));
     if (!token) {
@@ -35,23 +38,83 @@ export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
       return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
     }
 
-    // Validate body explicitly so we can short-circuit on auth before
-    // accepting/rejecting the manifest payload.
-    const parsed = ManifestSchema.safeParse(await c.req.json().catch(() => null));
+    const pubkeyHeader = c.req.header("x-aap-pubkey");
+    const sigHeader = c.req.header("x-aap-signature");
+    if (!pubkeyHeader || !sigHeader) {
+      return c.json(
+        {
+          error: "missing_signature",
+          message: "X-AAP-Pubkey and X-AAP-Signature headers are required",
+        },
+        400,
+      );
+    }
+    let pubkeyBytes: Uint8Array;
+    let sigBytes: Uint8Array;
+    try {
+      pubkeyBytes = b64uDecode(pubkeyHeader);
+      sigBytes = b64uDecode(sigHeader);
+    } catch {
+      return c.json(
+        { error: "malformed_signature", message: "pubkey/signature must be base64url" },
+        400,
+      );
+    }
+    if (pubkeyBytes.length !== 32 || sigBytes.length !== 64) {
+      return c.json(
+        {
+          error: "malformed_signature",
+          message: "expected 32-byte Ed25519 public key and 64-byte signature",
+        },
+        400,
+      );
+    }
+
+    const raw = await c.req.json().catch(() => null);
+    if (raw === null || typeof raw !== "object") {
+      return c.json({ error: "invalid_manifest", message: "body must be a JSON object" }, 400);
+    }
+
+    // Verify the signature against the JSON the client actually posted,
+    // before applying any Zod transforms / defaults — the client and
+    // server must canonicalize exactly the same value.
+    let canonical: Uint8Array;
+    try {
+      canonical = canonicalizeJsonBytes(raw);
+    } catch (err) {
+      return c.json({ error: "noncanonical_manifest", message: (err as Error).message }, 400);
+    }
+    const sigOk = await verifyEd25519(sigBytes, canonical, pubkeyBytes);
+    if (!sigOk) {
+      return c.json({ error: "unauthorized", message: "manifest signature does not verify" }, 401);
+    }
+
+    const parsed = ManifestSchema.safeParse(raw);
     if (!parsed.success) {
       return c.json({ error: "invalid_manifest", issues: parsed.error.issues }, 400);
     }
     const manifest = parsed.data;
 
     const existing = await storage.getAgent(manifest.aid);
-    if (existing && existing.publishedBy !== ownerId) {
-      return c.json(
-        {
-          error: "forbidden",
-          message: `aid ${manifest.aid} is owned by a different account`,
-        },
-        403,
-      );
+    if (existing) {
+      if (existing.publishedBy !== ownerId) {
+        return c.json(
+          {
+            error: "forbidden",
+            message: `aid ${manifest.aid} is owned by a different account`,
+          },
+          403,
+        );
+      }
+      if (existing.pubkey && existing.pubkey !== pubkeyHeader) {
+        return c.json(
+          {
+            error: "forbidden",
+            message: `aid ${manifest.aid} is pinned to a different signing key`,
+          },
+          403,
+        );
+      }
     }
 
     const record: AgentRecord = {
@@ -60,6 +123,7 @@ export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
       identityJwt: `mock.jwt.${manifest.aid.replace(/[:/]/g, "_")}`,
       publishedAt: new Date().toISOString(),
       publishedBy: ownerId,
+      pubkey: pubkeyHeader,
     };
     await storage.putAgent(record);
     return c.json(
@@ -68,6 +132,7 @@ export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
         identity_jwt: record.identityJwt,
         published_at: record.publishedAt,
         published_by: record.publishedBy,
+        pubkey: record.pubkey,
       },
       201,
     );

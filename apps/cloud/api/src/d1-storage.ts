@@ -14,9 +14,10 @@ interface AgentRow {
   identity_jwt: string;
   published_at: string;
   published_by: string;
+  pubkey: string;
 }
 
-const SELECT_COLS = "manifest, identity_jwt, published_at, published_by";
+const SELECT_COLS = "manifest, identity_jwt, published_at, published_by, pubkey";
 
 export class D1Storage implements Storage {
   constructor(private readonly db: D1Database) {}
@@ -32,13 +33,14 @@ export class D1Storage implements Storage {
   async putAgent(record: AgentRecord): Promise<void> {
     await this.db
       .prepare(
-        `INSERT INTO agents (aid, manifest, identity_jwt, published_at, published_by)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO agents (aid, manifest, identity_jwt, published_at, published_by, pubkey)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(aid) DO UPDATE SET
            manifest     = excluded.manifest,
            identity_jwt = excluded.identity_jwt,
            published_at = excluded.published_at,
-           published_by = excluded.published_by`,
+           published_by = excluded.published_by,
+           pubkey       = excluded.pubkey`,
       )
       .bind(
         record.manifest.aid,
@@ -46,6 +48,7 @@ export class D1Storage implements Storage {
         record.identityJwt,
         record.publishedAt,
         record.publishedBy,
+        record.pubkey,
       )
       .run();
   }
@@ -106,5 +109,6 @@ function rowToRecord(row: AgentRow): AgentRecord {
     identityJwt: row.identity_jwt,
     publishedAt: row.published_at,
     publishedBy: row.published_by,
+    pubkey: row.pubkey,
   };
 }

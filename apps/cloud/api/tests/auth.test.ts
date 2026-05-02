@@ -10,10 +10,11 @@
  * Also exercises parseOwnerTokens to lock the env-string format.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { StaticOwnerAuth, parseOwnerTokens } from "../src/auth.js";
 import { createApi } from "../src/index.js";
 import { InMemoryStorage } from "../src/storage.js";
+import { type SigningKey, generateSigningKey, signManifest } from "./_signing.js";
 
 const validManifest = {
   manifest_version: 1 as const,
@@ -31,6 +32,12 @@ const validManifest = {
   ],
 };
 
+let aliceKey: SigningKey;
+
+beforeAll(async () => {
+  aliceKey = await generateSigningKey(1);
+});
+
 function setup() {
   const storage = new InMemoryStorage();
   const ownerAuth = new StaticOwnerAuth({ "tok-alice": "alice", "tok-bob": "bob" });
@@ -41,9 +48,13 @@ async function publish(
   app: ReturnType<typeof createApi>,
   body: unknown,
   token: string | undefined,
+  key: SigningKey = aliceKey,
 ) {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (token !== undefined) headers.authorization = `Bearer ${token}`;
+  const { pubkey, signature } = await signManifest(body, key);
+  headers["x-aap-pubkey"] = pubkey;
+  headers["x-aap-signature"] = signature;
   return app.request("/v1/agents", {
     method: "POST",
     headers,

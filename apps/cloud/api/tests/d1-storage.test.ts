@@ -42,6 +42,7 @@ function record(
     identityJwt: `mock.jwt.${aid.replace(/[:/]/g, "_")}`,
     publishedAt,
     publishedBy: "anonymous",
+    pubkey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   };
 }
 
