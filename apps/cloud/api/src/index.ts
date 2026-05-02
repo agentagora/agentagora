@@ -21,15 +21,17 @@
  */
 
 import { Hono } from "hono";
+import { D1Storage } from "./d1-storage.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
 
 /**
- * Worker bindings. Empty in v0.0.1 — Phase 3 will add:
- *   DB: D1Database, AUDIT: R2Bucket, NONCE: KVNamespace,
- *   OIDC_KEY: string (JWT signing key).
+ * Worker bindings. `DB` lands in v0.0.2 (D1 registry persistence).
+ * Phase 3 still adds: AUDIT (R2), NONCE (KV), OIDC_KEY (secret).
  */
-export type Env = Record<string, never>;
+export interface Env {
+  DB?: D1Database;
+}
 
 export interface CreateApiOptions {
   /** Pluggable storage. Defaults to InMemoryStorage (per-isolate). */
@@ -47,7 +49,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   app.get("/", (c) =>
     c.json({
       name: "AgentAgora Cloud API",
-      version: "0.0.1",
+      version: "0.0.2",
       status: "pre-alpha",
       docs: "https://github.com/agentagora/agentagora/tree/main/docs",
     }),
@@ -67,14 +69,18 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   return app;
 }
 
-// Workers fetch handler. Storage is per-isolate (in-memory) until D1
-// binding lands; once bound, the cached app is replaced with one
-// holding D1Storage.
+// Workers fetch handler. The app is cached per isolate; storage is
+// chosen once based on whether the D1 binding is present (production)
+// or absent (e.g. unit tests, dry-run deploy without bindings, local
+// dev before `wrangler d1 create`).
 let cached: Hono | undefined;
 
 export default {
-  async fetch(request: Request, _env: Env): Promise<Response> {
-    if (!cached) cached = createApi();
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (!cached) {
+      const storage: Storage = env.DB ? new D1Storage(env.DB) : new InMemoryStorage();
+      cached = createApi({ storage });
+    }
     return cached.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

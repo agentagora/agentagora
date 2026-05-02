@@ -45,9 +45,10 @@ describe("metadata + healthz", () => {
     const { app } = setup();
     const res = await app.request("/");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { name: string; status: string };
+    const body = (await res.json()) as { name: string; status: string; version: string };
     expect(body.name).toBe("AgentAgora Cloud API");
     expect(body.status).toBe("pre-alpha");
+    expect(body.version).toBe("0.0.2");
   });
 
   it("GET /healthz returns ok", async () => {

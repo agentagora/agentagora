@@ -5,9 +5,20 @@
   "compatibility_date": "2026-04-01",
   "observability": {
     "enabled": true
-  }
-  // Future bindings (not enabled until Phase 3):
-  //   - D1 database for agent registry persistence
+  },
+  // Local dev / preview seeds against the local SQLite under
+  // .wrangler/state. Production binds to the real D1 instance after
+  // running `wrangler d1 create agentagora-cloud` and pasting the
+  // returned UUID into `database_id` below.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agentagora-cloud",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+  // Phase-3 bindings still pending:
   //   - R2 bucket for long-term audit log storage
   //   - KV namespace for nonce tracker / hot manifest cache
   //   - secrets: STRIPE_SECRET_KEY, OIDC_JWT_SIGNING_KEY

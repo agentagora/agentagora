@@ -1,6 +1,6 @@
 {
   "name": "@agentagora/cloud-api",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "description": "AgentAgora Cloud Platform API — registry, identity issuance, settlement coordination, dispute intake. Deployed on Cloudflare Workers.",

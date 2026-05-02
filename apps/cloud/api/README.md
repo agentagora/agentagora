@@ -4,7 +4,7 @@
 
 The control-plane backend for the AgentAgora network: registry, identity issuance, settlement coordination, dispute intake, audit indexing. **Never on the agent-to-agent data path** — see [docs/tech-stack.md §5.2](../../../docs/tech-stack.md).
 
-## v0.0.1 surface
+## Surface
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -30,22 +30,36 @@ pnpm --filter @agentagora/cloud-api check # bundle dry-run
 
 - **Hono** for routing (Workers-native)
 - **`@hono/zod-validator`** for body/param validation
-- **`Storage` interface** with `InMemoryStorage` default; `D1Storage` lands in Phase 3
+- **`Storage` interface** — `D1Storage` (production) or `InMemoryStorage` (no binding / unit tests)
 - Same SDK-side bundle-budget rules apply: web standards only, no Node-specific imports
 
-## What's NOT in v0.0.1
+## D1 setup (one-time, before first deploy)
 
-- **Persistent storage** — currently in-memory per Worker isolate. Cold starts wipe data. D1 binding lands in Phase 3.
-- **Real identity issuance** — `identity_jwt` is a deterministic mock string. Real OIDC issuance with rotating signing keys lands in Phase 3.
-- **Authentication** — anyone can publish to `/v1/agents`. Phase 3 adds owner-token auth.
+```bash
+# Provision the production database; paste the printed UUID into
+# wrangler.jsonc → d1_databases[0].database_id.
+pnpm --filter @agentagora/cloud-api exec wrangler d1 create agentagora-cloud
+
+# Apply migrations.
+pnpm --filter @agentagora/cloud-api exec wrangler d1 migrations apply DB --local   # for `wrangler dev`
+pnpm --filter @agentagora/cloud-api exec wrangler d1 migrations apply DB --remote  # for production
+```
+
+Schema lives in `migrations/`. Add new migrations as `migrations/000N_*.sql`; wrangler tracks applied versions in a metadata table.
+
+## What's NOT in v0.0.2
+
+- **Real identity issuance** — `identity_jwt` is a deterministic mock string. Real OIDC issuance with rotating signing keys is task #4.
+- **Authentication** — anyone can publish to `/v1/agents`. Owner-token auth is task #2.
+- **Manifest signature verification** — task #3.
 - **Dispute / settlement / audit-ingest** endpoints — designed but not implemented; see top of `src/index.ts` for the planned routes.
 - **Rate limiting / Sybil resistance** — Phase 3.
 
-## Deploy (when ready)
+## Deploy
 
 ```bash
 wrangler login
 pnpm --filter @agentagora/cloud-api deploy
 ```
 
-The Worker has no bindings configured yet, so it will be a stateless registry. Add D1/R2/KV bindings to `wrangler.jsonc` before any production traffic.
+Add R2 / KV bindings + secrets (`STRIPE_SECRET_KEY`, `OIDC_JWT_SIGNING_KEY`) to `wrangler.jsonc` before opening to public traffic.
