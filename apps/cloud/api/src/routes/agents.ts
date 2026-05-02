@@ -14,14 +14,18 @@ import { ManifestSchema } from "@agentagora/protocol";
 import { Hono } from "hono";
 import { b64uDecode, canonicalizeJsonBytes, verifyEd25519 } from "../_crypto.js";
 import type { OwnerAuthenticator } from "../auth.js";
+import type { OidcIssuer } from "../oidc.js";
 import type { AgentRecord, Storage } from "../storage.js";
 
 interface RouterDeps {
   storage: Storage;
   ownerAuth: OwnerAuthenticator;
+  /** When absent, the route falls back to a deterministic mock JWT
+   *  (dev/test convenience; production must always wire an issuer). */
+  oidc?: OidcIssuer;
 }
 
-export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
+export function createAgentsRouter({ storage, ownerAuth, oidc }: RouterDeps): Hono {
   const router = new Hono();
 
   // Publish or update a manifest. Three checks, in order:
@@ -117,10 +121,13 @@ export function createAgentsRouter({ storage, ownerAuth }: RouterDeps): Hono {
       }
     }
 
+    const identityJwt = oidc
+      ? await oidc.issue({ manifest, ownerId, publisherPubkey: pubkeyHeader })
+      : `mock.jwt.${manifest.aid.replace(/[:/]/g, "_")}`;
+
     const record: AgentRecord = {
       manifest,
-      // Mock JWT until task #4 wires real OIDC issuance.
-      identityJwt: `mock.jwt.${manifest.aid.replace(/[:/]/g, "_")}`,
+      identityJwt,
       publishedAt: new Date().toISOString(),
       publishedBy: ownerId,
       pubkey: pubkeyHeader,

@@ -10,7 +10,8 @@ The control-plane backend for the AgentAgora network: registry, identity issuanc
 |---|---|---|---|
 | GET | `/` | – | Service metadata |
 | GET | `/healthz` | – | Liveness ping |
-| POST | `/v1/agents` | Bearer | Publish (or update) a manifest |
+| GET | `/.well-known/jwks.json` | – | Active OIDC public keys (`503` until `OIDC_SIGNING_KEY` is set) |
+| POST | `/v1/agents` | Bearer + sig | Publish (or update) a manifest |
 | GET | `/v1/agents` | – | List / search agents (`?capability=`, `?accepts=`, `?q=`) |
 | GET | `/v1/agents/:aid` | – | Resolve one AID |
 
@@ -69,7 +70,6 @@ pnpm --filter @agentagora/cloud-api deploy
 
 ## What's NOT in v0.0.2
 
-- **Real identity issuance** — `identity_jwt` is a deterministic mock string. Real OIDC issuance with rotating signing keys is task #4.
-- **Manifest signature verification** — task #3.
 - **Dispute / settlement / audit-ingest** endpoints — designed but not implemented; see top of `src/index.ts` for the planned routes.
 - **Rate limiting / Sybil resistance** — Phase 3.
+- **JWT key rotation** — single active kid; multi-kid rotation comes when KV-backed key store lands.

@@ -63,11 +63,36 @@ pnpm --filter @agentagora/cloud-api exec wrangler secret put OWNER_TOKENS
 
 Tokens should be high-entropy random strings (≥ 32 bytes, base64url). Rotate by replacing the secret; clients re-authenticate with the new token.
 
-### Future secrets (Phase 3+)
+### `OIDC_SIGNING_KEY` and `OIDC_ISSUER` (required for real JWTs)
+
+When both are set, `POST /v1/agents` returns a real EdDSA-signed JWT and `GET /.well-known/jwks.json` publishes the verifying public key. When either is missing, the Worker logs a warning and falls back to a deterministic mock string (development convenience only).
+
+Generate a fresh Ed25519 private key and base64url-encode the raw 32 bytes:
+
+```bash
+node -e '
+  const { randomBytes } = require("node:crypto");
+  const k = randomBytes(32);
+  process.stdout.write(k.toString("base64url") + "\n");
+'
+```
+
+Set both secrets:
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put OIDC_SIGNING_KEY
+# Paste the base64url string from above.
+
+pnpm --filter @agentagora/cloud-api exec wrangler secret put OIDC_ISSUER
+# Paste the Worker's public URL, e.g.:  https://agentagora-cloud-api.example.workers.dev
+```
+
+The `kid` is derived deterministically from the public key (first 16 chars of SHA-256), so JWTs and JWKS always agree without an explicit kid registry. **Rotate** by generating a new key and replacing the secret — old JWTs become invalid at next verify and consumers must refetch JWKS.
+
+### Future secrets
 
 | Secret | Purpose | Task |
 |---|---|---|
-| `OIDC_JWT_SIGNING_KEY` | Identity certificate signing | #4 |
 | `STRIPE_SECRET_KEY` | Stripe Connect onboarding | M2 Phase 4 |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signature check | M2 Phase 4 |
 
@@ -99,6 +124,9 @@ TOKEN=<one of the tokens you put in OWNER_TOKENS>
 
 # Liveness:
 curl "$URL/healthz"
+
+# JWKS (consumers cache this to verify identity_jwt):
+curl "$URL/.well-known/jwks.json"
 
 # Discoverability (no auth):
 curl "$URL/v1/agents"

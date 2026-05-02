@@ -7,28 +7,29 @@
  * the agent-to-agent data path.
  *
  * Surface (this file):
- *   GET  /                  metadata
- *   GET  /healthz           liveness
- *   POST /v1/agents         publish manifest [Bearer auth, OWNER_TOKENS]
- *   GET  /v1/agents         list / search registered agents
- *   GET  /v1/agents/:aid    resolve one
+ *   GET  /                          metadata
+ *   GET  /healthz                   liveness
+ *   GET  /.well-known/jwks.json     active OIDC public keys
+ *   POST /v1/agents                 publish manifest [Bearer + sig]
+ *   GET  /v1/agents                 list / search registered agents
+ *   GET  /v1/agents/:aid            resolve one
  *
  * Still pending:
- *   POST /v1/oidc/token     identity issuance (real JWT, not mock) — task #4
- *   POST /v1/disputes       open a dispute → council intake
- *   POST /v1/audit/ingest   server-side audit log archival
- *   GET  /v1/conversations/:id   indexed audit query
+ *   POST /v1/disputes               open a dispute → council intake
+ *   POST /v1/audit/ingest           server-side audit log archival
+ *   GET  /v1/conversations/:id      indexed audit query
  */
 
 import { Hono } from "hono";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
 import { D1Storage } from "./d1-storage.js";
+import { OidcIssuer, decodePrivateKey } from "./oidc.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
 
 /**
  * Worker bindings. `DB` lands in v0.0.2 (D1 registry persistence).
- * Phase 3 still adds: AUDIT (R2), NONCE (KV), OIDC_KEY (secret).
+ * Phase 3 still adds: AUDIT (R2), NONCE (KV).
  */
 export interface Env {
   DB?: D1Database;
@@ -39,6 +40,16 @@ export interface Env {
    * publish (POST /v1/agents returns 401 for every request).
    */
   OWNER_TOKENS?: string;
+  /**
+   * base64url-encoded raw 32-byte Ed25519 private key. When set, the
+   * Worker issues real OIDC identity certificates and publishes a
+   * JWKS document at /.well-known/jwks.json. Without it, JWTs fall
+   * back to a deterministic mock string and JWKS is 503.
+   */
+  OIDC_SIGNING_KEY?: string;
+  /** `iss` claim and base for `aap.manifest_url`. Required when
+   *  OIDC_SIGNING_KEY is set. */
+  OIDC_ISSUER?: string;
 }
 
 export interface CreateApiOptions {
@@ -50,6 +61,12 @@ export interface CreateApiOptions {
    * every publish attempt is rejected as unauthorized.
    */
   ownerAuth?: OwnerAuthenticator;
+  /**
+   * OIDC issuer. When provided, POST /v1/agents returns a real
+   * EdDSA JWT and GET /.well-known/jwks.json publishes the
+   * verifying public key. When absent, JWTs are mocked.
+   */
+  oidc?: OidcIssuer;
 }
 
 /**
@@ -59,6 +76,7 @@ export interface CreateApiOptions {
 export function createApi(options: CreateApiOptions = {}): Hono {
   const storage = options.storage ?? new InMemoryStorage();
   const ownerAuth = options.ownerAuth ?? new StaticOwnerAuth({});
+  const oidc = options.oidc;
   const app = new Hono();
 
   app.get("/", (c) =>
@@ -72,7 +90,17 @@ export function createApi(options: CreateApiOptions = {}): Hono {
 
   app.get("/healthz", (c) => c.json({ ok: true, version: "0.0.1" }));
 
-  app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth }));
+  app.get("/.well-known/jwks.json", (c) => {
+    if (!oidc) {
+      return c.json(
+        { error: "not_configured", message: "OIDC signing key is not configured" },
+        503,
+      );
+    }
+    return c.json(oidc.jwks());
+  });
+
+  app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc }));
 
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 
@@ -84,24 +112,46 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   return app;
 }
 
-// Workers fetch handler. The app is cached per isolate; storage is
-// chosen once based on whether the D1 binding is present (production)
-// or absent (e.g. unit tests, dry-run deploy without bindings, local
-// dev before `wrangler d1 create`).
-let cached: Hono | undefined;
+// Workers fetch handler. The app is cached per isolate as a promise so
+// async setup (deriving the OIDC public key from the private one) only
+// runs once per cold start.
+let cached: Promise<Hono> | undefined;
+
+async function buildApp(env: Env): Promise<Hono> {
+  const storage: Storage = env.DB ? new D1Storage(env.DB) : new InMemoryStorage();
+  const ownerAuth = new StaticOwnerAuth(parseOwnerTokens(env.OWNER_TOKENS));
+  if (!ownerAuth.hasAnyTokens) {
+    console.warn(
+      "[cloud-api] OWNER_TOKENS not configured — POST /v1/agents will reject every request",
+    );
+  }
+
+  let oidc: OidcIssuer | undefined;
+  if (env.OIDC_SIGNING_KEY && env.OIDC_ISSUER) {
+    try {
+      oidc = await OidcIssuer.create({
+        privateKey: decodePrivateKey(env.OIDC_SIGNING_KEY),
+        issuer: env.OIDC_ISSUER,
+      });
+    } catch (err) {
+      console.error(
+        "[cloud-api] OIDC_SIGNING_KEY/OIDC_ISSUER set but invalid — falling back to mock JWTs",
+        err,
+      );
+    }
+  } else {
+    console.warn(
+      "[cloud-api] OIDC_SIGNING_KEY or OIDC_ISSUER missing — POST /v1/agents will return mock JWTs",
+    );
+  }
+
+  return createApi({ storage, ownerAuth, oidc });
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (!cached) {
-      const storage: Storage = env.DB ? new D1Storage(env.DB) : new InMemoryStorage();
-      const ownerAuth = new StaticOwnerAuth(parseOwnerTokens(env.OWNER_TOKENS));
-      if (!ownerAuth.hasAnyTokens) {
-        console.warn(
-          "[cloud-api] OWNER_TOKENS not configured — POST /v1/agents will reject every request",
-        );
-      }
-      cached = createApi({ storage, ownerAuth });
-    }
-    return cached.fetch(request);
+    if (!cached) cached = buildApp(env);
+    const app = await cached;
+    return app.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
