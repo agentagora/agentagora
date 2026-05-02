@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { StaticOwnerAuth } from "../src/auth.js";
 import { createApi } from "../src/index.js";
 import { InMemoryStorage } from "../src/storage.js";
 
@@ -27,15 +28,30 @@ const validManifest = {
   ],
 };
 
+const ALICE_TOKEN = "tok-alice";
+const BOB_TOKEN = "tok-bob";
+
 function setup() {
   const storage = new InMemoryStorage();
-  return { app: createApi({ storage }), storage };
+  const ownerAuth = new StaticOwnerAuth({
+    [ALICE_TOKEN]: "alice",
+    [BOB_TOKEN]: "bob",
+  });
+  return { app: createApi({ storage, ownerAuth }), storage };
 }
 
-async function postJson(app: ReturnType<typeof createApi>, path: string, body: unknown) {
+async function postJson(
+  app: ReturnType<typeof createApi>,
+  path: string,
+  body: unknown,
+  token = ALICE_TOKEN,
+) {
   return app.request(path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   });
 }
@@ -77,10 +93,12 @@ describe("POST /v1/agents", () => {
       aid: string;
       identity_jwt: string;
       published_at: string;
+      published_by: string;
     };
     expect(body.aid).toBe(validManifest.aid);
     expect(body.identity_jwt).toMatch(/^mock\.jwt\./);
     expect(body.published_at).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(body.published_by).toBe("alice");
   });
 
   it("rejects a manifest with an invalid AID", async () => {

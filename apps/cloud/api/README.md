@@ -6,15 +6,29 @@ The control-plane backend for the AgentAgora network: registry, identity issuanc
 
 ## Surface
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/` | Service metadata |
-| GET | `/healthz` | Liveness ping |
-| POST | `/v1/agents` | Publish (or update) a manifest |
-| GET | `/v1/agents` | List / search agents (`?capability=`, `?accepts=`, `?q=`) |
-| GET | `/v1/agents/:aid` | Resolve one AID |
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/` | – | Service metadata |
+| GET | `/healthz` | – | Liveness ping |
+| POST | `/v1/agents` | Bearer | Publish (or update) a manifest |
+| GET | `/v1/agents` | – | List / search agents (`?capability=`, `?accepts=`, `?q=`) |
+| GET | `/v1/agents/:aid` | – | Resolve one AID |
 
-All requests/responses are JSON. Manifest validation uses the canonical Zod schemas from `@agentagora/protocol` — invalid bodies return `400` with biome-validator details.
+All requests/responses are JSON. Manifest validation uses the canonical Zod schemas from `@agentagora/protocol` — invalid bodies return `400` with the Zod issues array.
+
+## Auth (closed alpha)
+
+`POST /v1/agents` requires `Authorization: Bearer <token>`. Tokens are pre-issued via the `OWNER_TOKENS` Worker secret:
+
+```
+OWNER_TOKENS="alice:tok-A1,bob:tok-B2"
+```
+
+Each comma-separated pair is `<ownerId>:<token>`. The resolved owner ID becomes the manifest's `published_by` — and updates to an existing AID are restricted to the same owner (cross-owner publish ⇒ `403`). Real OIDC issuance lands in task #4; the route shape stays the same.
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put OWNER_TOKENS
+```
 
 ## Dev
 
@@ -50,7 +64,6 @@ Schema lives in `migrations/`. Add new migrations as `migrations/000N_*.sql`; wr
 ## What's NOT in v0.0.2
 
 - **Real identity issuance** — `identity_jwt` is a deterministic mock string. Real OIDC issuance with rotating signing keys is task #4.
-- **Authentication** — anyone can publish to `/v1/agents`. Owner-token auth is task #2.
 - **Manifest signature verification** — task #3.
 - **Dispute / settlement / audit-ingest** endpoints — designed but not implemented; see top of `src/index.ts` for the planned routes.
 - **Rate limiting / Sybil resistance** — Phase 3.
