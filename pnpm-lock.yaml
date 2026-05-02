@@ -27,6 +27,31 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@24.12.2)
 
+  apps/cloud/api:
+    dependencies:
+      '@agentagora/protocol':
+        specifier: workspace:*
+        version: link:../../../packages/protocol
+      '@hono/zod-validator':
+        specifier: ^0.4.2
+        version: 0.4.3(hono@4.12.16)(zod@3.25.76)
+      hono:
+        specifier: ^4.6.13
+        version: 4.12.16
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20250101.0
+        version: 4.20260501.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@24.12.2)
+      wrangler:
+        specifier: ^4.0.0
+        version: 4.87.0(@cloudflare/workers-types@4.20260501.1)
+
   apps/examples/two-agents:
     dependencies:
       '@agentagora/sdk':
@@ -718,6 +743,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/zod-validator@0.4.3':
+    resolution: {integrity: sha512-xIgMYXDyJ4Hj6ekm9T9Y27s080Nl9NXHcJkOvkXPhubOLj8hZkOL8pDnnXfvCf5xEE8Q4oMFenQUZZREUY2gqQ==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      zod: ^3.19.1
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2190,6 +2221,11 @@ snapshots:
   '@hono/node-server@1.19.14(hono@4.12.16)':
     dependencies:
       hono: 4.12.16
+
+  '@hono/zod-validator@0.4.3(hono@4.12.16)(zod@3.25.76)':
+    dependencies:
+      hono: 4.12.16
+      zod: 3.25.76
 
   '@img/colour@1.1.0': {}
 

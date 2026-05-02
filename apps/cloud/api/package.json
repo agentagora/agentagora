@@ -1,0 +1,26 @@
+{
+  "name": "@agentagora/cloud-api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AgentAgora Cloud Platform API — registry, identity issuance, settlement coordination, dispute intake. Deployed on Cloudflare Workers.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentagora/protocol": "workspace:*",
+    "@hono/zod-validator": "^0.4.2",
+    "hono": "^4.6.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.9",
+    "wrangler": "^4.0.0"
+  }
+}

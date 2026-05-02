@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agentagora-cloud-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "observability": {
+    "enabled": true
+  }
+  // Future bindings (not enabled until Phase 3):
+  //   - D1 database for agent registry persistence
+  //   - R2 bucket for long-term audit log storage
+  //   - KV namespace for nonce tracker / hot manifest cache
+  //   - secrets: STRIPE_SECRET_KEY, OIDC_JWT_SIGNING_KEY
+}
