@@ -25,6 +25,7 @@ import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./au
 import { D1Storage } from "./d1-storage.js";
 import { InMemoryNonceStore, KvNonceStore, type NonceStore } from "./nonces.js";
 import { OidcIssuer, decodePrivateKey } from "./oidc.js";
+import { InMemoryRateLimiter, KvRateLimiter, type RateLimiter } from "./rate-limit.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { createAuditRouter, createConversationsRouter } from "./routes/audit.js";
 import { createDisputesRouter } from "./routes/disputes.js";
@@ -60,6 +61,13 @@ export interface Env {
    * lost on cold start — useful only for `wrangler dev` and tests).
    */
   NONCES?: KVNamespace;
+  /**
+   * KV namespace for the per-owner rate-limit counters. Without it,
+   * limiting falls back to an in-memory store (per-isolate, lossy
+   * across isolates — fine for closed alpha, won't catch coordinated
+   * abuse across the fleet).
+   */
+  RATE_LIMITS?: KVNamespace;
 }
 
 export interface CreateApiOptions {
@@ -82,6 +90,11 @@ export interface CreateApiOptions {
    * InMemoryNonceStore — per-isolate, fine for tests and dev.
    */
   nonceStore?: NonceStore;
+  /**
+   * Rate limiter applied to every Bearer-authed write route. When
+   * absent, no limiting is applied (tests pass undefined to skip).
+   */
+  rateLimiter?: RateLimiter;
 }
 
 /**
@@ -93,6 +106,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   const ownerAuth = options.ownerAuth ?? new StaticOwnerAuth({});
   const oidc = options.oidc;
   const nonceStore = options.nonceStore ?? new InMemoryNonceStore();
+  const rateLimiter = options.rateLimiter;
   const app = new Hono();
 
   app.get("/", (c) =>
@@ -116,11 +130,11 @@ export function createApi(options: CreateApiOptions = {}): Hono {
     return c.json(oidc.jwks());
   });
 
-  app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc }));
+  app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }));
   app.route("/v1/audit", createAuditRouter(storage));
   app.route("/v1/conversations", createConversationsRouter(storage));
-  app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth }));
-  app.route("/v1/nonces", createNoncesRouter({ ownerAuth, store: nonceStore }));
+  app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth, rateLimiter }));
+  app.route("/v1/nonces", createNoncesRouter({ ownerAuth, store: nonceStore, rateLimiter }));
 
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 
@@ -153,6 +167,14 @@ async function buildApp(env: Env): Promise<Hono> {
       "[cloud-api] NONCES KV namespace not bound — /v1/nonces/check is per-isolate only",
     );
   }
+  const rateLimiter: RateLimiter = env.RATE_LIMITS
+    ? new KvRateLimiter(env.RATE_LIMITS)
+    : new InMemoryRateLimiter();
+  if (!env.RATE_LIMITS) {
+    console.warn(
+      "[cloud-api] RATE_LIMITS KV namespace not bound — rate-limit counters are per-isolate only",
+    );
+  }
 
   let oidc: OidcIssuer | undefined;
   if (env.OIDC_SIGNING_KEY && env.OIDC_ISSUER) {
@@ -173,7 +195,7 @@ async function buildApp(env: Env): Promise<Hono> {
     );
   }
 
-  return createApi({ storage, ownerAuth, oidc, nonceStore });
+  return createApi({ storage, ownerAuth, oidc, nonceStore, rateLimiter });
 }
 
 export default {

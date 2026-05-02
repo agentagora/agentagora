@@ -133,9 +133,22 @@ Backed by Workers KV in production (native TTL); falls back to in-memory in test
 
 > SDK opt-in (a `CloudNonceTracker` that consults this endpoint before honoring incoming envelopes) is a follow-up — agents that want global dedup will wire it through `AgentOptions.nonceTracker`.
 
+## Rate limiting
+
+Bearer-authed write endpoints enforce a fixed-window per-minute cap, scoped per owner:
+
+| Route | Cap (req/min/owner) |
+|---|---|
+| `POST /v1/agents` | 30 |
+| `POST /v1/disputes` | 5 |
+| `POST /v1/nonces/check` | 6 000 |
+
+Audit ingest is intentionally not rate-limited — every event already carries a signature and chain-hash check, which is the cost gate. Exhausted buckets return `429 rate_limited` with a `Retry-After` header counting seconds to the next minute boundary.
+
+Backed by Workers KV in production (cross-isolate counters with native TTL); falls back to a per-isolate `Map` for tests / dev. Document race-acceptable: a coordinated burst at the second-edge can over-count by a handful of requests, irrelevant for abuse-prevention.
+
 ## What's NOT in v0.0.2
 
 - **Dispute resolution state machine** — task #6 captures intake only; ops writes the resolution.
-- **Rate limiting / Sybil resistance** — task #8.
 - **SDK-side opt-in for cloud nonce dedup** — endpoint is live; SDK still uses per-isolate `NonceTracker` until a `CloudNonceTracker` is wired in.
 - **JWT key rotation** — single active kid; multi-kid rotation comes when KV-backed key store lands.

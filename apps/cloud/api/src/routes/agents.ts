@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import { b64uDecode, canonicalizeJsonBytes, verifyEd25519 } from "../_crypto.js";
 import type { OwnerAuthenticator } from "../auth.js";
 import type { OidcIssuer } from "../oidc.js";
+import { DEFAULT_LIMITS, type RateLimiter, enforceRateLimit } from "../rate-limit.js";
 import type { AgentRecord, Storage } from "../storage.js";
 
 interface RouterDeps {
@@ -23,15 +24,18 @@ interface RouterDeps {
   /** When absent, the route falls back to a deterministic mock JWT
    *  (dev/test convenience; production must always wire an issuer). */
   oidc?: OidcIssuer;
+  /** Optional per-owner publish rate limiter. */
+  rateLimiter?: RateLimiter;
 }
 
-export function createAgentsRouter({ storage, ownerAuth, oidc }: RouterDeps): Hono {
+export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: RouterDeps): Hono {
   const router = new Hono();
 
-  // Publish or update a manifest. Three checks, in order:
+  // Publish or update a manifest. Four checks, in order:
   //   1. Bearer token resolves to an owner          → 401 if not
-  //   2. Detached Ed25519 signature verifies        → 401 if not
-  //   3. Owner + pubkey match the existing record   → 403 if not
+  //   2. Per-owner rate limit                       → 429 if exhausted
+  //   3. Detached Ed25519 signature verifies        → 401 if not
+  //   4. Owner + pubkey match the existing record   → 403 if not
   router.post("/", async (c) => {
     const token = extractBearer(c.req.header("authorization"));
     if (!token) {
@@ -40,6 +44,15 @@ export function createAgentsRouter({ storage, ownerAuth, oidc }: RouterDeps): Ho
     const ownerId = await ownerAuth.resolve(token);
     if (!ownerId) {
       return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+    }
+    if (rateLimiter) {
+      const reject = await enforceRateLimit(
+        c,
+        rateLimiter,
+        `${ownerId}:publish`,
+        DEFAULT_LIMITS.publish,
+      );
+      if (reject) return reject;
     }
 
     const pubkeyHeader = c.req.header("x-aap-pubkey");

@@ -16,6 +16,7 @@
 
 import { Hono } from "hono";
 import type { OwnerAuthenticator } from "../auth.js";
+import { DEFAULT_LIMITS, type RateLimiter, enforceRateLimit } from "../rate-limit.js";
 import type { DisputeReason, DisputeRecord, Storage } from "../storage.js";
 
 interface RouterDeps {
@@ -25,6 +26,8 @@ interface RouterDeps {
   newDisputeId?: () => string;
   /** Override the wall clock for deterministic tests. */
   now?: () => Date;
+  /** Optional per-owner dispute filing rate limiter. */
+  rateLimiter?: RateLimiter;
 }
 
 const REASONS: DisputeReason[] = ["non_delivery", "wrong_output", "fraud", "other"];
@@ -110,6 +113,7 @@ export function createDisputesRouter({
   ownerAuth,
   newDisputeId = defaultDisputeId,
   now = () => new Date(),
+  rateLimiter,
 }: RouterDeps): Hono {
   const router = new Hono();
 
@@ -121,6 +125,15 @@ export function createDisputesRouter({
     const ownerId = await ownerAuth.resolve(token);
     if (!ownerId) {
       return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+    }
+    if (rateLimiter) {
+      const reject = await enforceRateLimit(
+        c,
+        rateLimiter,
+        `${ownerId}:dispute`,
+        DEFAULT_LIMITS.dispute,
+      );
+      if (reject) return reject;
     }
 
     const parsed = parseFilingBody(await c.req.json().catch(() => null));

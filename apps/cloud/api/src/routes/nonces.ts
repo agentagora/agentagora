@@ -15,12 +15,15 @@
 import { Hono } from "hono";
 import type { OwnerAuthenticator } from "../auth.js";
 import type { NonceStore } from "../nonces.js";
+import { DEFAULT_LIMITS, type RateLimiter, enforceRateLimit } from "../rate-limit.js";
 
 interface RouterDeps {
   ownerAuth: OwnerAuthenticator;
   store: NonceStore;
   /** Default TTL when the body omits `ttl_seconds`. KV's floor is 60s. */
   defaultTtlSeconds?: number;
+  /** Optional per-owner nonce-check rate limiter. */
+  rateLimiter?: RateLimiter;
 }
 
 const TTL_MIN = 60;
@@ -30,6 +33,7 @@ export function createNoncesRouter({
   ownerAuth,
   store,
   defaultTtlSeconds = 600,
+  rateLimiter,
 }: RouterDeps): Hono {
   const router = new Hono();
 
@@ -41,6 +45,15 @@ export function createNoncesRouter({
     const ownerId = await ownerAuth.resolve(token);
     if (!ownerId) {
       return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+    }
+    if (rateLimiter) {
+      const reject = await enforceRateLimit(
+        c,
+        rateLimiter,
+        `${ownerId}:nonce`,
+        DEFAULT_LIMITS.nonce,
+      );
+      if (reject) return reject;
     }
 
     const raw = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;

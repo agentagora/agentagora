@@ -38,21 +38,23 @@ Wrangler prints a UUID. Paste it into `apps/cloud/api/wrangler.jsonc` at:
 
 Commit the change. The placeholder UUID `00000000-0000-0000-0000-000000000000` in the repo is a sentinel — the real one only lives in your account.
 
-## 1b. Provision the KV namespace (one-time)
+## 1b. Provision the KV namespaces (one-time)
 
 ```bash
 pnpm --filter @agentagora/cloud-api exec wrangler kv namespace create NONCES
+pnpm --filter @agentagora/cloud-api exec wrangler kv namespace create RATE_LIMITS
 ```
 
-Wrangler prints an `id`. Paste it into `apps/cloud/api/wrangler.jsonc` at:
+Wrangler prints an `id` for each. Paste them into `apps/cloud/api/wrangler.jsonc`:
 
 ```jsonc
 "kv_namespaces": [
-  { "binding": "NONCES", "id": "<paste id here>" }
+  { "binding": "NONCES",      "id": "<paste id here>" },
+  { "binding": "RATE_LIMITS", "id": "<paste id here>" }
 ]
 ```
 
-Without this, `/v1/nonces/check` falls back to a per-isolate in-memory store (the Worker logs a warning at boot). That's fine for `wrangler dev` but multi-isolate replays won't be caught in production.
+Without `NONCES`, `/v1/nonces/check` falls back to a per-isolate in-memory store. Without `RATE_LIMITS`, rate-limit counters are per-isolate (lossy across the fleet). Both fallbacks log a warning at boot. Fine for `wrangler dev`, not for production scale.
 
 ## 2. Apply migrations
 
