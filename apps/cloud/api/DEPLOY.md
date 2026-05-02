@@ -38,6 +38,22 @@ Wrangler prints a UUID. Paste it into `apps/cloud/api/wrangler.jsonc` at:
 
 Commit the change. The placeholder UUID `00000000-0000-0000-0000-000000000000` in the repo is a sentinel — the real one only lives in your account.
 
+## 1b. Provision the KV namespace (one-time)
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler kv namespace create NONCES
+```
+
+Wrangler prints an `id`. Paste it into `apps/cloud/api/wrangler.jsonc` at:
+
+```jsonc
+"kv_namespaces": [
+  { "binding": "NONCES", "id": "<paste id here>" }
+]
+```
+
+Without this, `/v1/nonces/check` falls back to a per-isolate in-memory store (the Worker logs a warning at boot). That's fine for `wrangler dev` but multi-isolate replays won't be caught in production.
+
 ## 2. Apply migrations
 
 ```bash
@@ -164,11 +180,11 @@ D1 keeps automatic backups; `wrangler d1 backup` can restore at the row level if
 
 ## 7. Out of scope (still pending)
 
-The current Worker covers registry + identity issuance + audit ingest + dispute intake. Operationally still missing:
+The current Worker covers registry + identity issuance + audit ingest + dispute intake + nonce dedup. Operationally still missing:
 - R2 bucket for long-term audit cold-storage (D1 holds everything for now)
-- KV namespace for nonce tracker / hot manifest cache
 - Dispute resolution state machine + admin tooling (intake only today; ops writes resolutions directly)
 - Stripe Connect onboarding endpoints (M2 Phase 4)
 - Rate limiting / Sybil resistance (task #8)
+- SDK opt-in for global nonce dedup (endpoint is live; SDK transport still uses per-isolate `NonceTracker`)
 
 See `apps/cloud/api/README.md` for the per-task tracker.

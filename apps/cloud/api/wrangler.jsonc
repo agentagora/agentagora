@@ -17,9 +17,17 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
+  ],
+  // KV-backed global nonce store. Provision with
+  //   wrangler kv:namespace create NONCES
+  // and paste the printed `id` into the `id` field below.
+  "kv_namespaces": [
+    {
+      "binding": "NONCES",
+      "id": "00000000000000000000000000000000"
+    }
   ]
-  // Phase-3 bindings still pending:
+  // Still pending:
   //   - R2 bucket for long-term audit log storage
-  //   - KV namespace for nonce tracker / hot manifest cache
-  //   - secrets: STRIPE_SECRET_KEY, OIDC_JWT_SIGNING_KEY
+  //   - secrets: STRIPE_SECRET_KEY (M2 Phase 4)
 }

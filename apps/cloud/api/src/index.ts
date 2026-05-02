@@ -17,15 +17,18 @@
  *   GET  /v1/conversations/:id      indexed audit query
  *   POST /v1/disputes               file a dispute case  [Bearer]
  *   GET  /v1/disputes/:id           read a case file (public-by-ID)
+ *   POST /v1/nonces/check           reserve a nonce [Bearer]
  */
 
 import { Hono } from "hono";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
 import { D1Storage } from "./d1-storage.js";
+import { InMemoryNonceStore, KvNonceStore, type NonceStore } from "./nonces.js";
 import { OidcIssuer, decodePrivateKey } from "./oidc.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { createAuditRouter, createConversationsRouter } from "./routes/audit.js";
 import { createDisputesRouter } from "./routes/disputes.js";
+import { createNoncesRouter } from "./routes/nonces.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
 
 /**
@@ -51,6 +54,12 @@ export interface Env {
   /** `iss` claim and base for `aap.manifest_url`. Required when
    *  OIDC_SIGNING_KEY is set. */
   OIDC_ISSUER?: string;
+  /**
+   * KV namespace for the global nonce dedup store. Without it,
+   * /v1/nonces/check falls back to an in-memory store (per-isolate,
+   * lost on cold start — useful only for `wrangler dev` and tests).
+   */
+  NONCES?: KVNamespace;
 }
 
 export interface CreateApiOptions {
@@ -68,6 +77,11 @@ export interface CreateApiOptions {
    * verifying public key. When absent, JWTs are mocked.
    */
   oidc?: OidcIssuer;
+  /**
+   * Global nonce store for /v1/nonces/check. Defaults to an
+   * InMemoryNonceStore — per-isolate, fine for tests and dev.
+   */
+  nonceStore?: NonceStore;
 }
 
 /**
@@ -78,6 +92,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   const storage = options.storage ?? new InMemoryStorage();
   const ownerAuth = options.ownerAuth ?? new StaticOwnerAuth({});
   const oidc = options.oidc;
+  const nonceStore = options.nonceStore ?? new InMemoryNonceStore();
   const app = new Hono();
 
   app.get("/", (c) =>
@@ -105,6 +120,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   app.route("/v1/audit", createAuditRouter(storage));
   app.route("/v1/conversations", createConversationsRouter(storage));
   app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth }));
+  app.route("/v1/nonces", createNoncesRouter({ ownerAuth, store: nonceStore }));
 
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 
@@ -129,6 +145,14 @@ async function buildApp(env: Env): Promise<Hono> {
       "[cloud-api] OWNER_TOKENS not configured — POST /v1/agents will reject every request",
     );
   }
+  const nonceStore: NonceStore = env.NONCES
+    ? new KvNonceStore(env.NONCES)
+    : new InMemoryNonceStore();
+  if (!env.NONCES) {
+    console.warn(
+      "[cloud-api] NONCES KV namespace not bound — /v1/nonces/check is per-isolate only",
+    );
+  }
 
   let oidc: OidcIssuer | undefined;
   if (env.OIDC_SIGNING_KEY && env.OIDC_ISSUER) {
@@ -149,7 +173,7 @@ async function buildApp(env: Env): Promise<Hono> {
     );
   }
 
-  return createApi({ storage, ownerAuth, oidc });
+  return createApi({ storage, ownerAuth, oidc, nonceStore });
 }
 
 export default {

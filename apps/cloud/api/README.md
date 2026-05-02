@@ -18,6 +18,7 @@ The control-plane backend for the AgentAgora network: registry, identity issuanc
 | GET | `/v1/conversations/:id` | – | Read the audit chain for a conversation |
 | POST | `/v1/disputes` | Bearer | File a dispute case |
 | GET | `/v1/disputes/:id` | – | Read a case file by opaque ID |
+| POST | `/v1/nonces/check` | Bearer | Reserve a nonce (200 first-seen / 409 replay) |
 
 All requests/responses are JSON. Manifest validation uses the canonical Zod schemas from `@agentagora/protocol` — invalid bodies return `400` with the Zod issues array.
 
@@ -116,9 +117,25 @@ Per [PRD §16](../../../docs/PRD.md), M2 closed alpha uses team adjudication: th
 
 `GET /v1/disputes/:id` is **not** bearer-gated — IDs are unguessable random tokens, and public case files seed the public-precedent library called out in the PRD.
 
+## Global nonce dedup
+
+`POST /v1/nonces/check` lets receivers detect replays across Worker isolates and cold restarts — the SDK's in-process `NonceTracker` only covers a single isolate.
+
+```json
+{ "key": "<convo:from:nonce>", "ttl_seconds": 600 }
+```
+
+- `200 { first_seen: true,  expires_at }` — first sighting; the key is reserved
+- `409 { first_seen: false, expires_at }` — replay; the call should be rejected
+- Bearer-authed; the resolved owner ID prefixes every key under the hood, so tenants can't poison each other's nonce namespace
+
+Backed by Workers KV in production (native TTL); falls back to in-memory in tests / `wrangler dev`. KV's get-then-put has a microsecond race window — a Durable Object or D1 PRIMARY KEY can replace the implementation later without changing the route shape.
+
+> SDK opt-in (a `CloudNonceTracker` that consults this endpoint before honoring incoming envelopes) is a follow-up — agents that want global dedup will wire it through `AgentOptions.nonceTracker`.
+
 ## What's NOT in v0.0.2
 
 - **Dispute resolution state machine** — task #6 captures intake only; ops writes the resolution.
 - **Rate limiting / Sybil resistance** — task #8.
-- **Global nonce dedup** — task #7 (SDK still does per-isolate today).
+- **SDK-side opt-in for cloud nonce dedup** — endpoint is live; SDK still uses per-isolate `NonceTracker` until a `CloudNonceTracker` is wired in.
 - **JWT key rotation** — single active kid; multi-kid rotation comes when KV-backed key store lands.
