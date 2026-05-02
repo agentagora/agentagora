@@ -8,7 +8,7 @@
  * in production.
  */
 
-import { ManifestSchema } from "@agentagora/protocol";
+import { AuditEventSchema, ManifestSchema } from "@agentagora/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { D1Storage } from "../src/d1-storage.js";
 import type { AgentRecord } from "../src/storage.js";
@@ -166,6 +166,44 @@ describe("D1Storage", () => {
     it("returns empty list when no filter matches", async () => {
       const none = await storage.searchAgents({ capability: "does_not_exist" });
       expect(none).toHaveLength(0);
+    });
+  });
+
+  describe("audit events", () => {
+    function event(eventId: string, ts: string, prevHash: string | null = null) {
+      return AuditEventSchema.parse({
+        event_id: eventId,
+        conversation_id: "convo-x",
+        type: "rpc.request.received",
+        timestamp: ts,
+        actor_aid: "aid:agentagora:weijt606/code-review",
+        previous_event_hash: prevHash,
+        data: {},
+        signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
+      });
+    }
+
+    it("ingests and reads back events ordered by timestamp", async () => {
+      await storage.ingestAuditEvent(event("e1", "2026-05-01T00:00:00.000Z"), "now");
+      await storage.ingestAuditEvent(event("e2", "2026-05-01T00:00:01.000Z", "sha256:aaa"), "now");
+      const events = await storage.getConversationEvents("convo-x");
+      expect(events.map((e) => e.event_id)).toEqual(["e1", "e2"]);
+
+      const latest = await storage.getLatestAuditEvent("convo-x");
+      expect(latest?.event_id).toBe("e2");
+    });
+
+    it("hasAuditEvent reports presence", async () => {
+      expect(await storage.hasAuditEvent("e1")).toBe(false);
+      await storage.ingestAuditEvent(event("e1", "2026-05-01T00:00:00.000Z"), "now");
+      expect(await storage.hasAuditEvent("e1")).toBe(true);
+    });
+
+    it("ingest is idempotent (INSERT OR IGNORE on duplicate event_id)", async () => {
+      await storage.ingestAuditEvent(event("e1", "2026-05-01T00:00:00.000Z"), "first");
+      await storage.ingestAuditEvent(event("e1", "2026-05-01T00:00:00.000Z"), "second");
+      const events = await storage.getConversationEvents("convo-x");
+      expect(events).toHaveLength(1);
     });
   });
 });

@@ -131,6 +131,9 @@ curl "$URL/.well-known/jwks.json"
 # Discoverability (no auth):
 curl "$URL/v1/agents"
 
+# Audit chain for a conversation (public read):
+curl "$URL/v1/conversations/<conversation_id>"
+
 # Publish (requires OWNER_TOKENS + an Ed25519 signature over the
 # RFC 8785 canonical bytes of the body):
 curl -X POST "$URL/v1/agents" \
@@ -161,11 +164,11 @@ D1 keeps automatic backups; `wrangler d1 backup` can restore at the row level if
 
 ## 7. Out of scope (still pending)
 
-The deploy currently produces a registry-only Worker. Operationally still missing:
-- R2 bucket for long-term audit log storage
+The current Worker covers registry + identity issuance + audit ingest. Operationally still missing:
+- R2 bucket for long-term audit cold-storage (D1 holds everything for now)
 - KV namespace for nonce tracker / hot manifest cache
-- Stripe Connect onboarding endpoints
-- Real OIDC issuance (replaces the mock `identity_jwt`)
-- Rate limiting / Sybil resistance
+- Dispute intake endpoint (task #6)
+- Stripe Connect onboarding endpoints (M2 Phase 4)
+- Rate limiting / Sybil resistance (task #8)
 
 See `apps/cloud/api/README.md` for the per-task tracker.

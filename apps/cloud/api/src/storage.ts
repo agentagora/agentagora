@@ -6,7 +6,7 @@
  * without touching route code.
  */
 
-import type { Manifest } from "@agentagora/protocol";
+import type { AuditEvent, Manifest } from "@agentagora/protocol";
 
 export interface AgentRecord {
   manifest: Manifest;
@@ -31,16 +31,29 @@ export interface SearchFilter {
 }
 
 export interface Storage {
+  // Agents
   getAgent(aid: string): Promise<AgentRecord | undefined>;
   putAgent(record: AgentRecord): Promise<void>;
   searchAgents(filter: SearchFilter): Promise<AgentRecord[]>;
   listAgents(): Promise<AgentRecord[]>;
+
+  // Audit events
+  /** Idempotent insert. No-op if event_id already exists. */
+  ingestAuditEvent(event: AuditEvent, ingestedAt: string): Promise<void>;
+  /** True if an event with this ID has already been ingested. */
+  hasAuditEvent(eventId: string): Promise<boolean>;
+  /** Latest event in the conversation by timestamp, or undefined if empty. */
+  getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined>;
+  /** Full chain for a conversation, ordered by timestamp ascending. */
+  getConversationEvents(conversationId: string): Promise<AuditEvent[]>;
 }
 
 /** In-memory storage. Per-isolate on Workers, lost on cold start.
- *  Replace with D1Storage in Phase 3. */
+ *  Used by tests and `wrangler dev` without D1 bindings. */
 export class InMemoryStorage implements Storage {
   private readonly agents = new Map<string, AgentRecord>();
+  private readonly auditEvents = new Map<string, AuditEvent>();
+  private readonly auditByConversation = new Map<string, AuditEvent[]>();
 
   async getAgent(aid: string): Promise<AgentRecord | undefined> {
     return this.agents.get(aid);
@@ -59,9 +72,33 @@ export class InMemoryStorage implements Storage {
     return [...this.agents.values()];
   }
 
+  async ingestAuditEvent(event: AuditEvent, _ingestedAt: string): Promise<void> {
+    if (this.auditEvents.has(event.event_id)) return;
+    this.auditEvents.set(event.event_id, event);
+    const list = this.auditByConversation.get(event.conversation_id) ?? [];
+    list.push(event);
+    list.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    this.auditByConversation.set(event.conversation_id, list);
+  }
+
+  async hasAuditEvent(eventId: string): Promise<boolean> {
+    return this.auditEvents.has(eventId);
+  }
+
+  async getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined> {
+    const list = this.auditByConversation.get(conversationId);
+    return list && list.length > 0 ? list[list.length - 1] : undefined;
+  }
+
+  async getConversationEvents(conversationId: string): Promise<AuditEvent[]> {
+    return [...(this.auditByConversation.get(conversationId) ?? [])];
+  }
+
   /** Test helper: drop all records. */
   clear(): void {
     this.agents.clear();
+    this.auditEvents.clear();
+    this.auditByConversation.clear();
   }
 }
 

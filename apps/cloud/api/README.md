@@ -14,6 +14,8 @@ The control-plane backend for the AgentAgora network: registry, identity issuanc
 | POST | `/v1/agents` | Bearer + sig | Publish (or update) a manifest |
 | GET | `/v1/agents` | – | List / search agents (`?capability=`, `?accepts=`, `?q=`) |
 | GET | `/v1/agents/:aid` | – | Resolve one AID |
+| POST | `/v1/audit/ingest` | Per-event sig | Batch-ingest signed audit events |
+| GET | `/v1/conversations/:id` | – | Read the audit chain for a conversation |
 
 All requests/responses are JSON. Manifest validation uses the canonical Zod schemas from `@agentagora/protocol` — invalid bodies return `400` with the Zod issues array.
 
@@ -68,8 +70,32 @@ End-to-end provisioning (D1, secrets, smoke test, rollback) lives in [DEPLOY.md]
 pnpm --filter @agentagora/cloud-api deploy
 ```
 
+## Audit ingest
+
+`POST /v1/audit/ingest` accepts a batch of signed audit events:
+
+```json
+{ "events": [ { "event_id": "...", "conversation_id": "...", ... } ] }
+```
+
+There is no bearer token — each event's Ed25519 signature is the auth, verified against the actor's pinned manifest pubkey. Batches return `201` when every event lands, `207 Multi-Status` when some are rejected:
+
+```json
+{
+  "ingested": ["evt-0001", "evt-0003"],
+  "rejected": [
+    { "event_id": "evt-0002", "error": "broken_chain", "message": "..." }
+  ]
+}
+```
+
+Reject codes: `validation_error`, `unknown_actor`, `actor_unsigned`, `invalid_signature`, `broken_chain`, `duplicate_event`. Re-ingest is idempotent (duplicates are reported, not poisoned).
+
+`GET /v1/conversations/:id` returns the chain in timestamp order. Public — disputes / inspectors fetch without coordinating credentials.
+
 ## What's NOT in v0.0.2
 
-- **Dispute / settlement / audit-ingest** endpoints — designed but not implemented; see top of `src/index.ts` for the planned routes.
-- **Rate limiting / Sybil resistance** — Phase 3.
+- **Dispute intake** — task #6.
+- **Rate limiting / Sybil resistance** — task #8.
+- **Global nonce dedup** — task #7 (SDK still does per-isolate today).
 - **JWT key rotation** — single active kid; multi-kid rotation comes when KV-backed key store lands.

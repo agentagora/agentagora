@@ -8,7 +8,9 @@
  * the right move is to promote these primitives to @agentagora/protocol.
  */
 
+import type { AuditEvent } from "@agentagora/protocol";
 import * as ed from "@noble/ed25519";
+import { sha256 } from "@noble/hashes/sha256";
 import { sha512 } from "@noble/hashes/sha512";
 import canonicalize from "canonicalize";
 
@@ -54,6 +56,45 @@ export async function verifyEd25519(
   } catch {
     return false;
   }
+}
+
+/**
+ * Verify an audit event's signature against `publicKey`. The event's
+ * canonical bytes are computed with `signature.value` cleared, exactly
+ * matching the SDK's signing path.
+ */
+export async function verifyAuditEvent(event: AuditEvent, publicKey: Uint8Array): Promise<boolean> {
+  if (!event.signature?.value) return false;
+  let sigBytes: Uint8Array;
+  try {
+    sigBytes = b64uDecode(event.signature.value);
+  } catch {
+    return false;
+  }
+  const cloned = JSON.parse(JSON.stringify(event)) as AuditEvent;
+  cloned.signature = { ...cloned.signature, value: "" };
+  let bytes: Uint8Array;
+  try {
+    bytes = canonicalizeJsonBytes(cloned);
+  } catch {
+    return false;
+  }
+  return verifyEd25519(sigBytes, bytes, publicKey);
+}
+
+/**
+ * Hash an audit event's canonical bytes (with signature.value cleared).
+ * Format mirrors the SDK: `sha256:<hex>`. Used for chain validation
+ * (next event's previous_event_hash must equal this).
+ */
+export function hashAuditEvent(event: AuditEvent): string {
+  const cloned = JSON.parse(JSON.stringify(event)) as AuditEvent;
+  cloned.signature = { ...cloned.signature, value: "" };
+  const bytes = canonicalizeJsonBytes(cloned);
+  const digest = sha256(bytes);
+  let hex = "";
+  for (const b of digest) hex += b.toString(16).padStart(2, "0");
+  return `sha256:${hex}`;
 }
 
 function rejectFloats(value: unknown, path: string[] = []): void {

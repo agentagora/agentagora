@@ -6,7 +6,7 @@
  * acceptable for v0 registry scale, promotable to a side table later.
  */
 
-import type { Manifest } from "@agentagora/protocol";
+import type { AuditEvent, Manifest } from "@agentagora/protocol";
 import type { AgentRecord, SearchFilter, Storage } from "./storage.js";
 
 interface AgentRow {
@@ -100,6 +100,60 @@ export class D1Storage implements Storage {
     const bound = binds.length ? stmt.bind(...binds) : stmt;
     const { results } = await bound.all<AgentRow>();
     return results.map(rowToRecord);
+  }
+
+  async ingestAuditEvent(event: AuditEvent, ingestedAt: string): Promise<void> {
+    // Idempotent insert — duplicate event_id is silently dropped so
+    // retry-on-network-blip doesn't poison the chain.
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO audit_events
+           (event_id, conversation_id, actor_aid, timestamp,
+            previous_event_hash, event_json, ingested_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        event.event_id,
+        event.conversation_id,
+        event.actor_aid,
+        event.timestamp,
+        event.previous_event_hash,
+        JSON.stringify(event),
+        ingestedAt,
+      )
+      .run();
+  }
+
+  async hasAuditEvent(eventId: string): Promise<boolean> {
+    const row = await this.db
+      .prepare("SELECT 1 AS hit FROM audit_events WHERE event_id = ?")
+      .bind(eventId)
+      .first<{ hit: number }>();
+    return row !== null;
+  }
+
+  async getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined> {
+    const row = await this.db
+      .prepare(
+        `SELECT event_json FROM audit_events
+         WHERE conversation_id = ?
+         ORDER BY timestamp DESC LIMIT 1`,
+      )
+      .bind(conversationId)
+      .first<{ event_json: string }>();
+    return row ? (JSON.parse(row.event_json) as AuditEvent) : undefined;
+  }
+
+  async getConversationEvents(conversationId: string): Promise<AuditEvent[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT event_json FROM audit_events
+         WHERE conversation_id = ?
+         ORDER BY timestamp ASC`,
+      )
+      .bind(conversationId)
+      .all<{ event_json: string }>();
+    return results.map((r) => JSON.parse(r.event_json) as AuditEvent);
   }
 }
 
