@@ -30,6 +30,25 @@ export interface SearchFilter {
   q?: string;
 }
 
+export type DisputeReason = "non_delivery" | "wrong_output" | "fraud" | "other";
+
+export interface DisputeRecord {
+  disputeId: string;
+  conversationId: string;
+  /** Owner ID resolved from the bearer at file-time. */
+  filedBy: string;
+  /** AID the filer is acting on behalf of (must be owned by filedBy). */
+  filerAid: string;
+  respondentAid: string;
+  reason: DisputeReason;
+  narrative?: string;
+  claimedRemedy?: string;
+  state: "open" | "closed" | "resolved" | "rejected";
+  filedAt: string;
+  resolvedAt?: string;
+  resolution?: string;
+}
+
 export interface Storage {
   // Agents
   getAgent(aid: string): Promise<AgentRecord | undefined>;
@@ -46,6 +65,12 @@ export interface Storage {
   getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined>;
   /** Full chain for a conversation, ordered by timestamp ascending. */
   getConversationEvents(conversationId: string): Promise<AuditEvent[]>;
+
+  // Disputes
+  /** Insert a fresh dispute. Caller pre-allocates the dispute_id. */
+  createDispute(record: DisputeRecord): Promise<void>;
+  /** Look up a dispute by its opaque ID. */
+  getDispute(disputeId: string): Promise<DisputeRecord | undefined>;
 }
 
 /** In-memory storage. Per-isolate on Workers, lost on cold start.
@@ -54,6 +79,7 @@ export class InMemoryStorage implements Storage {
   private readonly agents = new Map<string, AgentRecord>();
   private readonly auditEvents = new Map<string, AuditEvent>();
   private readonly auditByConversation = new Map<string, AuditEvent[]>();
+  private readonly disputes = new Map<string, DisputeRecord>();
 
   async getAgent(aid: string): Promise<AgentRecord | undefined> {
     return this.agents.get(aid);
@@ -94,11 +120,24 @@ export class InMemoryStorage implements Storage {
     return [...(this.auditByConversation.get(conversationId) ?? [])];
   }
 
+  async createDispute(record: DisputeRecord): Promise<void> {
+    if (this.disputes.has(record.disputeId)) {
+      throw new Error(`dispute ${record.disputeId} already exists`);
+    }
+    this.disputes.set(record.disputeId, { ...record });
+  }
+
+  async getDispute(disputeId: string): Promise<DisputeRecord | undefined> {
+    const rec = this.disputes.get(disputeId);
+    return rec ? { ...rec } : undefined;
+  }
+
   /** Test helper: drop all records. */
   clear(): void {
     this.agents.clear();
     this.auditEvents.clear();
     this.auditByConversation.clear();
+    this.disputes.clear();
   }
 }
 

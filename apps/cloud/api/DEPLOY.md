@@ -164,10 +164,10 @@ D1 keeps automatic backups; `wrangler d1 backup` can restore at the row level if
 
 ## 7. Out of scope (still pending)
 
-The current Worker covers registry + identity issuance + audit ingest. Operationally still missing:
+The current Worker covers registry + identity issuance + audit ingest + dispute intake. Operationally still missing:
 - R2 bucket for long-term audit cold-storage (D1 holds everything for now)
 - KV namespace for nonce tracker / hot manifest cache
-- Dispute intake endpoint (task #6)
+- Dispute resolution state machine + admin tooling (intake only today; ops writes resolutions directly)
 - Stripe Connect onboarding endpoints (M2 Phase 4)
 - Rate limiting / Sybil resistance (task #8)
 

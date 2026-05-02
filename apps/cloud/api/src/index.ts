@@ -15,9 +15,8 @@
  *   GET  /v1/agents/:aid            resolve one
  *   POST /v1/audit/ingest           server-side audit log archival
  *   GET  /v1/conversations/:id      indexed audit query
- *
- * Still pending:
- *   POST /v1/disputes               open a dispute → council intake
+ *   POST /v1/disputes               file a dispute case  [Bearer]
+ *   GET  /v1/disputes/:id           read a case file (public-by-ID)
  */
 
 import { Hono } from "hono";
@@ -26,6 +25,7 @@ import { D1Storage } from "./d1-storage.js";
 import { OidcIssuer, decodePrivateKey } from "./oidc.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { createAuditRouter, createConversationsRouter } from "./routes/audit.js";
+import { createDisputesRouter } from "./routes/disputes.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
 
 /**
@@ -104,6 +104,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc }));
   app.route("/v1/audit", createAuditRouter(storage));
   app.route("/v1/conversations", createConversationsRouter(storage));
+  app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth }));
 
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 

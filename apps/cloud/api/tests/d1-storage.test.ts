@@ -11,7 +11,7 @@
 import { AuditEventSchema, ManifestSchema } from "@agentagora/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { D1Storage } from "../src/d1-storage.js";
-import type { AgentRecord } from "../src/storage.js";
+import type { AgentRecord, DisputeRecord } from "../src/storage.js";
 import { createMockD1 } from "./_d1-mock.js";
 
 type ManifestInput = Parameters<typeof ManifestSchema.parse>[0];
@@ -204,6 +204,44 @@ describe("D1Storage", () => {
       await storage.ingestAuditEvent(event("e1", "2026-05-01T00:00:00.000Z"), "second");
       const events = await storage.getConversationEvents("convo-x");
       expect(events).toHaveLength(1);
+    });
+  });
+
+  describe("disputes", () => {
+    function dispute(overrides: Partial<DisputeRecord> = {}): DisputeRecord {
+      return {
+        disputeId: "disp_test_0001",
+        conversationId: "convo-d1",
+        filedBy: "alice",
+        filerAid: "aid:agentagora:alice/code-review",
+        respondentAid: "aid:agentagora:bob/translator",
+        reason: "non_delivery",
+        state: "open",
+        filedAt: "2026-05-01T12:00:00.000Z",
+        ...overrides,
+      };
+    }
+
+    it("round-trips a dispute with optional fields populated", async () => {
+      await storage.createDispute(dispute({ narrative: "broke things", claimedRemedy: "refund" }));
+      const got = await storage.getDispute("disp_test_0001");
+      expect(got?.disputeId).toBe("disp_test_0001");
+      expect(got?.narrative).toBe("broke things");
+      expect(got?.claimedRemedy).toBe("refund");
+      expect(got?.resolvedAt).toBeUndefined();
+    });
+
+    it("round-trips a dispute with optional fields omitted", async () => {
+      await storage.createDispute(dispute());
+      const got = await storage.getDispute("disp_test_0001");
+      expect(got?.narrative).toBeUndefined();
+      expect(got?.claimedRemedy).toBeUndefined();
+      expect(got?.resolvedAt).toBeUndefined();
+      expect(got?.resolution).toBeUndefined();
+    });
+
+    it("returns undefined for an unknown dispute_id", async () => {
+      expect(await storage.getDispute("disp_nope")).toBeUndefined();
     });
   });
 });

@@ -7,7 +7,13 @@
  */
 
 import type { AuditEvent, Manifest } from "@agentagora/protocol";
-import type { AgentRecord, SearchFilter, Storage } from "./storage.js";
+import type {
+  AgentRecord,
+  DisputeReason,
+  DisputeRecord,
+  SearchFilter,
+  Storage,
+} from "./storage.js";
 
 interface AgentRow {
   manifest: string;
@@ -155,6 +161,78 @@ export class D1Storage implements Storage {
       .all<{ event_json: string }>();
     return results.map((r) => JSON.parse(r.event_json) as AuditEvent);
   }
+
+  async createDispute(record: DisputeRecord): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO disputes
+           (dispute_id, conversation_id, filed_by, filer_aid, respondent_aid,
+            reason, narrative, claimed_remedy, state, filed_at,
+            resolved_at, resolution)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.disputeId,
+        record.conversationId,
+        record.filedBy,
+        record.filerAid,
+        record.respondentAid,
+        record.reason,
+        record.narrative ?? null,
+        record.claimedRemedy ?? null,
+        record.state,
+        record.filedAt,
+        record.resolvedAt ?? null,
+        record.resolution ?? null,
+      )
+      .run();
+  }
+
+  async getDispute(disputeId: string): Promise<DisputeRecord | undefined> {
+    const row = await this.db
+      .prepare(
+        `SELECT dispute_id, conversation_id, filed_by, filer_aid, respondent_aid,
+                reason, narrative, claimed_remedy, state, filed_at,
+                resolved_at, resolution
+         FROM disputes WHERE dispute_id = ?`,
+      )
+      .bind(disputeId)
+      .first<DisputeRow>();
+    return row ? rowToDispute(row) : undefined;
+  }
+}
+
+interface DisputeRow {
+  dispute_id: string;
+  conversation_id: string;
+  filed_by: string;
+  filer_aid: string;
+  respondent_aid: string;
+  reason: string;
+  narrative: string | null;
+  claimed_remedy: string | null;
+  state: string;
+  filed_at: string;
+  resolved_at: string | null;
+  resolution: string | null;
+}
+
+function rowToDispute(row: DisputeRow): DisputeRecord {
+  const out: DisputeRecord = {
+    disputeId: row.dispute_id,
+    conversationId: row.conversation_id,
+    filedBy: row.filed_by,
+    filerAid: row.filer_aid,
+    respondentAid: row.respondent_aid,
+    reason: row.reason as DisputeReason,
+    state: row.state as DisputeRecord["state"],
+    filedAt: row.filed_at,
+  };
+  if (row.narrative !== null) out.narrative = row.narrative;
+  if (row.claimed_remedy !== null) out.claimedRemedy = row.claimed_remedy;
+  if (row.resolved_at !== null) out.resolvedAt = row.resolved_at;
+  if (row.resolution !== null) out.resolution = row.resolution;
+  return out;
 }
 
 function rowToRecord(row: AgentRow): AgentRecord {
