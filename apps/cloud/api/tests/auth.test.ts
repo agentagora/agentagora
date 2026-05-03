@@ -13,6 +13,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { StaticOwnerAuth, parseOwnerTokens } from "../src/auth.js";
 import { createApi } from "../src/index.js";
+import { ChainOwnerAuth, OauthSessionAuth } from "../src/oauth-github.js";
 import { InMemoryStorage } from "../src/storage.js";
 import { type SigningKey, generateSigningKey, signManifest } from "./_signing.js";
 
@@ -138,6 +139,65 @@ describe("POST /v1/agents — auth", () => {
     // Bad token + bad body → 401, not 400.
     const res = await publish(app, { not: "a manifest" }, "tok-unknown");
     expect(res.status).toBe(401);
+  });
+});
+
+describe("ChainOwnerAuth — OAuth-issued bearers and OWNER_TOKENS bearers coexist", () => {
+  it("OAuth-issued bearer authenticates POST /v1/agents the same as OWNER_TOKENS", async () => {
+    const storage = new InMemoryStorage();
+    const staticAuth = new StaticOwnerAuth({ "tok-alice": "alice" });
+    // Pre-seed an oauth session as if /v1/auth/github/callback had run.
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    await storage.createOauthSession({
+      bearer: "oauth-bearer-fresh",
+      ownerId: "gh:weijt606",
+      provider: "github",
+      providerUid: "4242",
+      issuedAt: issuedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    const ownerAuth = new ChainOwnerAuth(staticAuth, new OauthSessionAuth(storage));
+    const app = createApi({ storage, ownerAuth });
+
+    const ghManifest = {
+      ...validManifest,
+      aid: "aid:agentagora:gh-weijt606/code-review",
+    };
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: "Bearer oauth-bearer-fresh",
+    };
+    const { pubkey, signature } = await signManifest(ghManifest, aliceKey);
+    headers["x-aap-pubkey"] = pubkey;
+    headers["x-aap-signature"] = signature;
+    const res = await app.request("/v1/agents", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(ghManifest),
+    });
+    expect(res.status).toBe(201);
+    const stored = await storage.getAgent(ghManifest.aid);
+    expect(stored?.publishedBy).toBe("gh:weijt606");
+
+    // The static OWNER_TOKEN bearer still works for a separate AID.
+    const aliceManifest = { ...validManifest, aid: "aid:agentagora:alice/code-review" };
+    const aliceHeaders: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: "Bearer tok-alice",
+    };
+    const aliceSig = await signManifest(aliceManifest, aliceKey);
+    aliceHeaders["x-aap-pubkey"] = aliceSig.pubkey;
+    aliceHeaders["x-aap-signature"] = aliceSig.signature;
+    const aliceRes = await app.request("/v1/agents", {
+      method: "POST",
+      headers: aliceHeaders,
+      body: JSON.stringify(aliceManifest),
+    });
+    expect(aliceRes.status).toBe(201);
+    const aliceStored = await storage.getAgent(aliceManifest.aid);
+    expect(aliceStored?.publishedBy).toBe("alice");
   });
 });
 

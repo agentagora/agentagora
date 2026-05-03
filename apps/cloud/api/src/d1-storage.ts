@@ -11,6 +11,7 @@ import type {
   AgentRecord,
   DisputeReason,
   DisputeRecord,
+  OauthSessionRecord,
   RefundRecord,
   SearchFilter,
   Storage,
@@ -305,6 +306,51 @@ export class D1Storage implements Storage {
       .first<StripeAccountRow>();
     return row ? rowToStripeAccount(row) : undefined;
   }
+
+  async createOauthSession(record: OauthSessionRecord): Promise<void> {
+    // INSERT OR IGNORE makes a (statistically impossible) bearer
+    // collision a no-op rather than a 500 to the dashboard.
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO oauth_sessions
+           (bearer, owner_id, provider, provider_uid, email, issued_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.bearer,
+        record.ownerId,
+        record.provider,
+        record.providerUid,
+        record.email ?? null,
+        record.issuedAt,
+        record.expiresAt,
+      )
+      .run();
+  }
+
+  async getOauthSession(bearer: string): Promise<OauthSessionRecord | undefined> {
+    const row = await this.db
+      .prepare(
+        `SELECT bearer, owner_id, provider, provider_uid, email, issued_at, expires_at
+         FROM oauth_sessions
+         WHERE bearer = ? AND expires_at > ?`,
+      )
+      .bind(bearer, new Date().toISOString())
+      .first<OauthSessionRow>();
+    return row ? rowToOauthSession(row) : undefined;
+  }
+
+  async deleteExpiredOauthSessions(now: string): Promise<number> {
+    const result = await this.db
+      .prepare("DELETE FROM oauth_sessions WHERE expires_at <= ?")
+      .bind(now)
+      .run();
+    // D1's RunResult.meta.changes is the row-count when available;
+    // tests under the node:sqlite shim return undefined — just report
+    // 0 in that case rather than throwing.
+    const meta = (result as { meta?: { changes?: number } }).meta;
+    return typeof meta?.changes === "number" ? meta.changes : 0;
+  }
 }
 
 const STRIPE_COLS =
@@ -394,4 +440,27 @@ function rowToRecord(row: AgentRow): AgentRecord {
     publishedBy: row.published_by,
     pubkey: row.pubkey,
   };
+}
+
+interface OauthSessionRow {
+  bearer: string;
+  owner_id: string;
+  provider: string;
+  provider_uid: string;
+  email: string | null;
+  issued_at: string;
+  expires_at: string;
+}
+
+function rowToOauthSession(row: OauthSessionRow): OauthSessionRecord {
+  const out: OauthSessionRecord = {
+    bearer: row.bearer,
+    ownerId: row.owner_id,
+    provider: row.provider as OauthSessionRecord["provider"],
+    providerUid: row.provider_uid,
+    issuedAt: row.issued_at,
+    expiresAt: row.expires_at,
+  };
+  if (row.email !== null) out.email = row.email;
+  return out;
 }

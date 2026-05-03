@@ -60,6 +60,34 @@ export interface DisputeRecord {
 }
 
 /**
+ * OAuth-issued dashboard session. Persisted by the
+ * /v1/auth/github/callback handler; resolved on every authenticated
+ * cloud-api request via OauthSessionAuth.
+ *
+ * The bearer is the table's primary key and is the value the dashboard
+ * stores in its encrypted session cookie. The owner_id (`gh:<login>`)
+ * is what every existing route already keys off — agents.published_by,
+ * disputes.filedBy, etc. — so OAuth and OWNER_TOKENS bearers compose
+ * uniformly behind the OwnerAuthenticator interface.
+ */
+export interface OauthSessionRecord {
+  /** Opaque random bearer (32 bytes, base64url). Primary key. */
+  bearer: string;
+  /** Stable owner ID; "gh:<login>" today, "<provider>:<id>" later. */
+  ownerId: string;
+  /** Identity provider; "github" today. */
+  provider: "github";
+  /** Provider-side user ID (numeric for GitHub, stable across renames). */
+  providerUid: string;
+  /** Optional primary email when the OAuth scope returned one. */
+  email?: string;
+  /** ISO 8601 — when the bearer was minted. */
+  issuedAt: string;
+  /** ISO 8601 — issuedAt + 30d. Stale rows refuse to authenticate. */
+  expiresAt: string;
+}
+
+/**
  * Auto-refund ledger entry. Written by the Stripe webhook handler on
  * `charge.refunded` events for AAP-tagged charges. Read by the dispute
  * intake route to short-circuit the human-loop case ("paid call failed
@@ -127,6 +155,24 @@ export interface Storage {
   getStripeAccountByOwner(ownerId: string): Promise<StripeAccountRecord | undefined>;
   /** Fetch by Stripe account ID (used by webhooks). */
   getStripeAccountByStripeId(stripeAccountId: string): Promise<StripeAccountRecord | undefined>;
+
+  // OAuth-issued dashboard sessions
+  /** Persist a freshly minted bearer → owner mapping. Idempotent on
+   *  bearer primary-key collision (which is statistically impossible
+   *  for 32 random bytes — collision means caller bug, log + ignore). */
+  createOauthSession(record: OauthSessionRecord): Promise<void>;
+  /** Look up a session by bearer. Returns undefined when missing.
+   *  Implementations MAY filter rows past expires_at — the D1 path
+   *  does (defense-in-depth + so stale rows can't leak side-channel
+   *  metadata via a hit/miss timing distinguisher). The InMemoryStorage
+   *  used by tests does not filter; the OauthSessionAuth.resolve()
+   *  layer always re-checks the session row's expires_at against an
+   *  injectable clock so tests can simulate time-passage without
+   *  poking Date.now globally. */
+  getOauthSession(bearer: string): Promise<OauthSessionRecord | undefined>;
+  /** Sweeper: delete every row whose expires_at is ≤ now. Called
+   *  out-of-band by an admin / cron task; safe to run any time. */
+  deleteExpiredOauthSessions(now: string): Promise<number>;
 }
 
 /** In-memory storage. Per-isolate on Workers, lost on cold start.
@@ -139,6 +185,7 @@ export class InMemoryStorage implements Storage {
   private readonly stripeAccounts = new Map<string, StripeAccountRecord>();
   private readonly stripeAccountsByStripeId = new Map<string, StripeAccountRecord>();
   private readonly refunds = new Map<string, RefundRecord>();
+  private readonly oauthSessions = new Map<string, OauthSessionRecord>();
 
   async getAgent(aid: string): Promise<AgentRecord | undefined> {
     return this.agents.get(aid);
@@ -245,6 +292,28 @@ export class InMemoryStorage implements Storage {
     return rec ? { ...rec } : undefined;
   }
 
+  async createOauthSession(record: OauthSessionRecord): Promise<void> {
+    if (this.oauthSessions.has(record.bearer)) return;
+    this.oauthSessions.set(record.bearer, { ...record });
+  }
+
+  async getOauthSession(bearer: string): Promise<OauthSessionRecord | undefined> {
+    const rec = this.oauthSessions.get(bearer);
+    return rec ? { ...rec } : undefined;
+  }
+
+  async deleteExpiredOauthSessions(now: string): Promise<number> {
+    const cutoff = new Date(now).getTime();
+    let removed = 0;
+    for (const [bearer, rec] of this.oauthSessions) {
+      if (new Date(rec.expiresAt).getTime() <= cutoff) {
+        this.oauthSessions.delete(bearer);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   /** Test helper: drop all records. */
   clear(): void {
     this.agents.clear();
@@ -254,6 +323,7 @@ export class InMemoryStorage implements Storage {
     this.stripeAccounts.clear();
     this.stripeAccountsByStripeId.clear();
     this.refunds.clear();
+    this.oauthSessions.clear();
   }
 }
 

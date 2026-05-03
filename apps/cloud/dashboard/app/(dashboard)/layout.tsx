@@ -78,7 +78,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         <div style={{ marginTop: "auto", borderTop: "1px solid #eee", paddingTop: 16 }}>
           <div style={{ fontSize: 13, color: "#444", marginBottom: 8 }}>
-            Signed in as <strong>{session.ownerLabel}</strong>
+            Signed in as{" "}
+            <strong>
+              {session.provider === "github" && session.githubLogin
+                ? `@${session.githubLogin}`
+                : session.ownerLabel}
+            </strong>
           </div>
           <LogoutButton />
         </div>

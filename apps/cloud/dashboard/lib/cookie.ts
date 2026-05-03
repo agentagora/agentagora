@@ -22,15 +22,26 @@ const DEC = new TextDecoder();
 
 export interface SessionPayload {
   /** The cloud-api bearer token (plaintext within the cookie body —
-   *  the cookie itself is encrypted). */
+   *  the cookie itself is encrypted). For OAuth sessions this is the
+   *  opaque random bearer cloud-api minted at /v1/auth/github/callback;
+   *  for static sessions it's whatever bearer the user pasted. */
   bearer: string;
-  /** Display name surfaced in the UI. Until cloud-api exposes a
-   *  whoami endpoint we just label the session "owner" until the
-   *  user publishes their first agent. */
+  /** Display name surfaced in the UI. For OAuth sessions this is
+   *  `gh:<login>`; for static / paste sessions it falls back to the
+   *  user-supplied label or "owner". */
   ownerLabel: string;
   /** ISO timestamp the session was issued at (for future expiry
    *  policy; not currently enforced server-side). */
   issuedAt: string;
+  /** How the session was minted. "github" for OAuth-issued bearers,
+   *  "static" for the closed-alpha bearer-paste path. Optional so
+   *  cookies issued before this field landed still decrypt cleanly —
+   *  the layout renders an "@<login>" header only when provider is
+   *  "github". */
+  provider?: "github" | "static";
+  /** GitHub login when `provider === "github"`. Surfaces in the
+   *  sidebar header as `Signed in as @<login>`. */
+  githubLogin?: string;
 }
 
 /** Cookie name. Prefixed `__Host-`-style would require Secure + Path=/

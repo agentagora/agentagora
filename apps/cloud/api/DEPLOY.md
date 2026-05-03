@@ -122,6 +122,31 @@ The cloud talks to Stripe via fetch (no `stripe-node` dep), so the
 Worker bundle stays small. Store the live key in production only;
 test keys are fine for `wrangler dev` and CI.
 
+### `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (required for /v1/auth/github/*)
+
+GitHub OAuth app credentials. When both are set (and `OIDC_SIGNING_KEY` is configured for state HMAC), the dashboard's "Sign in with GitHub" CTA works end-to-end. Without them, `/v1/auth/github/*` returns `503 not_configured` and the dashboard falls back to the closed-alpha bearer-paste sign-in.
+
+Create an OAuth app at https://github.com/settings/developers ("New OAuth App"). Set the authorization callback URL to your dashboard's callback page, e.g. `https://dashboard.example.com/login/callback`.
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put GITHUB_CLIENT_ID
+# Paste the "Client ID" shown on the OAuth app page (Iv1.…).
+
+pnpm --filter @agentagora/cloud-api exec wrangler secret put GITHUB_CLIENT_SECRET
+# Paste a freshly generated client secret. Treat it like a database password:
+# rotate by clicking "Generate a new client secret" and replacing the wrangler
+# secret; existing OAuth-issued bearers stay valid (they're stored in
+# oauth_sessions, not derived from the client secret).
+```
+
+Optional: set `GITHUB_REDIRECT_URI` if your callback URL differs from the OAuth app's default.
+
+The state parameter passed back through GitHub is HMAC-signed with a key derived from `OIDC_SIGNING_KEY`. State has a 10-minute freshness window — leaked states past that age cannot complete a callback.
+
+OAuth-issued bearers are 32 random bytes (base64url-encoded), persisted in the `oauth_sessions` D1 table for 30 days. They authenticate alongside `OWNER_TOKENS` bearers — both schemes coexist behind the same `OwnerAuthenticator` chain, so CI / integration test bearers (which run on raw `OWNER_TOKENS`) never break when OAuth is added.
+
+To sweep expired sessions, call `Storage.deleteExpiredOauthSessions(now)` from a maintenance task; the index on `expires_at` makes this a fast prefix scan.
+
 ### `STRIPE_WEBHOOK_SECRET` (required for /v1/stripe/webhook)
 
 The endpoint signing secret (`whsec_…`) printed when you create the

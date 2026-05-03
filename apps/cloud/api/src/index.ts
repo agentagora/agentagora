@@ -33,6 +33,15 @@ import { Hono } from "hono";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
 import { D1Storage } from "./d1-storage.js";
 import { InMemoryNonceStore, KvNonceStore, type NonceStore } from "./nonces.js";
+import {
+  ChainOwnerAuth,
+  GithubHttpClient,
+  type GithubLike,
+  type GithubOauthConfig,
+  OauthSessionAuth,
+  createGithubOauthRouter,
+  deriveStateSigningKey,
+} from "./oauth-github.js";
 import { OidcIssuer, decodePrivateKey } from "./oidc.js";
 import { InMemoryRateLimiter, KvRateLimiter, type RateLimiter } from "./rate-limit.js";
 import { createAgentsRouter } from "./routes/agents.js";
@@ -93,6 +102,22 @@ export interface Env {
    * returns 503 not_configured.
    */
   STRIPE_WEBHOOK_SECRET?: string;
+  /**
+   * GitHub OAuth app client id (the public half of the credential
+   * pair). Required for /v1/auth/github/* — without it the routes
+   * return 503 not_configured (mirrors the Stripe pattern).
+   */
+  GITHUB_CLIENT_ID?: string;
+  /**
+   * GitHub OAuth app client secret. Paired with GITHUB_CLIENT_ID.
+   * Without it the github routes return 503 not_configured.
+   */
+  GITHUB_CLIENT_SECRET?: string;
+  /**
+   * Optional override for the GitHub OAuth redirect URI. When unset,
+   * GitHub uses the OAuth app's default callback URL.
+   */
+  GITHUB_REDIRECT_URI?: string;
 }
 
 export interface CreateApiOptions {
@@ -131,6 +156,21 @@ export interface CreateApiOptions {
    * returns 503 not_configured. Tests pass a fixed-secret verifier.
    */
   stripeWebhookVerifier?: WebhookVerifier;
+  /**
+   * GitHub OAuth wiring. When all three (config, client, key) are
+   * provided, /v1/auth/github/* is mounted. When any are missing,
+   * the routes return 503 not_configured.
+   */
+  githubOauth?: {
+    config: GithubOauthConfig;
+    client: GithubLike;
+    /** 32-byte HMAC key for signing OAuth `state`. */
+    stateSigningKey: Uint8Array;
+    /** Override the wall clock for deterministic tests. */
+    now?: () => Date;
+    /** Override the bearer minter for deterministic tests. */
+    newBearer?: () => string;
+  };
 }
 
 /**
@@ -193,6 +233,31 @@ export function createApi(options: CreateApiOptions = {}): Hono {
     );
   }
 
+  const githubOauth = options.githubOauth;
+  if (githubOauth) {
+    app.route(
+      "/v1/auth/github",
+      createGithubOauthRouter({
+        config: githubOauth.config,
+        github: githubOauth.client,
+        storage,
+        stateSigningKey: githubOauth.stateSigningKey,
+        ...(githubOauth.now ? { now: githubOauth.now } : {}),
+        ...(githubOauth.newBearer ? { newBearer: githubOauth.newBearer } : {}),
+      }),
+    );
+  } else {
+    app.all("/v1/auth/github/*", (c) =>
+      c.json(
+        {
+          error: "not_configured",
+          message: "GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET are not set",
+        },
+        503,
+      ),
+    );
+  }
+
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 
   app.onError((err, c) => {
@@ -210,12 +275,17 @@ let cached: Promise<Hono> | undefined;
 
 async function buildApp(env: Env): Promise<Hono> {
   const storage: Storage = env.DB ? new D1Storage(env.DB) : new InMemoryStorage();
-  const ownerAuth = new StaticOwnerAuth(parseOwnerTokens(env.OWNER_TOKENS));
-  if (!ownerAuth.hasAnyTokens) {
+  const staticAuth = new StaticOwnerAuth(parseOwnerTokens(env.OWNER_TOKENS));
+  if (!staticAuth.hasAnyTokens) {
     console.warn(
-      "[cloud-api] OWNER_TOKENS not configured — POST /v1/agents will reject every request",
+      "[cloud-api] OWNER_TOKENS not configured — closed-alpha bearer-paste sign-in disabled",
     );
   }
+  // OAuth-issued bearers and OWNER_TOKENS-issued bearers compose
+  // behind a single OwnerAuthenticator so route code stays identical.
+  // Static lookup runs first (constant time, no DB round-trip); the
+  // session table is consulted only when the static map misses.
+  const ownerAuth = new ChainOwnerAuth(staticAuth, new OauthSessionAuth(storage));
   const nonceStore: NonceStore = env.NONCES
     ? new KvNonceStore(env.NONCES)
     : new InMemoryNonceStore();
@@ -268,6 +338,36 @@ async function buildApp(env: Env): Promise<Hono> {
     console.warn("[cloud-api] STRIPE_WEBHOOK_SECRET missing — /v1/stripe/webhook will return 503");
   }
 
+  let githubOauth: CreateApiOptions["githubOauth"] | undefined;
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET && env.OIDC_SIGNING_KEY) {
+    try {
+      const stateSigningKey = await deriveStateSigningKey(decodePrivateKey(env.OIDC_SIGNING_KEY));
+      const config: GithubOauthConfig = {
+        clientId: env.GITHUB_CLIENT_ID,
+        clientSecret: env.GITHUB_CLIENT_SECRET,
+      };
+      if (env.GITHUB_REDIRECT_URI) config.redirectUri = env.GITHUB_REDIRECT_URI;
+      githubOauth = {
+        config,
+        client: new GithubHttpClient(),
+        stateSigningKey,
+      };
+    } catch (err) {
+      console.error(
+        "[cloud-api] GitHub OAuth wiring failed (likely OIDC_SIGNING_KEY malformed) — /v1/auth/github/* will return 503",
+        err,
+      );
+    }
+  } else if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
+    console.warn(
+      "[cloud-api] GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET missing — /v1/auth/github/* will return 503",
+    );
+  } else {
+    console.warn(
+      "[cloud-api] OIDC_SIGNING_KEY missing — /v1/auth/github/* will return 503 (state signing requires it)",
+    );
+  }
+
   return createApi({
     storage,
     ownerAuth,
@@ -276,6 +376,7 @@ async function buildApp(env: Env): Promise<Hono> {
     rateLimiter,
     stripe,
     stripeWebhookVerifier,
+    ...(githubOauth ? { githubOauth } : {}),
   });
 }
 
