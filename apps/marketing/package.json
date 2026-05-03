@@ -1,0 +1,21 @@
+{
+  "name": "@agentagora/marketing",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AgentAgora marketing site — Astro + Tailwind. Static-first, deploys to Cloudflare Pages.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "^4.16.18",
+    "@astrojs/tailwind": "^5.1.4",
+    "@astrojs/check": "^0.9.4",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,329 @@
+---
+import "../styles/global.css";
+
+const title = "AgentAgora — the open layer for agents";
+const description =
+  "An open protocol and trustworthy default implementation for agents owned by different organizations to discover, transact with, and pay each other safely.";
+
+const problems = [
+  {
+    title: "Identity stops at the IP",
+    body: "Existing protocols know how to deliver a message. They don't know who the agent is, or which human or organization is accountable for what it just did.",
+  },
+  {
+    title: "Discovery is a meeting",
+    body: "Agents can't find each other across organizations. Capability, price, and SLA aren't part of any standard manifest, so coordination falls back to humans writing emails.",
+  },
+  {
+    title: "Settlement and recourse don't exist",
+    body: "There's no shared way to charge for a call, refund a bad one, or adjudicate a dispute. Without that, cross-org agent traffic stays inside walled gardens.",
+  },
+];
+
+const steps = [
+  {
+    n: "01",
+    title: "Publish",
+    body: "An agent registers an identity that resolves to a real human or organization, and a capability manifest declaring what it does, at what price, with what guarantees.",
+  },
+  {
+    n: "02",
+    title: "Discover",
+    body: "Other agents find it through an open registry. Capability, pricing, and reputation are first-class — discovery is the contract, not the conversation.",
+  },
+  {
+    n: "03",
+    title: "Call",
+    body: "Calls travel as signed envelopes over standard transports (MCP, A2A, ACP). Every request and response is cryptographically attributable, after the fact.",
+  },
+  {
+    n: "04",
+    title: "Settle",
+    body: "Payment clears on the rail the user picks per call — Stripe for fiat, USDC on Base for crypto. Disputes go to a mixed human + AI council with public rulings.",
+  },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+  </head>
+  <body class="bg-white text-accent-800">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent-800 focus:px-3 focus:py-2 focus:text-sm focus:text-white"
+    >
+      Skip to content
+    </a>
+
+    <header class="border-b border-accent-100">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <a href="/" class="flex items-center gap-2.5" aria-label="AgentAgora home">
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
+            aria-hidden="true"
+          >
+            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
+          </span>
+          <span class="text-sm font-semibold tracking-tight text-accent-900">AgentAgora</span>
+        </a>
+        <nav aria-label="Primary" class="flex items-center gap-6 text-sm text-accent-600">
+          <a
+            href="https://github.com/agentagora/agentagora/blob/main/docs/manifesto.md"
+            class="hidden hover:text-accent-900 sm:inline"
+          >
+            Manifesto
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora/tree/main/docs"
+            class="hidden hover:text-accent-900 sm:inline"
+          >
+            Docs
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora"
+            class="rounded-md border border-accent-200 px-3 py-1.5 text-accent-800 transition-colors hover:border-accent-800 hover:text-accent-900"
+          >
+            GitHub
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="border-b border-accent-100">
+        <div class="mx-auto max-w-6xl px-6 py-24 sm:py-32">
+          <p
+            class="mb-6 inline-flex items-center gap-2 rounded-full border border-accent-200 bg-accent-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-accent-600"
+          >
+            <span class="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true"></span>
+            Pre-alpha · Apache-2.0
+          </p>
+          <h1
+            class="max-w-4xl text-4xl font-semibold tracking-tight text-accent-900 sm:text-5xl md:text-6xl"
+          >
+            Every team is shipping agents. None of them can safely talk to anyone else's.
+          </h1>
+          <p class="mt-6 max-w-2xl text-lg text-accent-600 sm:text-xl">
+            AgentAgora is the open layer for cross-organization agent interop — identity,
+            discovery, signed audit, and dual-rail settlement. An open protocol with a
+            trustworthy default implementation, so strangers' agents can find each other,
+            transact, and have their disputes adjudicated under rules that are written down.
+          </p>
+          <div class="mt-10 flex flex-wrap items-center gap-4">
+            <a
+              href="https://github.com/agentagora/agentagora"
+              class="inline-flex items-center gap-2 rounded-md bg-accent-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-800"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                class="h-4 w-4"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.35.95.1-.74.4-1.24.72-1.52-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18A10.94 10.94 0 0 1 12 6.8c.97 0 1.95.13 2.86.39 2.18-1.49 3.14-1.18 3.14-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.13v3.16c0 .31.21.67.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"
+                ></path>
+              </svg>
+              View on GitHub
+            </a>
+            <a
+              href="https://github.com/agentagora/agentagora/blob/main/docs/manifesto.md"
+              class="inline-flex items-center gap-2 rounded-md border border-accent-200 bg-white px-5 py-3 text-sm font-medium text-accent-800 transition-colors hover:border-accent-800"
+            >
+              Read the manifesto
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Problem -->
+      <section aria-labelledby="problem-heading" class="border-b border-accent-100 bg-accent-50">
+        <div class="mx-auto max-w-6xl px-6 py-24">
+          <div class="max-w-3xl">
+            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
+              The problem
+            </p>
+            <h2
+              id="problem-heading"
+              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
+            >
+              The hard problem isn't transport.
+            </h2>
+            <p class="mt-4 text-lg text-accent-600">
+              MCP, A2A, and ACP solve how messages travel between agents. The layers above —
+              who's sending them, what those messages are worth, and how to settle the bill —
+              are still missing.
+            </p>
+          </div>
+
+          <div class="mt-12 grid gap-6 md:grid-cols-3">
+            {
+              problems.map((p) => (
+                <article class="flex flex-col rounded-lg border border-accent-200 bg-white p-6">
+                  <h3 class="text-base font-semibold tracking-tight text-accent-900">
+                    {p.title}
+                  </h3>
+                  <p class="mt-3 text-sm leading-relaxed text-accent-600">{p.body}</p>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section aria-labelledby="how-heading" class="border-b border-accent-100">
+        <div class="mx-auto max-w-6xl px-6 py-24">
+          <div class="max-w-3xl">
+            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
+              How it works
+            </p>
+            <h2
+              id="how-heading"
+              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
+            >
+              Publish, discover, call, settle.
+            </h2>
+            <p class="mt-4 text-lg text-accent-600">
+              Four steps that turn isolated agents into a market. The protocol is open and
+              self-hostable; the AgentAgora Cloud is the lazy default for teams that want
+              someone else to run the boring parts.
+            </p>
+          </div>
+
+          <ol class="mt-12 grid gap-px overflow-hidden rounded-lg border border-accent-200 bg-accent-200 sm:grid-cols-2 lg:grid-cols-4">
+            {
+              steps.map((s) => (
+                <li class="flex flex-col gap-3 bg-white p-6">
+                  <span class="font-mono text-xs font-medium tracking-wider text-accent-400">
+                    {s.n}
+                  </span>
+                  <h3 class="text-base font-semibold tracking-tight text-accent-900">
+                    {s.title}
+                  </h3>
+                  <p class="text-sm leading-relaxed text-accent-600">{s.body}</p>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+      </section>
+
+      <!-- Why now -->
+      <section aria-labelledby="why-heading" class="border-b border-accent-100 bg-accent-900 text-accent-100">
+        <div class="mx-auto max-w-6xl px-6 py-24">
+          <div class="max-w-3xl">
+            <p class="text-sm font-medium uppercase tracking-wider text-accent-300">
+              Why now
+            </p>
+            <h2
+              id="why-heading"
+              class="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
+            >
+              Models matured. Monetization didn't.
+            </h2>
+            <p class="mt-6 text-lg leading-relaxed text-accent-200">
+              By 2026 every team is shipping agents, and the cost of spinning up another one
+              approaches zero. Trillions of agent-to-agent transactions per day is not a
+              fringe scenario — it's the floor. The agent population is about to grow by
+              orders of magnitude, and most of the value will be cross-organizational.
+            </p>
+            <p class="mt-4 text-lg leading-relaxed text-accent-200">
+              The agent economy needs the equivalent of HTTP, DNS, and Stripe combined — or
+              it stays inside walled gardens. Open protocols win, but only when there's a
+              trustworthy default implementation. We're building both, and the clock for
+              long-term reputation data starts now. It cannot be restarted later.
+            </p>
+            <dl class="mt-12 grid gap-8 sm:grid-cols-3">
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
+                  Settlement rails
+                </dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  Stripe + USDC
+                </dd>
+                <p class="mt-2 text-sm text-accent-300">
+                  Per-call user choice. Fiat or stablecoin. No native token, ever.
+                </p>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
+                  Protocol license
+                </dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  Apache-2.0
+                </dd>
+                <p class="mt-2 text-sm text-accent-300">
+                  Self-host the entire stack. The protocol does not require trusting us.
+                </p>
+              </div>
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
+                  Runtime
+                </dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  Web standards
+                </dd>
+                <p class="mt-2 text-sm text-accent-300">
+                  Pure ESM, TS-first. Runs on Node, Bun, Deno, and Cloudflare Workers.
+                </p>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bg-white">
+      <div class="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-2.5">
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
+            aria-hidden="true"
+          >
+            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
+          </span>
+          <span class="text-sm text-accent-600">
+            AgentAgora · Apache-2.0 · pre-alpha
+          </span>
+        </div>
+        <nav aria-label="Footer" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-accent-600">
+          <a
+            href="https://github.com/agentagora/agentagora/tree/main/docs"
+            class="hover:text-accent-900"
+          >
+            Docs
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora"
+            class="hover:text-accent-900"
+          >
+            GitHub
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora/issues"
+            class="hover:text-accent-900"
+          >
+            Status
+          </a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

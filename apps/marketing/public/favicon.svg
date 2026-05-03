@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AgentAgora">
+  <rect width="32" height="32" rx="6" fill="#23272f"/>
+  <circle cx="16" cy="16" r="7" fill="none" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="16" cy="16" r="2" fill="#ffffff"/>
+</svg>
