@@ -122,13 +122,22 @@ The cloud talks to Stripe via fetch (no `stripe-node` dep), so the
 Worker bundle stays small. Store the live key in production only;
 test keys are fine for `wrangler dev` and CI.
 
-### Future secrets
+### `STRIPE_WEBHOOK_SECRET` (required for /v1/stripe/webhook)
 
-| Secret | Purpose | Task |
-|---|---|---|
-| `STRIPE_WEBHOOK_SECRET` | Webhook signature check | task #11 |
+The endpoint signing secret (`whsec_…`) printed when you create the
+webhook in the Stripe dashboard. Without it, `/v1/stripe/webhook`
+returns `503 not_configured`.
 
-Add via `wrangler secret put <NAME>` when each lands.
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put STRIPE_WEBHOOK_SECRET
+# Paste the whsec_… value from Stripe.
+```
+
+In the Stripe dashboard, point the webhook endpoint at
+`https://<your-worker-url>/v1/stripe/webhook` and enable at least
+`account.updated` (the only event the closed-alpha handler acts on
+today; other events are ack'd as `200 ignored` so Stripe won't
+retry).
 
 ---
 

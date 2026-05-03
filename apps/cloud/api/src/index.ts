@@ -20,6 +20,7 @@
  *   POST /v1/nonces/check           reserve a nonce [Bearer]
  *   POST /v1/connect/onboarding     Stripe Express onboarding link [Bearer]
  *   GET  /v1/connect/account        owner's Connect account status [Bearer]
+ *   POST /v1/stripe/webhook         Stripe → cloud event ingestion (HMAC)
  */
 
 import { Hono } from "hono";
@@ -33,7 +34,9 @@ import { createAuditRouter, createConversationsRouter } from "./routes/audit.js"
 import { createConnectRouter } from "./routes/connect.js";
 import { createDisputesRouter } from "./routes/disputes.js";
 import { createNoncesRouter } from "./routes/nonces.js";
+import { createStripeWebhookRouter } from "./routes/stripe-webhook.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
+import { HmacWebhookVerifier, type WebhookVerifier } from "./stripe-webhook.js";
 import { HttpStripeApiClient, type StripeApiClient } from "./stripe.js";
 
 /**
@@ -78,6 +81,12 @@ export interface Env {
    * 503 because the Stripe API client isn't configured.
    */
   STRIPE_SECRET_KEY?: string;
+  /**
+   * Stripe webhook endpoint signing secret (whsec_…). Required for
+   * /v1/stripe/webhook to verify deliveries. Without it the route
+   * returns 503 not_configured.
+   */
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 export interface CreateApiOptions {
@@ -111,6 +120,11 @@ export interface CreateApiOptions {
    * STRIPE_SECRET_KEY; tests pass an in-memory mock.
    */
   stripe?: StripeApiClient;
+  /**
+   * Stripe webhook verifier. When absent, /v1/stripe/webhook
+   * returns 503 not_configured. Tests pass a fixed-secret verifier.
+   */
+  stripeWebhookVerifier?: WebhookVerifier;
 }
 
 /**
@@ -124,6 +138,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   const nonceStore = options.nonceStore ?? new InMemoryNonceStore();
   const rateLimiter = options.rateLimiter;
   const stripe = options.stripe;
+  const stripeWebhookVerifier = options.stripeWebhookVerifier;
   const app = new Hono();
 
   app.get("/", (c) =>
@@ -158,6 +173,17 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   } else {
     app.all("/v1/connect/*", (c) =>
       c.json({ error: "not_configured", message: "STRIPE_SECRET_KEY is not set" }, 503),
+    );
+  }
+
+  if (stripeWebhookVerifier) {
+    app.route(
+      "/v1/stripe/webhook",
+      createStripeWebhookRouter({ storage, verifier: stripeWebhookVerifier }),
+    );
+  } else {
+    app.all("/v1/stripe/webhook", (c) =>
+      c.json({ error: "not_configured", message: "STRIPE_WEBHOOK_SECRET is not set" }, 503),
     );
   }
 
@@ -229,7 +255,22 @@ async function buildApp(env: Env): Promise<Hono> {
     );
   }
 
-  return createApi({ storage, ownerAuth, oidc, nonceStore, rateLimiter, stripe });
+  let stripeWebhookVerifier: WebhookVerifier | undefined;
+  if (env.STRIPE_WEBHOOK_SECRET) {
+    stripeWebhookVerifier = new HmacWebhookVerifier(env.STRIPE_WEBHOOK_SECRET);
+  } else {
+    console.warn("[cloud-api] STRIPE_WEBHOOK_SECRET missing — /v1/stripe/webhook will return 503");
+  }
+
+  return createApi({
+    storage,
+    ownerAuth,
+    oidc,
+    nonceStore,
+    rateLimiter,
+    stripe,
+    stripeWebhookVerifier,
+  });
 }
 
 export default {
