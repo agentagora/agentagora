@@ -70,6 +70,9 @@ coverage/
 **/coverage/
 *.lcov
 
+# ===== Latency benchmark output =====
+apps/cloud/api/bench/results.json
+
 # ===== Logs & runtime =====
 *.log
 logs/

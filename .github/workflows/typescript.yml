@@ -74,12 +74,17 @@ jobs:
       - name: Test all packages
         run: pnpm test
 
-      # Coverage is informational only for now (no thresholds, no
-      # upload). Once we have a settled baseline we can promote it
-      # to a gate. Emits a per-package summary table to the run log.
-      - name: Coverage (informational)
+      # Coverage gate (M3 §D). Per-package thresholds live in each
+      # package's vitest.config.ts and were locked ~5pp below the
+      # measured baseline so small refactors don't flap CI. vitest
+      # will exit non-zero if any threshold drops.
+      #
+      # Gated packages: @agentagora/protocol, @agentagora/sdk,
+      # @agentagora/cloud-api. apps/status and apps/cloud/dashboard
+      # are intentionally excluded — they have no meaningful test
+      # coverage yet and would only add noise.
+      - name: Test coverage (gated)
         run: pnpm -r test --coverage --coverage.reporter=text-summary
-        continue-on-error: true
 
       # Bundle-size budget — guards the "must run on Cloudflare Workers"
       # constraint in docs/tech-stack.md §8 principle #1. The worker-agent
@@ -149,3 +154,106 @@ jobs:
             exit 1
           fi
           echo "::notice::Bundle within budget (${RAW_KIB}/${CLOUD_API_RAW_LIMIT_KIB} KiB raw, ${GZIP_KIB}/${CLOUD_API_GZIP_LIMIT_KIB} KiB gzip)"
+
+  # M3 §A.5 — synthetic latency benchmark for the cloud-api control
+  # plane. Spins up `wrangler dev`, hammers the read-path routes with
+  # ~100 sequential GETs each (after a 10-request warm-up), and fails
+  # if median or p95 overhead exceeds the PRD §9.3 #4 acceptance
+  # criterion (200 ms p95).
+  #
+  # Marked `continue-on-error: true` for now — informational while we
+  # establish a baseline. Promote to required after 2 weeks of green
+  # runs.
+  latency-bench:
+    name: latency benchmark (cloud-api)
+    runs-on: ubuntu-latest
+    needs: build-test-lint
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      LATENCY_P50_MS_LIMIT: 100
+      LATENCY_P95_MS_LIMIT: 200
+      BENCH_BASE_URL: http://127.0.0.1:8787
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start cloud-api (wrangler dev) in the background
+        run: |
+          set -euo pipefail
+          mkdir -p .bench-logs
+          # `wrangler dev` defaults to 127.0.0.1:8787. We pin --ip and
+          # --port explicitly so the URL is stable even if wrangler
+          # changes its defaults.
+          nohup pnpm --filter @agentagora/cloud-api dev -- \
+            --ip 127.0.0.1 --port 8787 \
+            > .bench-logs/wrangler.log 2>&1 &
+          echo $! > .bench-logs/wrangler.pid
+          echo "wrangler dev pid=$(cat .bench-logs/wrangler.pid)"
+
+      - name: Wait for /healthz to respond (timeout 30s)
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 30))
+          until curl -fsS "$BENCH_BASE_URL/healthz" >/dev/null 2>&1; do
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::wrangler dev failed to respond on $BENCH_BASE_URL/healthz within 30s"
+              echo "----- wrangler.log (tail) -----"
+              tail -n 200 .bench-logs/wrangler.log || true
+              # Best-effort cleanup so the runner can finalize.
+              if [ -f .bench-logs/wrangler.pid ]; then
+                kill -TERM "$(cat .bench-logs/wrangler.pid)" 2>/dev/null || true
+              fi
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "cloud-api is up at $BENCH_BASE_URL"
+
+      - name: Run latency benchmark
+        id: bench
+        run: pnpm --filter @agentagora/cloud-api bench
+
+      - name: Upload bench results JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-api-latency-bench
+          path: apps/cloud/api/bench/results.json
+          if-no-files-found: warn
+
+      - name: Stop wrangler dev
+        if: always()
+        run: |
+          if [ -f .bench-logs/wrangler.pid ]; then
+            pid=$(cat .bench-logs/wrangler.pid)
+            echo "stopping wrangler dev pid=$pid"
+            kill -TERM "$pid" 2>/dev/null || true
+            # Give it 5s to exit gracefully, then force.
+            for _ in 1 2 3 4 5; do
+              if ! kill -0 "$pid" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            kill -KILL "$pid" 2>/dev/null || true
+          fi
+
+      - name: Append wrangler log to step summary on failure
+        if: failure()
+        run: |
+          {
+            echo "## wrangler dev log (tail)"
+            echo '```'
+            tail -n 200 .bench-logs/wrangler.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
