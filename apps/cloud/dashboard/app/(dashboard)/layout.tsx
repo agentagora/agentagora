@@ -20,6 +20,7 @@ const navItems = [
   { href: "/agents", label: "Agents" },
   { href: "/conversations", label: "Conversations" },
   { href: "/earnings", label: "Earnings" },
+  { href: "/onboarding", label: "Onboarding" },
   { href: "/disputes", label: "Disputes" },
 ];
 
