@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agentagora-status",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "observability": {
+    "enabled": true
+  },
+  // Upstream healthz endpoint to probe. Override per-environment via
+  //   wrangler deploy --var UPSTREAM_HEALTHZ:https://api.example.com/healthz
+  // or by setting `vars` blocks for `env.production` etc.
+  "vars": {
+    "UPSTREAM_HEALTHZ": "http://localhost:8787/healthz"
+  }
+}
