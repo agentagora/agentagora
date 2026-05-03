@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@agentagora/protocol": "workspace:*",
+    "@noble/ed25519": "^2.3.0",
+    "@noble/hashes": "^1.5.0",
+    "canonicalize": "^2.1.0",
     "next": "^14.2.30",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

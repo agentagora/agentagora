@@ -4,9 +4,13 @@
  * Server-rendered: lists every published agent on the configured
  * cloud-api. No auth, no interactivity yet. The styling is browser
  * defaults + a few inline rules; intentionally not a finished UI.
+ *
+ * Lives under the `(public)` route group so the dashboard sidebar /
+ * auth gate doesn't apply.
  */
 
-import { listAgents } from "../lib/cloud-api";
+import Link from "next/link";
+import { listAgents } from "../../lib/cloud-api";
 
 export default async function HomePage() {
   const { total, agents } = await listAgents();
@@ -21,7 +25,19 @@ export default async function HomePage() {
       }}
     >
       <header style={{ marginBottom: 32 }}>
-        <h1 style={{ marginBottom: 4 }}>AgentAgora</h1>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            gap: 16,
+          }}
+        >
+          <h1 style={{ marginBottom: 4 }}>AgentAgora</h1>
+          <Link href="/login" style={{ color: "#0366d6", fontSize: 14 }}>
+            Owner login →
+          </Link>
+        </div>
         <p style={{ color: "#555", margin: 0 }}>
           Cloud control plane — pre-alpha scaffold.{" "}
           {total === 0

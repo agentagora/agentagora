@@ -5,17 +5,23 @@
 ## What's wired
 
 - Workspace-mounted under `apps/cloud/*` (auto-discovered by pnpm)
-- `app/page.tsx` server-renders the public agent catalog by calling `cloud-api`'s `GET /v1/agents`
-- `lib/cloud-api.ts` is the typed client (just the read paths needed today)
+- `app/(public)/page.tsx` server-renders the public agent catalog at `/`
+- `app/(public)/login/page.tsx` — closed-alpha bearer-token login (Server Action)
+- `app/(dashboard)/*` — gated owner UI (sidebar nav, `/home`, `/agents`, `/agents/new`, `/agents/[aid]`, plus stub pages for conversations / earnings / disputes)
+- `lib/cloud-api.ts` typed client (public reads + bearer-aware GETs)
+- `lib/cookie.ts` — AES-256-GCM session-cookie encryption (key is SHA-256 of `DASHBOARD_COOKIE_SECRET`)
+- `lib/auth.ts` — `getOwnerSession()` + `requireOwner()` for Server Components
+- `lib/sign-manifest.ts` — browser-only Ed25519 signing for the publish form
 - Cloud-api base URL comes from `AGENTAGORA_CLOUD_URL` (defaults to `http://localhost:8787`)
+- Cookie-encryption secret comes from `DASHBOARD_COOKIE_SECRET` (32+ random bytes; ephemeral fallback is generated for dev with a warning)
 
 ## What's intentionally NOT wired (pending UX decisions)
 
-- **Authentication.** No OIDC / GitHub OAuth flow yet — needs design alignment on which provider, session handling, and what "owner" means in the UI. Tracked in `docs/m3-launch-checklist.md` §A.2.
+- **Real OIDC.** Today's login is the closed-alpha bearer placeholder. GitHub / Google sign-up is M3 §A.2; the cookie contract is provider-agnostic so the swap is mostly a route-handler change.
 - **Brand / design system.** Inline styles and browser defaults only. Tailwind / shadcn / a custom token set is a UX call.
-- **Agent CRUD.** Publish / edit / delete forms — server side is ready (`POST /v1/agents`), but the form UX, signature handling, and key management story all need a session.
-- **Conversations / disputes / earnings views.** Routes scoped in §A.1 of the checklist; not stubbed here so the empty pages don't pretend to work.
-- **Stripe Connect onboarding UX.** The `POST /v1/connect/onboarding` server route returns the link; clicking through to it from the dashboard is §A.3.
+- **Owner-scoped indexes.** Cloud-api list endpoint doesn't filter by `published_by`; until it does, `/agents` shows the public catalog and the home dashboard renders "—" for conversations / disputes counts.
+- **Conversations / disputes / earnings views.** Stub pages are linked in the sidebar; they explicitly say "not wired" rather than pretending to work.
+- **Stripe Connect onboarding UX.** Server side already exists; dashboard click-through is §A.3.
 
 ## Dev
 
