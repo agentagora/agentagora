@@ -162,6 +162,32 @@ export function createConnectRouter({
     });
   });
 
+  // Public: which Stripe Connect account receives payments routed to
+  // this AID? Returned only when the agent's owner has finished
+  // onboarding (charges_enabled), so callers don't pin destinations
+  // that would later fail.
+  router.get("/accounts/:aid", async (c) => {
+    const aid = decodeURIComponent(c.req.param("aid"));
+    const agent = await storage.getAgent(aid);
+    if (!agent) {
+      return c.json({ error: "not_found", message: `agent ${aid} not found` }, 404);
+    }
+    const account = await storage.getStripeAccountByOwner(agent.publishedBy);
+    if (!account || !account.chargesEnabled) {
+      return c.json(
+        {
+          error: "not_ready",
+          message: `${aid}'s owner has not completed Stripe onboarding`,
+        },
+        404,
+      );
+    }
+    return c.json({
+      aid,
+      account_id: account.stripeAccountId,
+    });
+  });
+
   return router;
 }
 

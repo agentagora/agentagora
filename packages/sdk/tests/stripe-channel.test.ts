@@ -133,6 +133,51 @@ describe("StripeChannel.escrow", () => {
     expect(params.application_fee_amount).toBeUndefined();
   });
 
+  it("routes via payeeAccountResolver per call (destination charge)", async () => {
+    const { stripe, calls } = makeFakeStripe();
+    const channel = new StripeChannel(stripe, {
+      payeeAccountResolver: async (aid) =>
+        aid === "aid:agentagora:bob/code-review" ? "acct_bob_42" : "acct_other",
+    });
+    await channel.escrow({
+      payerAid: "aid:agentagora:alice/x",
+      payeeAid: "aid:agentagora:bob/code-review",
+      amount: "5.00",
+      currency: "USD",
+      conversationId: "c1",
+    });
+    const params = calls.intentsCreate[0] as Stripe.PaymentIntentCreateParams;
+    expect(params.transfer_data?.destination).toBe("acct_bob_42");
+
+    // Different payee → different account.
+    await channel.escrow({
+      payerAid: "aid:agentagora:alice/x",
+      payeeAid: "aid:agentagora:carol/y",
+      amount: "5.00",
+      currency: "USD",
+      conversationId: "c2",
+    });
+    const params2 = calls.intentsCreate[1] as Stripe.PaymentIntentCreateParams;
+    expect(params2.transfer_data?.destination).toBe("acct_other");
+  });
+
+  it("falls back to defaultPayeeAccount when the resolver returns undefined", async () => {
+    const { stripe, calls } = makeFakeStripe();
+    const channel = new StripeChannel(stripe, {
+      defaultPayeeAccount: "acct_platform_fallback",
+      payeeAccountResolver: async () => undefined,
+    });
+    await channel.escrow({
+      payerAid: "aid:agentagora:a/x",
+      payeeAid: "aid:agentagora:b/y",
+      amount: "1.00",
+      currency: "USD",
+      conversationId: "c1",
+    });
+    const params = calls.intentsCreate[0] as Stripe.PaymentIntentCreateParams;
+    expect(params.transfer_data?.destination).toBe("acct_platform_fallback");
+  });
+
   it("rejects invalid decimal amounts", async () => {
     const { stripe } = makeFakeStripe();
     const channel = new StripeChannel(stripe);

@@ -52,6 +52,7 @@ describe("@agentagora/sdk public API surface", () => {
         "b64uEncode",
         "canonicalizeForSigning",
         "capability",
+        "cloudPayeeAccountResolver",
         "createAgent",
         "createStripeChannelFromKey",
         "formatAid",

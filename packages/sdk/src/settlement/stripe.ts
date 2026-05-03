@@ -38,9 +38,20 @@ export interface StripeLike {
 export interface StripeChannelOptions {
   /**
    * Default Connect account id to receive payouts. Used as the
-   * `transfer_data.destination` on PaymentIntents when set.
+   * `transfer_data.destination` on PaymentIntents when no
+   * `payeeAccountResolver` is set or the resolver returns undefined.
    */
   defaultPayeeAccount?: string;
+  /**
+   * Per-call resolver: given the payee AID, return the Stripe Connect
+   * account id (acct_…) that should receive funds. When this is set,
+   * the channel uses destination charges routed to the recipient's
+   * connected account — exactly the "marketplace" Connect topology.
+   *
+   * Returning undefined falls back to `defaultPayeeAccount`. Returning
+   * undefined for both routes the funds to the platform account.
+   */
+  payeeAccountResolver?: (payeeAid: string) => Promise<string | undefined>;
   /** Default currency for new escrows. ISO 4217. */
   currency?: string;
   /**
@@ -57,12 +68,14 @@ export class StripeChannel implements SettlementChannel {
   private readonly stripe: StripeLike;
   private readonly defaultCurrency: string;
   private readonly defaultPayeeAccount: string | undefined;
+  private readonly payeeAccountResolver: StripeChannelOptions["payeeAccountResolver"];
   private readonly platformFeeBp: number;
 
   constructor(stripe: StripeLike, options: StripeChannelOptions = {}) {
     this.stripe = stripe;
     this.defaultCurrency = (options.currency ?? "USD").toLowerCase();
     this.defaultPayeeAccount = options.defaultPayeeAccount;
+    this.payeeAccountResolver = options.payeeAccountResolver;
     this.platformFeeBp = options.platformFeeBasisPoints ?? DEFAULT_FEE_BP;
   }
 
@@ -88,8 +101,10 @@ export class StripeChannel implements SettlementChannel {
       },
     };
     if (fee > 0) params.application_fee_amount = fee;
-    if (this.defaultPayeeAccount) {
-      params.transfer_data = { destination: this.defaultPayeeAccount };
+    const destination =
+      (await this.payeeAccountResolver?.(args.payeeAid)) ?? this.defaultPayeeAccount;
+    if (destination) {
+      params.transfer_data = { destination };
     }
 
     const intent = await this.stripe.paymentIntents.create(params);
@@ -166,6 +181,47 @@ export async function createStripeChannelFromKey(
     ...(options.httpClient ? { httpClient: options.httpClient } : {}),
   });
   return new StripeChannel(stripeInstance as unknown as StripeLike, options);
+}
+
+/**
+ * Build a `payeeAccountResolver` that consults cloud-api's public
+ * `GET /v1/connect/accounts/:aid` endpoint. Returns the connected
+ * Stripe account id when the recipient has finished onboarding,
+ * undefined otherwise — letting `defaultPayeeAccount` take over (or
+ * payment going straight to the platform account if none is set).
+ *
+ * Cached per-AID for the lifetime of the resolver instance; pass a
+ * fresh resolver if you need to invalidate.
+ */
+export function cloudPayeeAccountResolver(
+  cloudUrl: string,
+  options: { fetchImpl?: typeof fetch } = {},
+): (payeeAid: string) => Promise<string | undefined> {
+  const url = cloudUrl.replace(/\/+$/, "");
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const cache = new Map<string, string | undefined>();
+  return async (payeeAid: string) => {
+    if (cache.has(payeeAid)) return cache.get(payeeAid);
+    let res: Response;
+    try {
+      res = await fetchImpl(`${url}/v1/connect/accounts/${encodeURIComponent(payeeAid)}`);
+    } catch (err) {
+      console.warn("[cloudPayeeAccountResolver] cloud unreachable", err);
+      return undefined;
+    }
+    if (res.status === 404) {
+      cache.set(payeeAid, undefined);
+      return undefined;
+    }
+    if (!res.ok) {
+      console.warn(`[cloudPayeeAccountResolver] unexpected status ${res.status}`);
+      return undefined;
+    }
+    const body = (await res.json()) as { account_id?: unknown };
+    const accountId = typeof body.account_id === "string" ? body.account_id : undefined;
+    cache.set(payeeAid, accountId);
+    return accountId;
+  };
 }
 
 /**

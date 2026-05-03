@@ -72,6 +72,7 @@ export { CloudNonceTracker } from "./cloud-nonce-tracker.js";
 export type { CloudNonceTrackerOptions } from "./cloud-nonce-tracker.js";
 export type { ConversationSnapshot } from "./conversation.js";
 export {
+  cloudPayeeAccountResolver,
   createStripeChannelFromKey,
   StripeChannel,
   stripeChannelFromEnv,

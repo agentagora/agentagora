@@ -50,6 +50,7 @@ export {
   type StripeChannelOptions,
   type StripeLike,
   StripeChannel,
+  cloudPayeeAccountResolver,
   createStripeChannelFromKey,
   stripeChannelFromEnv,
 } from "./stripe.js";

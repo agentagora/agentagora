@@ -217,6 +217,95 @@ describe("GET /v1/connect/account", () => {
   });
 });
 
+describe("GET /v1/connect/accounts/:aid (public)", () => {
+  it("404 when the AID is not registered", async () => {
+    const { app } = setup();
+    const res = await app.request("/v1/connect/accounts/aid%3Aagentagora%3Aghost%2Fnobody");
+    expect(res.status).toBe(404);
+  });
+
+  it("404 not_ready when the owner has not completed onboarding", async () => {
+    const { app } = setup();
+    // Onboard alice but don't flip charges_enabled.
+    await postOnboarding(app, validBody, "tok-alice");
+
+    // Need a registered agent owned by alice. We don't run the
+    // publish flow here (it'd require signing); seed storage directly.
+    const setupRes = setup();
+    // setupRes is a fresh harness — use it instead so the agent + onboard line up.
+    await setupRes.storage.putAgent({
+      manifest: {
+        manifest_version: 1,
+        aid: "aid:agentagora:alice/agent" as never,
+        endpoints: { rpc: "https://example.com" },
+        capabilities: [
+          {
+            name: "x",
+            input_schema: { type: "object" },
+            output_schema: { type: "object" },
+            pricing: { model: "per_call", amount: "1.00", currency: "USD" },
+            sla: {},
+            accepts: ["stripe-fiat"],
+          },
+        ],
+        privacy: { data_retention_days: 7, pii_handling: "redact", region_restriction: [] },
+        metadata: { tags: [], languages: [], models_used: [] },
+      } as never,
+      identityJwt: "mock",
+      publishedAt: "2026-05-01T00:00:00.000Z",
+      publishedBy: "alice",
+      pubkey: "x".repeat(43),
+    });
+    await postOnboarding(setupRes.app, validBody, "tok-alice");
+    const res = await setupRes.app.request("/v1/connect/accounts/aid%3Aagentagora%3Aalice%2Fagent");
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("not_ready");
+  });
+
+  it("200 with the account_id once onboarding has completed", async () => {
+    const { app, storage, stripe } = setup();
+    // Seed an alice-owned agent and an onboarded alice account.
+    await storage.putAgent({
+      manifest: {
+        manifest_version: 1,
+        aid: "aid:agentagora:alice/agent" as never,
+        endpoints: { rpc: "https://example.com" },
+        capabilities: [
+          {
+            name: "x",
+            input_schema: { type: "object" },
+            output_schema: { type: "object" },
+            pricing: { model: "per_call", amount: "1.00", currency: "USD" },
+            sla: {},
+            accepts: ["stripe-fiat"],
+          },
+        ],
+        privacy: { data_retention_days: 7, pii_handling: "redact", region_restriction: [] },
+        metadata: { tags: [], languages: [], models_used: [] },
+      } as never,
+      identityJwt: "mock",
+      publishedAt: "2026-05-01T00:00:00.000Z",
+      publishedBy: "alice",
+      pubkey: "x".repeat(43),
+    });
+    const onboard = await postOnboarding(app, validBody, "tok-alice");
+    const onboardBody = (await onboard.json()) as { account_id: string };
+    // Mark alice's account as onboarded by updating storage.
+    const account = await storage.getStripeAccountByOwner("alice");
+    if (!account) throw new Error("setup: account missing");
+    await storage.upsertStripeAccount({ ...account, chargesEnabled: true });
+    // (stripe mock isn't strictly needed past this point — keep in
+    // scope so the test reads naturally if we extend it.)
+    void stripe;
+
+    const res = await app.request("/v1/connect/accounts/aid%3Aagentagora%3Aalice%2Fagent");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { aid: string; account_id: string };
+    expect(body.account_id).toBe(onboardBody.account_id);
+  });
+});
+
 describe("/v1/connect/* with no Stripe client configured", () => {
   it("returns 503 not_configured", async () => {
     const { app } = setup({ stripe: null });
