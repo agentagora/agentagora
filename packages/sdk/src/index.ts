@@ -71,7 +71,7 @@ export type {
 } from "./agent.js";
 export { CloudNonceTracker } from "./cloud-nonce-tracker.js";
 export type { CloudNonceTrackerOptions } from "./cloud-nonce-tracker.js";
-export type { ConversationSnapshot } from "./conversation.js";
+export type { ConversationRefund, ConversationSnapshot } from "./conversation.js";
 export {
   cloudPayeeAccountResolver,
   createStripeChannelFromKey,
@@ -87,6 +87,7 @@ export type {
   StripeChannelFromKeyOptions,
   StripeChannelOptions,
   StripeLike,
+  UsdcBaseChannelOptions,
 } from "./settlement/index.js";
 
 // Re-export the protocol types so users only need one import.

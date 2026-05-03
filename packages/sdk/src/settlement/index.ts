@@ -55,3 +55,4 @@ export {
   stripeChannelFromEnv,
 } from "./stripe.js";
 export { UsdcBaseChannel } from "./usdc-base.js";
+export type { UsdcBaseChannelOptions } from "./usdc-base.js";
