@@ -160,6 +160,97 @@ export async function getConversation(id: string): Promise<ConversationResponse 
 }
 
 /**
+ * `GET /v1/connect/account` — caller's Stripe Connect account status.
+ *
+ * Returns:
+ *   `{ kind: "ok", ... }`         200 from cloud-api with the account record
+ *   `{ kind: "missing" }`         404 — owner has no Stripe account yet
+ *   `{ kind: "unreachable" }`     network error or unexpected non-2xx
+ *
+ * We model "no account yet" as a first-class case rather than a
+ * `null` return because the page rendering distinguishes it from
+ * "cloud-api is down" (different copy, different next action).
+ */
+export interface StripeAccountStatus {
+  details_submitted: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+}
+
+export interface StripeAccountResponse {
+  account_id: string;
+  status: StripeAccountStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StripeAccountResult =
+  | ({ kind: "ok" } & StripeAccountResponse)
+  | { kind: "missing" }
+  | { kind: "unreachable" };
+
+export async function getStripeAccount(bearer: string): Promise<StripeAccountResult> {
+  const url = `${BASE_URL}/v1/connect/account`;
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { authorization: `Bearer ${bearer}` },
+    });
+    if (res.status === 404) return { kind: "missing" };
+    if (!res.ok) {
+      console.error(`[cloud-api] /v1/connect/account responded ${res.status}`);
+      return { kind: "unreachable" };
+    }
+    const body = (await res.json()) as StripeAccountResponse;
+    return { kind: "ok", ...body };
+  } catch (err) {
+    console.error("[cloud-api] /v1/connect/account unreachable", err);
+    return { kind: "unreachable" };
+  }
+}
+
+/**
+ * `GET /v1/disputes/:id` — public-by-ID case file read. No bearer
+ * required (dispute IDs are unguessable random tokens; the cloud-api
+ * deliberately leaves the read path open so adjudicators / inspectors
+ * can fetch chains without coordinating credentials).
+ *
+ * The wire shape mirrors `disputeView()` in cloud-api's
+ * `routes/disputes.ts`. Optional fields are populated only when the
+ * record carries them.
+ */
+export interface DisputeResponse {
+  dispute_id: string;
+  conversation_id: string;
+  filed_by: string;
+  filer_aid: string;
+  respondent_aid: string;
+  reason: "non_delivery" | "wrong_output" | "fraud" | "other";
+  state: "open" | "resolved" | "rejected" | string;
+  filed_at: string;
+  narrative?: string;
+  claimed_remedy?: string;
+  resolved_at?: string;
+  resolution?: string;
+}
+
+export async function getDispute(id: string): Promise<DisputeResponse | null> {
+  const url = `${BASE_URL}/v1/disputes/${encodeURIComponent(id)}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      console.error(`[cloud-api] /v1/disputes/${id} responded ${res.status}`);
+      return null;
+    }
+    return (await res.json()) as DisputeResponse;
+  } catch (err) {
+    console.error("[cloud-api] /v1/disputes/:id unreachable", err);
+    return null;
+  }
+}
+
+/**
  * Validate a bearer token by hitting cloud-api's healthz with the
  * Authorization header and confirming the API is reachable. The
  * cloud-api doesn't expose a `/v1/whoami`, so we can't actually
