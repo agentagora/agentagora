@@ -114,6 +114,13 @@ export interface ServeOptions {
    * Required.
    */
   signingKeyId?: string;
+  /**
+   * Replay-protection tracker. Defaults to a per-isolate
+   * `InMemoryNonceTracker`. Pass a `CloudNonceTracker` (or any
+   * implementation) to dedup nonces across Worker isolates and
+   * cold restarts.
+   */
+  nonceTracker?: NonceTracker;
 }
 
 export interface Agent {
@@ -159,12 +166,22 @@ const noOpTransport: Transport = {
 const TIMESTAMP_PAST_TOLERANCE_MS = 5 * 60_000; // 5 minutes
 const TIMESTAMP_FUTURE_TOLERANCE_MS = 30_000; // 30 seconds
 
+/**
+ * Replay-protection contract — receivers consult the tracker for
+ * each inbound envelope. Returns true on first sighting, false on
+ * replay. Async so a `CloudNonceTracker` (KV-backed via cloud-api)
+ * can replace the in-process variant for multi-isolate deployments.
+ */
+export interface NonceTracker {
+  check(envelope: RpcRequestEnvelope, nowMs: number): Promise<boolean>;
+}
+
 /** Per AAP-spec §11.1 — nonce uniqueness is enforced per (conversation_id, from).
  *  Old entries are pruned beyond TIMESTAMP_PAST_TOLERANCE_MS so memory stays bounded. */
-class NonceTracker {
+export class InMemoryNonceTracker implements NonceTracker {
   private seen = new Map<string, number>();
 
-  check(envelope: RpcRequestEnvelope, nowMs: number): boolean {
+  async check(envelope: RpcRequestEnvelope, nowMs: number): Promise<boolean> {
     this.prune(nowMs);
     const key = `${envelope.aap.conversation_id}\x00${envelope.aap.from}\x00${envelope.aap.nonce}`;
     if (this.seen.has(key)) return false;
@@ -191,7 +208,7 @@ class AgentImpl implements Agent {
   readonly options: AgentOptions;
   private context: ServeContext | undefined;
   private readonly auditLogs = new Map<string, AuditLog>();
-  private readonly nonceTracker = new NonceTracker();
+  private nonceTracker: NonceTracker = new InMemoryNonceTracker();
 
   constructor(options: AgentOptions) {
     this.name = options.name;
@@ -214,13 +231,14 @@ class AgentImpl implements Agent {
   }
 
   async serve(serveOptions: ServeOptions = {}): Promise<void> {
-    const { transport, registry, signingKey, signingKeyId } = serveOptions;
+    const { transport, registry, signingKey, signingKeyId, nonceTracker } = serveOptions;
     if (!registry) {
       throw new Error("Agent.serve: `registry` is required");
     }
     if (!signingKey || !signingKeyId) {
       throw new Error("Agent.serve: `signingKey` and `signingKeyId` are required");
     }
+    if (nonceTracker) this.nonceTracker = nonceTracker;
     this.context = {
       transport: transport ?? noOpTransport,
       registry,
@@ -309,7 +327,7 @@ class AgentImpl implements Agent {
     }
 
     // 0b. Nonce uniqueness enforcement (spec §11.1).
-    if (!this.nonceTracker.check(envelope, nowMs)) {
+    if (!(await this.nonceTracker.check(envelope, nowMs))) {
       return await this.errorResponse(
         envelope,
         ErrorCodes.Unauthorized,

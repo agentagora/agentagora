@@ -57,6 +57,7 @@ export type { AgentAgoraClientOptions, CallOptions, SpendCap } from "./client.js
 export {
   capability,
   createAgent,
+  InMemoryNonceTracker,
 } from "./agent.js";
 export type {
   Agent,
@@ -64,8 +65,11 @@ export type {
   CapabilityDefinition,
   CapabilityPrice,
   CapabilitySLA,
+  NonceTracker,
   ServeOptions,
 } from "./agent.js";
+export { CloudNonceTracker } from "./cloud-nonce-tracker.js";
+export type { CloudNonceTrackerOptions } from "./cloud-nonce-tracker.js";
 export type { ConversationSnapshot } from "./conversation.js";
 export {
   createStripeChannelFromKey,
