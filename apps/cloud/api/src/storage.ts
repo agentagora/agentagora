@@ -59,6 +59,27 @@ export interface DisputeRecord {
   resolution?: string;
 }
 
+/**
+ * Auto-refund ledger entry. Written by the Stripe webhook handler on
+ * `charge.refunded` events for AAP-tagged charges. Read by the dispute
+ * intake route to short-circuit the human-loop case ("paid call failed
+ * → refund happened → if a dispute is filed it's already resolved").
+ */
+export interface RefundRecord {
+  /** Stripe refund id (`re_…`); primary key. */
+  refundId: string;
+  /** AAP conversation id from the underlying charge metadata. */
+  conversationId: string;
+  /** Decimal-string amount (matches the SDK's escrow shape). */
+  amount: string;
+  /** ISO 4217. */
+  currency: string;
+  /** ISO 8601 — Stripe's `created` timestamp converted. */
+  refundedAt: string;
+  /** Stripe-reported reason, free-form ("requested_by_customer", etc.). */
+  reason?: string;
+}
+
 export interface Storage {
   // Agents
   getAgent(aid: string): Promise<AgentRecord | undefined>;
@@ -81,6 +102,23 @@ export interface Storage {
   createDispute(record: DisputeRecord): Promise<void>;
   /** Look up a dispute by its opaque ID. */
   getDispute(disputeId: string): Promise<DisputeRecord | undefined>;
+  /**
+   * Find every open dispute filed against the given conversation. Used
+   * by the refund webhook to retroactively resolve disputes that were
+   * filed before the refund landed.
+   */
+  getOpenDisputesByConversation(conversationId: string): Promise<DisputeRecord[]>;
+  /**
+   * Mark a dispute as resolved. No-op if the dispute is already
+   * resolved/closed/rejected — keeps webhook redelivery idempotent.
+   */
+  resolveDispute(disputeId: string, resolution: string, resolvedAt: string): Promise<void>;
+
+  // Auto-refund ledger
+  /** Idempotent insert by refund_id. Re-delivered webhooks are no-ops. */
+  recordRefund(record: RefundRecord): Promise<void>;
+  /** All refunds we know about for a conversation, newest first. */
+  getRefundsByConversation(conversationId: string): Promise<RefundRecord[]>;
 
   // Stripe Connect accounts
   /** Insert or update the owner's Stripe Connect account record. */
@@ -100,6 +138,7 @@ export class InMemoryStorage implements Storage {
   private readonly disputes = new Map<string, DisputeRecord>();
   private readonly stripeAccounts = new Map<string, StripeAccountRecord>();
   private readonly stripeAccountsByStripeId = new Map<string, StripeAccountRecord>();
+  private readonly refunds = new Map<string, RefundRecord>();
 
   async getAgent(aid: string): Promise<AgentRecord | undefined> {
     return this.agents.get(aid);
@@ -152,6 +191,42 @@ export class InMemoryStorage implements Storage {
     return rec ? { ...rec } : undefined;
   }
 
+  async getOpenDisputesByConversation(conversationId: string): Promise<DisputeRecord[]> {
+    const out: DisputeRecord[] = [];
+    for (const rec of this.disputes.values()) {
+      if (rec.conversationId === conversationId && rec.state === "open") {
+        out.push({ ...rec });
+      }
+    }
+    return out;
+  }
+
+  async resolveDispute(disputeId: string, resolution: string, resolvedAt: string): Promise<void> {
+    const rec = this.disputes.get(disputeId);
+    if (!rec) return;
+    if (rec.state !== "open") return;
+    this.disputes.set(disputeId, {
+      ...rec,
+      state: "resolved",
+      resolution,
+      resolvedAt,
+    });
+  }
+
+  async recordRefund(record: RefundRecord): Promise<void> {
+    if (this.refunds.has(record.refundId)) return;
+    this.refunds.set(record.refundId, { ...record });
+  }
+
+  async getRefundsByConversation(conversationId: string): Promise<RefundRecord[]> {
+    const out: RefundRecord[] = [];
+    for (const rec of this.refunds.values()) {
+      if (rec.conversationId === conversationId) out.push({ ...rec });
+    }
+    out.sort((a, b) => b.refundedAt.localeCompare(a.refundedAt));
+    return out;
+  }
+
   async upsertStripeAccount(record: StripeAccountRecord): Promise<void> {
     const copy = { ...record };
     this.stripeAccounts.set(record.ownerId, copy);
@@ -178,6 +253,7 @@ export class InMemoryStorage implements Storage {
     this.disputes.clear();
     this.stripeAccounts.clear();
     this.stripeAccountsByStripeId.clear();
+    this.refunds.clear();
   }
 }
 

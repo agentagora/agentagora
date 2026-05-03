@@ -21,6 +21,12 @@
  *   POST /v1/connect/onboarding     Stripe Express onboarding link [Bearer]
  *   GET  /v1/connect/account        owner's Connect account status [Bearer]
  *   POST /v1/stripe/webhook         Stripe → cloud event ingestion (HMAC)
+ *
+ * Stripe webhook event coverage:
+ *   - account.updated   refresh stripe_accounts cached flags
+ *   - charge.refunded   record into `refunds` table + auto-resolve any
+ *                        open dispute against the same conversation
+ *                        (PRD §9.3 #3 auto-refund loop)
  */
 
 import { Hono } from "hono";

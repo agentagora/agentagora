@@ -187,6 +187,14 @@ export function createDisputesRouter({
       );
     }
 
+    // Auto-resolve: if the platform already issued a refund for this
+    // conversation (charge.refunded webhook hit before the dispute was
+    // filed), short-circuit straight to `resolved` / `auto_refunded`.
+    // This is the "no human in the loop" promise from PRD §9.3 #3 —
+    // refund + dispute together = closed case.
+    const existingRefunds = await storage.getRefundsByConversation(body.conversation_id);
+    const filedAt = now().toISOString();
+
     const record: DisputeRecord = {
       disputeId: newDisputeId(),
       conversationId: body.conversation_id,
@@ -194,11 +202,15 @@ export function createDisputesRouter({
       filerAid: body.filer_aid,
       respondentAid: body.respondent_aid,
       reason: body.reason,
-      state: "open",
-      filedAt: now().toISOString(),
+      state: existingRefunds.length > 0 ? "resolved" : "open",
+      filedAt,
     };
     if (body.narrative !== undefined) record.narrative = body.narrative;
     if (body.claimed_remedy !== undefined) record.claimedRemedy = body.claimed_remedy;
+    if (existingRefunds.length > 0) {
+      record.resolution = "auto_refunded";
+      record.resolvedAt = filedAt;
+    }
 
     await storage.createDispute(record);
 

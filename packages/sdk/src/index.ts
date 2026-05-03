@@ -30,6 +30,7 @@ export {
 export { AuditLog, hashEvent } from "./audit.js";
 export {
   AAPError,
+  CallRefundedError,
   EscrowFailedError,
   InputInvalidError,
   ManifestMismatchError,

@@ -11,6 +11,7 @@ import type {
   AgentRecord,
   DisputeReason,
   DisputeRecord,
+  RefundRecord,
   SearchFilter,
   Storage,
   StripeAccountRecord,
@@ -202,6 +203,65 @@ export class D1Storage implements Storage {
     return row ? rowToDispute(row) : undefined;
   }
 
+  async getOpenDisputesByConversation(conversationId: string): Promise<DisputeRecord[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT dispute_id, conversation_id, filed_by, filer_aid, respondent_aid,
+                reason, narrative, claimed_remedy, state, filed_at,
+                resolved_at, resolution
+         FROM disputes
+         WHERE conversation_id = ? AND state = 'open'
+         ORDER BY filed_at ASC`,
+      )
+      .bind(conversationId)
+      .all<DisputeRow>();
+    return results.map(rowToDispute);
+  }
+
+  async resolveDispute(disputeId: string, resolution: string, resolvedAt: string): Promise<void> {
+    // Bound by `state = 'open'` so re-deliveries / late refunds don't
+    // overwrite a closed/rejected case file.
+    await this.db
+      .prepare(
+        `UPDATE disputes
+         SET state = 'resolved', resolution = ?, resolved_at = ?
+         WHERE dispute_id = ? AND state = 'open'`,
+      )
+      .bind(resolution, resolvedAt, disputeId)
+      .run();
+  }
+
+  async recordRefund(record: RefundRecord): Promise<void> {
+    // INSERT OR IGNORE makes Stripe webhook redelivery a no-op.
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO refunds
+           (refund_id, conversation_id, amount, currency, refunded_at, reason)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.refundId,
+        record.conversationId,
+        record.amount,
+        record.currency,
+        record.refundedAt,
+        record.reason ?? null,
+      )
+      .run();
+  }
+
+  async getRefundsByConversation(conversationId: string): Promise<RefundRecord[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT refund_id, conversation_id, amount, currency, refunded_at, reason
+         FROM refunds WHERE conversation_id = ?
+         ORDER BY refunded_at DESC`,
+      )
+      .bind(conversationId)
+      .all<RefundRow>();
+    return results.map(rowToRefund);
+  }
+
   async upsertStripeAccount(record: StripeAccountRecord): Promise<void> {
     await this.db
       .prepare(
@@ -302,6 +362,27 @@ function rowToDispute(row: DisputeRow): DisputeRecord {
   if (row.claimed_remedy !== null) out.claimedRemedy = row.claimed_remedy;
   if (row.resolved_at !== null) out.resolvedAt = row.resolved_at;
   if (row.resolution !== null) out.resolution = row.resolution;
+  return out;
+}
+
+interface RefundRow {
+  refund_id: string;
+  conversation_id: string;
+  amount: string;
+  currency: string;
+  refunded_at: string;
+  reason: string | null;
+}
+
+function rowToRefund(row: RefundRow): RefundRecord {
+  const out: RefundRecord = {
+    refundId: row.refund_id,
+    conversationId: row.conversation_id,
+    amount: row.amount,
+    currency: row.currency,
+    refundedAt: row.refunded_at,
+  };
+  if (row.reason !== null) out.reason = row.reason;
   return out;
 }
 

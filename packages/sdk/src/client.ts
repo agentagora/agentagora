@@ -24,7 +24,7 @@ import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
 import { AuditLog } from "./audit.js";
 import type { ConversationSnapshot } from "./conversation.js";
-import { AAPError } from "./errors.js";
+import { AAPError, CallRefundedError } from "./errors.js";
 import type { RegistryResolver } from "./registry.js";
 import type { EscrowHandle, SettlementChannel } from "./settlement/index.js";
 import { signEnvelope, verifyEnvelope } from "./signing.js";
@@ -133,6 +133,20 @@ export class AgentAgoraClient {
   ): Promise<T> {
     const snapshot = await this.callRich(aid, capabilityName, input, options);
     if (snapshot.error) {
+      // Paid call that returned an RPC error — escrow has already been
+      // refunded inside callRich(). Surface the refund metadata so the
+      // caller sees auto_refund happened without inspecting the audit
+      // log.
+      const refundData = extractRefundContext(snapshot);
+      if (refundData) {
+        throw new CallRefundedError({
+          cause: AAPError.fromRpc(snapshot.error),
+          escrowId: refundData.escrowId,
+          channelId: refundData.channelId,
+          refundTxId: refundData.refundTxId,
+          refundError: refundData.refundError,
+        });
+      }
       throw AAPError.fromRpc(snapshot.error);
     }
     return snapshot.result as T;
@@ -217,116 +231,149 @@ export class AgentAgoraClient {
       });
     }
 
-    // Build, sign, send the request.
-    const request: RpcRequestEnvelope = {
-      jsonrpc: "2.0",
-      id: requestId,
-      method: Methods.Invoke,
-      params: { capability: capabilityName, input },
-      aap: {
-        version: AAP_VERSION,
-        conversation_id: conversationId,
-        timestamp: makeTimestamp(),
-        nonce: makeId(),
-        from: fromAid as never,
-        to: aid as never,
-        signature: { alg: "EdDSA", key_id: signingKeyId, value: "" },
-      },
-    };
-    await signEnvelope(request, { privateKey: signingKey, keyId: signingKeyId });
+    // From this point forward, any thrown error must trigger a refund
+    // if escrow has been funded. Wrap the rest of the flow in a guard
+    // that consults `escrowSettled` so we never double-refund (RPC-error
+    // path refunds explicitly inside the try; transport / signature /
+    // unexpected throws refund in the catch).
+    let escrowSettled = false;
+    try {
+      // Build, sign, send the request.
+      const request: RpcRequestEnvelope = {
+        jsonrpc: "2.0",
+        id: requestId,
+        method: Methods.Invoke,
+        params: { capability: capabilityName, input },
+        aap: {
+          version: AAP_VERSION,
+          conversation_id: conversationId,
+          timestamp: makeTimestamp(),
+          nonce: makeId(),
+          from: fromAid as never,
+          to: aid as never,
+          signature: { alg: "EdDSA", key_id: signingKeyId, value: "" },
+        },
+      };
+      await signEnvelope(request, { privateKey: signingKey, keyId: signingKeyId });
 
-    const response = await transport.send(request);
+      const response = await transport.send(request);
 
-    // Verify the responder's signature.
-    const responderKey = await resolver.resolvePublicKey(aid);
-    const valid = await verifyEnvelope(response, responderKey);
-    if (!valid) {
-      // Hard failure — do not write further audit (we cannot trust
-      // anything from the responder in this state).
-      throw new AAPError(ErrorCodes.Unauthorized, "response signature verification failed");
-    }
+      // Verify the responder's signature.
+      const responderKey = await resolver.resolvePublicKey(aid);
+      const valid = await verifyEnvelope(response, responderKey);
+      if (!valid) {
+        // Hard failure — do not write further audit (we cannot trust
+        // anything from the responder in this state). The catch below
+        // refunds and re-throws.
+        throw new AAPError(ErrorCodes.Unauthorized, "response signature verification failed");
+      }
 
-    let snapshotError:
-      | { code: number; message: string; data?: Record<string, unknown> }
-      | undefined;
-    let result: unknown;
-    let status: ConversationStatus;
+      let snapshotError:
+        | { code: number; message: string; data?: Record<string, unknown> }
+        | undefined;
+      let result: unknown;
+      let status: ConversationStatus;
 
-    if ("error" in response) {
-      const wireErr = (response as RpcErrorResponseEnvelope).error;
-      snapshotError = wireErr;
-      status = ConversationStatuses.Cancelled;
-    } else {
-      result = (response as RpcSuccessResponseEnvelope).result;
-      status = ConversationStatuses.Archived;
-      // Audit: acknowledged. Only on success — failure paths do not
-      // emit ack because the initiator hasn't accepted any work.
+      if ("error" in response) {
+        const wireErr = (response as RpcErrorResponseEnvelope).error;
+        snapshotError = wireErr;
+        status = ConversationStatuses.Cancelled;
+      } else {
+        result = (response as RpcSuccessResponseEnvelope).result;
+        status = ConversationStatuses.Archived;
+        // Audit: acknowledged. Only on success — failure paths do not
+        // emit ack because the initiator hasn't accepted any work.
+        await writeEvent(log, {
+          type: AuditEventTypes.Acknowledged,
+          actorAid: fromAid,
+          privateKey: signingKey,
+          keyId: signingKeyId,
+          data: { responder: aid },
+        });
+      }
+
+      // Settle the escrow based on outcome.
+      let snapshotRefund: RefundContext | undefined;
+      if (channel && escrowHandle) {
+        if (snapshotError) {
+          snapshotRefund = await refundEscrow(
+            channel,
+            escrowHandle,
+            log,
+            fromAid,
+            signingKey,
+            signingKeyId,
+          );
+          escrowSettled = true;
+        } else {
+          const captureTxId = await channel.capture(escrowHandle);
+          escrowSettled = true;
+          // Once captured, the conversation is settled, not just archived.
+          status = ConversationStatuses.Settled;
+          await writeEvent(log, {
+            type: AuditEventTypes.EscrowCaptured,
+            actorAid: fromAid,
+            privateKey: signingKey,
+            keyId: signingKeyId,
+            data: {
+              channelId: channel.id,
+              escrowId: escrowHandle.escrowId,
+              captureTxId,
+            },
+          });
+        }
+      }
+
+      // Audit: conversation archived (always, regardless of outcome).
       await writeEvent(log, {
-        type: AuditEventTypes.Acknowledged,
+        type: AuditEventTypes.ConversationArchived,
         actorAid: fromAid,
         privateKey: signingKey,
         keyId: signingKeyId,
-        data: { responder: aid },
+        data: snapshotError ? { status, error: snapshotError } : { status },
       });
-    }
 
-    // Settle the escrow based on outcome.
-    if (channel && escrowHandle) {
-      if (snapshotError) {
-        const refundTxId = await channel.refund(escrowHandle);
-        await writeEvent(log, {
-          type: AuditEventTypes.EscrowRefunded,
-          actorAid: fromAid,
-          privateKey: signingKey,
-          keyId: signingKeyId,
-          data: {
-            channelId: channel.id,
-            escrowId: escrowHandle.escrowId,
-            refundTxId,
-          },
-        });
-      } else {
-        const captureTxId = await channel.capture(escrowHandle);
-        // Once captured, the conversation is settled, not just archived.
-        status = ConversationStatuses.Settled;
-        await writeEvent(log, {
-          type: AuditEventTypes.EscrowCaptured,
-          actorAid: fromAid,
-          privateKey: signingKey,
-          keyId: signingKeyId,
-          data: {
-            channelId: channel.id,
-            escrowId: escrowHandle.escrowId,
-            captureTxId,
-          },
+      return {
+        id: conversationId,
+        initiator: fromAid,
+        responder: aid,
+        capability: capabilityName,
+        status,
+        startedAt,
+        endedAt: new Date(),
+        priceAmount: options.pay?.amount,
+        currency: options.pay?.currency,
+        channel: channel?.id,
+        result,
+        error: snapshotError,
+        audit: log,
+        ...(snapshotRefund ? { refund: refundContextToSnapshot(snapshotRefund) } : {}),
+      } as ConversationSnapshot;
+    } catch (err) {
+      // Pre-RPC-result failure: transport blew up, response signature
+      // didn't verify, or any unexpected throw between escrow.funded
+      // and capture/refund. We still owe the payer their money.
+      if (channel && escrowHandle && !escrowSettled) {
+        const refund = await refundEscrow(
+          channel,
+          escrowHandle,
+          log,
+          fromAid,
+          signingKey,
+          signingKeyId,
+        );
+        escrowSettled = true;
+        const cause = err instanceof Error ? err : new Error(String(err));
+        throw new CallRefundedError({
+          cause,
+          escrowId: escrowHandle.escrowId,
+          channelId: channel.id,
+          refundTxId: refund.refundTxId,
+          refundError: refund.refundError,
         });
       }
+      throw err;
     }
-
-    // Audit: conversation archived (always, regardless of outcome).
-    await writeEvent(log, {
-      type: AuditEventTypes.ConversationArchived,
-      actorAid: fromAid,
-      privateKey: signingKey,
-      keyId: signingKeyId,
-      data: snapshotError ? { status, error: snapshotError } : { status },
-    });
-
-    return {
-      id: conversationId,
-      initiator: fromAid,
-      responder: aid,
-      capability: capabilityName,
-      status,
-      startedAt,
-      endedAt: new Date(),
-      priceAmount: options.pay?.amount,
-      currency: options.pay?.currency,
-      channel: channel?.id,
-      result,
-      error: snapshotError,
-      audit: log,
-    };
   }
 
   /** Look up the local (initiator-side) audit log for a conversation. */
@@ -362,4 +409,87 @@ export class AgentAgoraClient {
   async close(): Promise<void> {
     return;
   }
+}
+
+interface RefundContext {
+  readonly channelId: string;
+  readonly escrowId: string;
+  readonly refundTxId: string | undefined;
+  readonly refundError: Error | undefined;
+}
+
+/**
+ * Issue a refund against a funded escrow and append the matching
+ * audit event. Idempotence is the caller's responsibility — they
+ * gate this behind their own "already settled?" flag.
+ *
+ * If the refund call itself throws, we log it, attach the failure
+ * to the returned context, and emit the audit event with
+ * `refundError` so disputes can see the platform tried.
+ *
+ * Never re-throws — the original call error must win.
+ */
+async function refundEscrow(
+  channel: SettlementChannel,
+  escrow: EscrowHandle,
+  log: AuditLog,
+  actorAid: string,
+  privateKey: Uint8Array,
+  keyId: string,
+): Promise<RefundContext> {
+  let refundTxId: string | undefined;
+  let refundError: Error | undefined;
+  try {
+    refundTxId = await channel.refund(escrow);
+  } catch (err) {
+    refundError = err instanceof Error ? err : new Error(String(err));
+    console.error(
+      "[AgentAgoraClient] auto-refund failed",
+      { channelId: channel.id, escrowId: escrow.escrowId },
+      refundError,
+    );
+  }
+  await writeEvent(log, {
+    type: AuditEventTypes.EscrowRefunded,
+    actorAid,
+    privateKey,
+    keyId,
+    data: {
+      channelId: channel.id,
+      escrowId: escrow.escrowId,
+      ...(refundTxId !== undefined ? { refundTxId } : {}),
+      ...(refundError !== undefined ? { refundError: refundError.message } : {}),
+    },
+  });
+  return {
+    channelId: channel.id,
+    escrowId: escrow.escrowId,
+    refundTxId,
+    refundError,
+  };
+}
+
+function extractRefundContext(snapshot: ConversationSnapshot): RefundContext | undefined {
+  const r = snapshot.refund;
+  if (!r) return undefined;
+  return {
+    channelId: r.channelId,
+    escrowId: r.escrowId,
+    refundTxId: r.refundTxId,
+    refundError: r.refundError ? new Error(r.refundError) : undefined,
+  };
+}
+
+function refundContextToSnapshot(ctx: RefundContext): {
+  channelId: string;
+  escrowId: string;
+  refundTxId: string | undefined;
+  refundError: string | undefined;
+} {
+  return {
+    channelId: ctx.channelId,
+    escrowId: ctx.escrowId,
+    refundTxId: ctx.refundTxId,
+    refundError: ctx.refundError?.message,
+  };
 }

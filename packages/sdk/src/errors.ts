@@ -93,6 +93,80 @@ export class RateLimitedError extends AAPError {
   }
 }
 
+/**
+ * Wraps the original error from a paid `client.call()` after the
+ * SDK has automatically refunded (or attempted to refund) the
+ * caller's escrow.
+ *
+ * Surfaces three things the caller couldn't otherwise observe:
+ *   - `cause`         — the original underlying error that triggered
+ *                       refund (RPC error, signature mismatch,
+ *                       transport failure, etc.). Mirrors the same
+ *                       error the call would have rejected with had
+ *                       no escrow been involved.
+ *   - `escrowId`      — the channel-issued escrow id whose lifecycle
+ *                       just terminated.
+ *   - `refundTxId`    — the channel's refund transaction id when the
+ *                       refund succeeded; `undefined` when the refund
+ *                       itself failed.
+ *   - `refundError`   — the Error from a failed refund attempt; the
+ *                       original `cause` still wins, but ops needs to
+ *                       see why the refund didn't go through.
+ *
+ * Designed so that `try/catch` consumers reading off `.code`, `.message`,
+ * or `instanceof AAPError` continue to work — the inner `cause` is
+ * cloned into this error's code/message/data so existing call sites
+ * keep observing the underlying failure mode.
+ */
+export class CallRefundedError extends AAPError {
+  override readonly cause: Error;
+  readonly escrowId: string;
+  readonly channelId: string;
+  readonly refundTxId: string | undefined;
+  readonly refundError: Error | undefined;
+
+  constructor(args: {
+    cause: Error;
+    escrowId: string;
+    channelId: string;
+    refundTxId?: string;
+    refundError?: Error;
+  }) {
+    const innerCode = args.cause instanceof AAPError ? args.cause.code : ErrorCodes.Internal;
+    const innerData = args.cause instanceof AAPError ? args.cause.data : undefined;
+    const message = buildRefundedMessage(args);
+    super(innerCode, message, {
+      ...(innerData ?? {}),
+      escrow_id: args.escrowId,
+      channel_id: args.channelId,
+      ...(args.refundTxId !== undefined ? { refund_tx_id: args.refundTxId } : {}),
+      ...(args.refundError !== undefined ? { refund_error: args.refundError.message } : {}),
+      original_message: args.cause.message,
+    });
+    this.name = "CallRefundedError";
+    this.cause = args.cause;
+    this.escrowId = args.escrowId;
+    this.channelId = args.channelId;
+    this.refundTxId = args.refundTxId;
+    this.refundError = args.refundError;
+  }
+}
+
+function buildRefundedMessage(args: {
+  cause: Error;
+  refundTxId?: string;
+  refundError?: Error;
+}): string {
+  const head = args.cause.message || "call failed";
+  if (args.refundTxId !== undefined) {
+    return `${head} [auto-refunded: ${args.refundTxId}]`;
+  }
+  if (args.refundError !== undefined) {
+    return `${head} [auto-refund failed: ${args.refundError.message}]`;
+  }
+  return head;
+}
+
 type ErrorFactory = (message?: string, data?: Record<string, unknown>) => AAPError;
 
 const CODE_TO_FACTORY = new Map<number, ErrorFactory>([

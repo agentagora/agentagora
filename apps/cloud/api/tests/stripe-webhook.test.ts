@@ -195,6 +195,169 @@ describe("POST /v1/stripe/webhook (HTTP)", () => {
   });
 });
 
+function chargeRefundedEvent(
+  overrides: {
+    conversationId?: string;
+    refundId?: string;
+    amount?: number;
+    currency?: string;
+    reason?: string;
+    noMetadata?: boolean;
+  } = {},
+) {
+  const conversationId = overrides.conversationId ?? "convo-refund-001";
+  const refundId = overrides.refundId ?? "re_test_001";
+  const amount = overrides.amount ?? 50; // cents → "0.50"
+  const currency = overrides.currency ?? "usd";
+  const metadata = overrides.noMetadata
+    ? {}
+    : {
+        aap_conversation_id: conversationId,
+        aap_payer_aid: "aid:agentagora:alice/orchestrator",
+        aap_payee_aid: "aid:agentagora:bob/echo",
+      };
+  return {
+    id: "evt_refund_1",
+    type: "charge.refunded",
+    livemode: false,
+    created: 1_700_000_000,
+    data: {
+      object: {
+        id: "ch_test_001",
+        amount: 50,
+        amount_refunded: amount,
+        currency,
+        metadata,
+        refunds: {
+          object: "list",
+          data: [
+            {
+              id: refundId,
+              amount,
+              currency,
+              created: 1_700_000_100,
+              ...(overrides.reason ? { reason: overrides.reason } : {}),
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
+describe("POST /v1/stripe/webhook — charge.refunded", () => {
+  function setup() {
+    const storage = new InMemoryStorage();
+    const ownerAuth = new StaticOwnerAuth({});
+    const verifier = new HmacWebhookVerifier(SECRET);
+    const app = createApi({ storage, ownerAuth, stripeWebhookVerifier: verifier });
+    return { app, storage };
+  }
+
+  async function postEvent(app: ReturnType<typeof createApi>, payload: object) {
+    const { body, header } = await signEvent(payload);
+    return app.request("/v1/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": header,
+      },
+      body,
+    });
+  }
+
+  it("records the refund and acks `refund_recorded` for an AAP-tagged charge", async () => {
+    const { app, storage } = setup();
+    const res = await postEvent(
+      app,
+      chargeRefundedEvent({ conversationId: "convo-A", refundId: "re_aap_1" }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { handled: string };
+    expect(body.handled).toBe("refund_recorded");
+
+    const stored = await storage.getRefundsByConversation("convo-A");
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.refundId).toBe("re_aap_1");
+    expect(stored[0]?.amount).toBe("0.50");
+    expect(stored[0]?.currency).toBe("USD");
+    expect(stored[0]?.refundedAt).toBe("2023-11-14T22:15:00.000Z");
+  });
+
+  it("ignores charges with no aap_conversation_id metadata", async () => {
+    const { app, storage } = setup();
+    const res = await postEvent(app, chargeRefundedEvent({ noMetadata: true }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { handled: string };
+    expect(body.handled).toBe("ignored_non_aap");
+    expect(await storage.getRefundsByConversation("convo-refund-001")).toHaveLength(0);
+  });
+
+  it("redelivery of the same refund is idempotent", async () => {
+    const { app, storage } = setup();
+    await postEvent(app, chargeRefundedEvent({ conversationId: "convo-B", refundId: "re_dup" }));
+    await postEvent(app, chargeRefundedEvent({ conversationId: "convo-B", refundId: "re_dup" }));
+    const stored = await storage.getRefundsByConversation("convo-B");
+    expect(stored).toHaveLength(1);
+  });
+
+  it("auto-resolves an open dispute filed before the refund event arrives", async () => {
+    const { app, storage } = setup();
+
+    // Pre-seed a dispute in the open state for the conversation.
+    await storage.createDispute({
+      disputeId: "disp_pre_refund",
+      conversationId: "convo-C",
+      filedBy: "alice",
+      filerAid: "aid:agentagora:alice/orchestrator",
+      respondentAid: "aid:agentagora:bob/echo",
+      reason: "non_delivery",
+      state: "open",
+      filedAt: "2026-05-01T10:00:00.000Z",
+    });
+
+    const res = await postEvent(
+      app,
+      chargeRefundedEvent({ conversationId: "convo-C", refundId: "re_late" }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { handled: string };
+    expect(body.handled).toBe("refund_recorded_resolved_1");
+
+    const after = await storage.getDispute("disp_pre_refund");
+    expect(after?.state).toBe("resolved");
+    expect(after?.resolution).toBe("auto_refunded");
+    expect(after?.resolvedAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("does NOT mutate disputes already in a non-open terminal state", async () => {
+    const { app, storage } = setup();
+    await storage.createDispute({
+      disputeId: "disp_already_rejected",
+      conversationId: "convo-D",
+      filedBy: "alice",
+      filerAid: "aid:agentagora:alice/orchestrator",
+      respondentAid: "aid:agentagora:bob/echo",
+      reason: "fraud",
+      state: "rejected",
+      filedAt: "2026-05-01T10:00:00.000Z",
+      resolvedAt: "2026-05-01T11:00:00.000Z",
+      resolution: "ops_dismissed",
+    });
+    const res = await postEvent(
+      app,
+      chargeRefundedEvent({ conversationId: "convo-D", refundId: "re_x" }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { handled: string };
+    // No open dispute → just record_recorded, no resolve count.
+    expect(body.handled).toBe("refund_recorded");
+    const after = await storage.getDispute("disp_already_rejected");
+    expect(after?.state).toBe("rejected");
+    expect(after?.resolution).toBe("ops_dismissed");
+  });
+});
+
 describe("/v1/stripe/webhook with no verifier configured", () => {
   it("returns 503 not_configured", async () => {
     const ownerAuth = new StaticOwnerAuth({});

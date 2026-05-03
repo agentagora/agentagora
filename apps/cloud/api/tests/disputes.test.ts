@@ -260,6 +260,46 @@ describe("POST /v1/disputes — rejection paths", () => {
   });
 });
 
+describe("POST /v1/disputes — auto-resolve when refund already recorded", () => {
+  it("returns state=resolved + resolution=auto_refunded when a refund exists", async () => {
+    const { app, storage } = await setup();
+    // Webhook landed first: a refund is already on the books for CONVO.
+    await storage.recordRefund({
+      refundId: "re_pre_dispute",
+      conversationId: CONVO,
+      amount: "0.50",
+      currency: "USD",
+      refundedAt: "2026-05-01T11:00:00.000Z",
+    });
+
+    const res = await file(app, { narrative: "paid but never delivered" });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      state: string;
+      resolution: string;
+      resolved_at: string;
+    };
+    expect(body.state).toBe("resolved");
+    expect(body.resolution).toBe("auto_refunded");
+    expect(body.resolved_at).toMatch(/\d{4}-\d{2}-\d{2}T/);
+
+    // The persisted record matches.
+    const id = (body as unknown as { dispute_id: string }).dispute_id;
+    const stored = await storage.getDispute(id);
+    expect(stored?.state).toBe("resolved");
+    expect(stored?.resolution).toBe("auto_refunded");
+  });
+
+  it("opens the dispute when no refund has been recorded yet", async () => {
+    const { app } = await setup();
+    const res = await file(app, {});
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { state: string; resolution?: string };
+    expect(body.state).toBe("open");
+    expect(body.resolution).toBeUndefined();
+  });
+});
+
 describe("GET /v1/disputes/:id", () => {
   it("returns the case file for a known ID (no auth)", async () => {
     const { app } = await setup();

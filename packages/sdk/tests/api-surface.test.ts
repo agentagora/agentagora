@@ -27,6 +27,7 @@ describe("@agentagora/sdk public API surface", () => {
         "AgentAgoraClient",
         "AuditEventTypes",
         "AuditLog",
+        "CallRefundedError",
         "CloudNonceTracker",
         "ConversationStatuses",
         "ErrorCodes",

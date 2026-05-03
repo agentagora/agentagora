@@ -243,5 +243,83 @@ describe("D1Storage", () => {
     it("returns undefined for an unknown dispute_id", async () => {
       expect(await storage.getDispute("disp_nope")).toBeUndefined();
     });
+
+    it("getOpenDisputesByConversation returns only open rows for the convo", async () => {
+      await storage.createDispute(dispute({ disputeId: "disp_open", state: "open" }));
+      await storage.createDispute(
+        dispute({
+          disputeId: "disp_other_convo",
+          conversationId: "convo-different",
+          state: "open",
+        }),
+      );
+      await storage.createDispute(
+        dispute({
+          disputeId: "disp_resolved",
+          state: "resolved",
+          resolvedAt: "2026-05-02T00:00:00.000Z",
+          resolution: "ops_settled",
+        }),
+      );
+      const got = await storage.getOpenDisputesByConversation("convo-d1");
+      expect(got.map((d) => d.disputeId)).toEqual(["disp_open"]);
+    });
+
+    it("resolveDispute transitions only open disputes; redelivery is a no-op", async () => {
+      await storage.createDispute(dispute({ disputeId: "disp_to_resolve", state: "open" }));
+      await storage.resolveDispute("disp_to_resolve", "auto_refunded", "2026-05-03T00:00:00.000Z");
+      const after = await storage.getDispute("disp_to_resolve");
+      expect(after?.state).toBe("resolved");
+      expect(after?.resolution).toBe("auto_refunded");
+      expect(after?.resolvedAt).toBe("2026-05-03T00:00:00.000Z");
+
+      // Second call must not mutate state again.
+      await storage.resolveDispute("disp_to_resolve", "ops_overrode", "2026-05-04T00:00:00.000Z");
+      const second = await storage.getDispute("disp_to_resolve");
+      expect(second?.resolution).toBe("auto_refunded");
+    });
+  });
+
+  describe("refunds ledger", () => {
+    it("records and reads back refunds, newest first", async () => {
+      await storage.recordRefund({
+        refundId: "re_1",
+        conversationId: "convo-r",
+        amount: "0.50",
+        currency: "USD",
+        refundedAt: "2026-05-01T00:00:00.000Z",
+        reason: "requested_by_customer",
+      });
+      await storage.recordRefund({
+        refundId: "re_2",
+        conversationId: "convo-r",
+        amount: "1.25",
+        currency: "USD",
+        refundedAt: "2026-05-02T00:00:00.000Z",
+      });
+      const got = await storage.getRefundsByConversation("convo-r");
+      expect(got.map((r) => r.refundId)).toEqual(["re_2", "re_1"]);
+      expect(got[0]?.reason).toBeUndefined();
+      expect(got[1]?.reason).toBe("requested_by_customer");
+    });
+
+    it("recordRefund is idempotent on refund_id", async () => {
+      const rec = {
+        refundId: "re_dup",
+        conversationId: "convo-r",
+        amount: "0.50",
+        currency: "USD",
+        refundedAt: "2026-05-01T00:00:00.000Z",
+      };
+      await storage.recordRefund(rec);
+      await storage.recordRefund({ ...rec, amount: "999.00" }); // would-be-poison value
+      const got = await storage.getRefundsByConversation("convo-r");
+      expect(got).toHaveLength(1);
+      expect(got[0]?.amount).toBe("0.50");
+    });
+
+    it("returns an empty list for a conversation with no refunds", async () => {
+      expect(await storage.getRefundsByConversation("convo-empty")).toEqual([]);
+    });
   });
 });

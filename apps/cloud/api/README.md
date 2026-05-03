@@ -121,6 +121,27 @@ Per [PRD §16](../../../docs/PRD.md), M2 closed alpha uses team adjudication: th
 
 `GET /v1/disputes/:id` is **not** bearer-gated — IDs are unguessable random tokens, and public case files seed the public-precedent library called out in the PRD.
 
+## Auto-refund
+
+Per [PRD §9.3 #3](../../../docs/PRD.md), failed paid calls refund automatically — no human in the loop. Two halves cooperate:
+
+1. **SDK side** (`@agentagora/sdk`): when `client.call()` throws after escrow has funded (transport failure, signature mismatch, RPC error, etc.), the SDK invokes `channel.refund(escrow)` before the call promise rejects. The thrown `CallRefundedError` carries `refundTxId` so the caller can prove they were made whole without inspecting audit logs.
+2. **Cloud side**: the Stripe webhook listens for `charge.refunded` on charges carrying `aap_conversation_id` metadata and writes one row into the `refunds` table per refund. Schema in `migrations/0006_refunds.sql`:
+
+   | column | type | notes |
+   |---|---|---|
+   | `refund_id` | TEXT (PK) | Stripe `re_…` |
+   | `conversation_id` | TEXT | from charge metadata |
+   | `amount` | TEXT | decimal string |
+   | `currency` | TEXT | ISO 4217 |
+   | `refunded_at` | TEXT | ISO 8601 |
+   | `reason` | TEXT (nullable) | e.g. `requested_by_customer` |
+
+The dispute pipeline closes the loop:
+
+- A dispute filed against a conversation that **already** has a refund record auto-resolves to `state=resolved`, `resolution=auto_refunded`.
+- A dispute filed **before** the refund event → the webhook handler retroactively resolves any open dispute on the conversation when the refund lands. Re-deliveries are no-ops thanks to `INSERT OR IGNORE` on `refund_id` and the `WHERE state='open'` guard on `resolveDispute`.
+
 ## Global nonce dedup
 
 `POST /v1/nonces/check` lets receivers detect replays across Worker isolates and cold restarts — the SDK's in-process `NonceTracker` only covers a single isolate.
