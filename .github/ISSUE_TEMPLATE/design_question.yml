@@ -1,0 +1,36 @@
+name: Design question / spec critique
+description: Something in the protocol, SDK API, or architecture seems wrong, missing, or naive.
+labels: ["design", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Disagreement at this stage is more valuable than agreement. Read the relevant doc first ([manifesto](../../docs/manifesto.md), [PRD](../../docs/PRD.md), [AAP spec](../../docs/AAP-spec.md), [tech-stack](../../docs/tech-stack.md)) and tell us what's wrong.
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: What's the design claim you're questioning?
+      description: Quote the section / decision verbatim if you can.
+    validations:
+      required: true
+
+  - type: textarea
+    id: counterargument
+    attributes:
+      label: Why is it wrong, missing, or naive?
+      description: Concrete reasoning beats "I don't like this". Examples that break the design are gold.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative
+    attributes:
+      label: What would you do instead?
+      description: Optional — sometimes "I don't have a fix yet, but here's the hole" is itself useful.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What context are you bringing?
+      description: Optional — e.g., "I shipped a similar protocol at $WORK and we hit X". Helps us calibrate.

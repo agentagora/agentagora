@@ -83,7 +83,11 @@ Scope (`sdk`, `protocol`, `examples`, etc.) is encouraged but not required.
 
 ## Code of Conduct
 
-By participating in any AgentAgora space (issues, discussions, PRs), you agree to follow our [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+By participating in any AgentAgora space (issues, discussions, PRs), you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Governance
+
+How decisions get made (and how that grows over time) is documented in [GOVERNANCE.md](GOVERNANCE.md). For the current pre-public-beta stage: assume single-maintainer BDFL; expect a formal RFC process at M6.
 
 ## License
 
