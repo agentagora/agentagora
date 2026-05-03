@@ -114,3 +114,38 @@ jobs:
             exit 1
           fi
           echo "::notice::Bundle within budget (${RAW_KIB}/${BUNDLE_RAW_LIMIT_KIB} KiB raw, ${GZIP_KIB}/${BUNDLE_GZIP_LIMIT_KIB} KiB gzip)"
+
+      # Bundle-size budget — cloud-api Worker. Same Workers-only constraint
+      # as worker-agent, but cloud-api carries D1, KV, Stripe, OIDC, audit,
+      # and disputes wiring. Budget is set above the M2-closed-alpha steady
+      # state (281 KiB raw / 61 KiB gzip) with headroom for M3 dashboard
+      # server actions and Stripe charge handling.
+      - name: Bundle-size guard (cloud-api)
+        run: pnpm --filter "@agentagora/cloud-api" check
+
+      - name: Enforce bundle-size budget (≤ 320 KiB raw, ≤ 75 KiB gzip)
+        env:
+          CLOUD_API_RAW_LIMIT_KIB: 320
+          CLOUD_API_GZIP_LIMIT_KIB: 75
+        run: |
+          set -euo pipefail
+          BUNDLE=apps/cloud/api/.wrangler/dry-run/index.js
+          if [ ! -f "$BUNDLE" ]; then
+            echo "::error::Expected bundle at $BUNDLE — wrangler dry-run did not produce it"
+            ls -la apps/cloud/api/.wrangler/dry-run/ || true
+            exit 1
+          fi
+          RAW_BYTES=$(wc -c < "$BUNDLE")
+          GZIP_BYTES=$(gzip -c "$BUNDLE" | wc -c)
+          RAW_KIB=$(( (RAW_BYTES + 1023) / 1024 ))
+          GZIP_KIB=$(( (GZIP_BYTES + 1023) / 1024 ))
+          echo "Worker bundle: ${RAW_KIB} KiB raw, ${GZIP_KIB} KiB gzipped"
+          if [ "$RAW_KIB" -gt "$CLOUD_API_RAW_LIMIT_KIB" ]; then
+            echo "::error::Worker bundle ${RAW_KIB} KiB exceeds raw budget ${CLOUD_API_RAW_LIMIT_KIB} KiB"
+            exit 1
+          fi
+          if [ "$GZIP_KIB" -gt "$CLOUD_API_GZIP_LIMIT_KIB" ]; then
+            echo "::error::Worker bundle ${GZIP_KIB} KiB gzipped exceeds budget ${CLOUD_API_GZIP_LIMIT_KIB} KiB"
+            exit 1
+          fi
+          echo "::notice::Bundle within budget (${RAW_KIB}/${CLOUD_API_RAW_LIMIT_KIB} KiB raw, ${GZIP_KIB}/${CLOUD_API_GZIP_LIMIT_KIB} KiB gzip)"
