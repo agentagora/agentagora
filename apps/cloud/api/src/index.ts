@@ -18,6 +18,8 @@
  *   POST /v1/disputes               file a dispute case  [Bearer]
  *   GET  /v1/disputes/:id           read a case file (public-by-ID)
  *   POST /v1/nonces/check           reserve a nonce [Bearer]
+ *   POST /v1/connect/onboarding     Stripe Express onboarding link [Bearer]
+ *   GET  /v1/connect/account        owner's Connect account status [Bearer]
  */
 
 import { Hono } from "hono";
@@ -28,9 +30,11 @@ import { OidcIssuer, decodePrivateKey } from "./oidc.js";
 import { InMemoryRateLimiter, KvRateLimiter, type RateLimiter } from "./rate-limit.js";
 import { createAgentsRouter } from "./routes/agents.js";
 import { createAuditRouter, createConversationsRouter } from "./routes/audit.js";
+import { createConnectRouter } from "./routes/connect.js";
 import { createDisputesRouter } from "./routes/disputes.js";
 import { createNoncesRouter } from "./routes/nonces.js";
 import { InMemoryStorage, type Storage } from "./storage.js";
+import { HttpStripeApiClient, type StripeApiClient } from "./stripe.js";
 
 /**
  * Worker bindings. `DB` lands in v0.0.2 (D1 registry persistence).
@@ -68,6 +72,12 @@ export interface Env {
    * abuse across the fleet).
    */
   RATE_LIMITS?: KVNamespace;
+  /**
+   * Stripe secret key (sk_live_… or sk_test_…). When set, the
+   * /v1/connect/* routes are live; without it, the routes return
+   * 503 because the Stripe API client isn't configured.
+   */
+  STRIPE_SECRET_KEY?: string;
 }
 
 export interface CreateApiOptions {
@@ -95,6 +105,12 @@ export interface CreateApiOptions {
    * absent, no limiting is applied (tests pass undefined to skip).
    */
   rateLimiter?: RateLimiter;
+  /**
+   * Stripe API client. When absent, the /v1/connect/* routes return
+   * 503 not_configured. Production wires HttpStripeApiClient with
+   * STRIPE_SECRET_KEY; tests pass an in-memory mock.
+   */
+  stripe?: StripeApiClient;
 }
 
 /**
@@ -107,6 +123,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   const oidc = options.oidc;
   const nonceStore = options.nonceStore ?? new InMemoryNonceStore();
   const rateLimiter = options.rateLimiter;
+  const stripe = options.stripe;
   const app = new Hono();
 
   app.get("/", (c) =>
@@ -135,6 +152,14 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   app.route("/v1/conversations", createConversationsRouter(storage));
   app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth, rateLimiter }));
   app.route("/v1/nonces", createNoncesRouter({ ownerAuth, store: nonceStore, rateLimiter }));
+
+  if (stripe) {
+    app.route("/v1/connect", createConnectRouter({ storage, ownerAuth, stripe }));
+  } else {
+    app.all("/v1/connect/*", (c) =>
+      c.json({ error: "not_configured", message: "STRIPE_SECRET_KEY is not set" }, 503),
+    );
+  }
 
   app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
 
@@ -195,7 +220,16 @@ async function buildApp(env: Env): Promise<Hono> {
     );
   }
 
-  return createApi({ storage, ownerAuth, oidc, nonceStore, rateLimiter });
+  let stripe: StripeApiClient | undefined;
+  if (env.STRIPE_SECRET_KEY) {
+    stripe = new HttpStripeApiClient(env.STRIPE_SECRET_KEY);
+  } else {
+    console.warn(
+      "[cloud-api] STRIPE_SECRET_KEY missing — /v1/connect/* will return 503 not_configured",
+    );
+  }
+
+  return createApi({ storage, ownerAuth, oidc, nonceStore, rateLimiter, stripe });
 }
 
 export default {

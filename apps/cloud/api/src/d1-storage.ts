@@ -13,6 +13,7 @@ import type {
   DisputeRecord,
   SearchFilter,
   Storage,
+  StripeAccountRecord,
 } from "./storage.js";
 
 interface AgentRow {
@@ -200,6 +201,75 @@ export class D1Storage implements Storage {
       .first<DisputeRow>();
     return row ? rowToDispute(row) : undefined;
   }
+
+  async upsertStripeAccount(record: StripeAccountRecord): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO stripe_accounts
+           (owner_id, stripe_account_id, details_submitted, charges_enabled,
+            payouts_enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(owner_id) DO UPDATE SET
+           stripe_account_id = excluded.stripe_account_id,
+           details_submitted = excluded.details_submitted,
+           charges_enabled   = excluded.charges_enabled,
+           payouts_enabled   = excluded.payouts_enabled,
+           updated_at        = excluded.updated_at`,
+      )
+      .bind(
+        record.ownerId,
+        record.stripeAccountId,
+        record.detailsSubmitted ? 1 : 0,
+        record.chargesEnabled ? 1 : 0,
+        record.payoutsEnabled ? 1 : 0,
+        record.createdAt,
+        record.updatedAt,
+      )
+      .run();
+  }
+
+  async getStripeAccountByOwner(ownerId: string): Promise<StripeAccountRecord | undefined> {
+    const row = await this.db
+      .prepare(`SELECT ${STRIPE_COLS} FROM stripe_accounts WHERE owner_id = ?`)
+      .bind(ownerId)
+      .first<StripeAccountRow>();
+    return row ? rowToStripeAccount(row) : undefined;
+  }
+
+  async getStripeAccountByStripeId(
+    stripeAccountId: string,
+  ): Promise<StripeAccountRecord | undefined> {
+    const row = await this.db
+      .prepare(`SELECT ${STRIPE_COLS} FROM stripe_accounts WHERE stripe_account_id = ?`)
+      .bind(stripeAccountId)
+      .first<StripeAccountRow>();
+    return row ? rowToStripeAccount(row) : undefined;
+  }
+}
+
+const STRIPE_COLS =
+  "owner_id, stripe_account_id, details_submitted, charges_enabled, payouts_enabled, created_at, updated_at";
+
+interface StripeAccountRow {
+  owner_id: string;
+  stripe_account_id: string;
+  details_submitted: number;
+  charges_enabled: number;
+  payouts_enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToStripeAccount(row: StripeAccountRow): StripeAccountRecord {
+  return {
+    ownerId: row.owner_id,
+    stripeAccountId: row.stripe_account_id,
+    detailsSubmitted: row.details_submitted === 1,
+    chargesEnabled: row.charges_enabled === 1,
+    payoutsEnabled: row.payouts_enabled === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 interface DisputeRow {

@@ -19,6 +19,8 @@ The control-plane backend for the AgentAgora network: registry, identity issuanc
 | POST | `/v1/disputes` | Bearer | File a dispute case |
 | GET | `/v1/disputes/:id` | – | Read a case file by opaque ID |
 | POST | `/v1/nonces/check` | Bearer | Reserve a nonce (200 first-seen / 409 replay) |
+| POST | `/v1/connect/onboarding` | Bearer | Start (or refresh) Stripe Connect Express onboarding |
+| GET | `/v1/connect/account` | Bearer | Read the caller's Connect account status |
 
 All requests/responses are JSON. Manifest validation uses the canonical Zod schemas from `@agentagora/protocol` — invalid bodies return `400` with the Zod issues array.
 

@@ -30,6 +30,16 @@ export interface SearchFilter {
   q?: string;
 }
 
+export interface StripeAccountRecord {
+  ownerId: string;
+  stripeAccountId: string;
+  detailsSubmitted: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type DisputeReason = "non_delivery" | "wrong_output" | "fraud" | "other";
 
 export interface DisputeRecord {
@@ -71,6 +81,14 @@ export interface Storage {
   createDispute(record: DisputeRecord): Promise<void>;
   /** Look up a dispute by its opaque ID. */
   getDispute(disputeId: string): Promise<DisputeRecord | undefined>;
+
+  // Stripe Connect accounts
+  /** Insert or update the owner's Stripe Connect account record. */
+  upsertStripeAccount(record: StripeAccountRecord): Promise<void>;
+  /** Fetch by cloud owner ID. */
+  getStripeAccountByOwner(ownerId: string): Promise<StripeAccountRecord | undefined>;
+  /** Fetch by Stripe account ID (used by webhooks). */
+  getStripeAccountByStripeId(stripeAccountId: string): Promise<StripeAccountRecord | undefined>;
 }
 
 /** In-memory storage. Per-isolate on Workers, lost on cold start.
@@ -80,6 +98,8 @@ export class InMemoryStorage implements Storage {
   private readonly auditEvents = new Map<string, AuditEvent>();
   private readonly auditByConversation = new Map<string, AuditEvent[]>();
   private readonly disputes = new Map<string, DisputeRecord>();
+  private readonly stripeAccounts = new Map<string, StripeAccountRecord>();
+  private readonly stripeAccountsByStripeId = new Map<string, StripeAccountRecord>();
 
   async getAgent(aid: string): Promise<AgentRecord | undefined> {
     return this.agents.get(aid);
@@ -132,12 +152,32 @@ export class InMemoryStorage implements Storage {
     return rec ? { ...rec } : undefined;
   }
 
+  async upsertStripeAccount(record: StripeAccountRecord): Promise<void> {
+    const copy = { ...record };
+    this.stripeAccounts.set(record.ownerId, copy);
+    this.stripeAccountsByStripeId.set(record.stripeAccountId, copy);
+  }
+
+  async getStripeAccountByOwner(ownerId: string): Promise<StripeAccountRecord | undefined> {
+    const rec = this.stripeAccounts.get(ownerId);
+    return rec ? { ...rec } : undefined;
+  }
+
+  async getStripeAccountByStripeId(
+    stripeAccountId: string,
+  ): Promise<StripeAccountRecord | undefined> {
+    const rec = this.stripeAccountsByStripeId.get(stripeAccountId);
+    return rec ? { ...rec } : undefined;
+  }
+
   /** Test helper: drop all records. */
   clear(): void {
     this.agents.clear();
     this.auditEvents.clear();
     this.auditByConversation.clear();
     this.disputes.clear();
+    this.stripeAccounts.clear();
+    this.stripeAccountsByStripeId.clear();
   }
 }
 

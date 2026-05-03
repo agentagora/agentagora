@@ -107,12 +107,26 @@ pnpm --filter @agentagora/cloud-api exec wrangler secret put OIDC_ISSUER
 
 The `kid` is derived deterministically from the public key (first 16 chars of SHA-256), so JWTs and JWKS always agree without an explicit kid registry. **Rotate** by generating a new key and replacing the secret — old JWTs become invalid at next verify and consumers must refetch JWKS.
 
+### `STRIPE_SECRET_KEY` (required for /v1/connect/*)
+
+Stripe API key used by the cloud-api to create Connect Express
+accounts and onboarding links. Without it, `/v1/connect/*` returns
+`503 not_configured`.
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put STRIPE_SECRET_KEY
+# Paste a sk_test_… key for staging or sk_live_… for production.
+```
+
+The cloud talks to Stripe via fetch (no `stripe-node` dep), so the
+Worker bundle stays small. Store the live key in production only;
+test keys are fine for `wrangler dev` and CI.
+
 ### Future secrets
 
 | Secret | Purpose | Task |
 |---|---|---|
-| `STRIPE_SECRET_KEY` | Stripe Connect onboarding | M2 Phase 4 |
-| `STRIPE_WEBHOOK_SECRET` | Webhook signature check | M2 Phase 4 |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signature check | task #11 |
 
 Add via `wrangler secret put <NAME>` when each lands.
 
