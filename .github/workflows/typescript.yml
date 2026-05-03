@@ -58,14 +58,18 @@ jobs:
         run: pnpm audit --audit-level=moderate --prod
         continue-on-error: true
 
+      # Build first: package.json `types` fields point at dist/index.d.ts,
+      # so cloud-api / examples can't typecheck until protocol + sdk emit
+      # their declarations. (Locally this is hidden because a previous
+      # build leaves dist/ on disk.)
+      - name: Build all packages
+        run: pnpm build
+
       - name: Lint (biome)
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Build all packages
-        run: pnpm build
 
       - name: Test all packages
         run: pnpm test
