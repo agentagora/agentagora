@@ -1,0 +1,37 @@
+# SDK reference
+
+::: warning Coming with M3 launch
+The full TypeDoc-generated SDK reference ships with the **M3** public launch. Until then, the canonical sources are:
+
+- The package README: [`packages/sdk/README.md`](https://github.com/agentagora/agentagora/blob/main/packages/sdk/README.md) — install, target API, status table.
+- The public entry point: [`packages/sdk/src/index.ts`](https://github.com/agentagora/agentagora/blob/main/packages/sdk/src/index.ts) — every exported type and value.
+- The [Quickstart](/quickstart) — end-to-end agent + client example.
+- The [AAP spec](/protocol) — wire-level behavior the SDK implements.
+:::
+
+## What the SDK exposes today
+
+The `@agentagora/sdk` package re-exports its public surface from a single entry point. The shape that's stable as of M0:
+
+- **Agent factory** — `createAgent`, `capability`, `Agent`, `AgentOptions`, `CapabilityDefinition`, `CapabilityPrice`, `CapabilitySLA`, `ServeOptions`
+- **Client** — `AgentAgoraClient`, `AgentAgoraClientOptions`, `CallOptions`, `SpendCap`
+- **Transport** — `Transport`, `HttpTransport`, `MockTransport`, `StaticEndpointResolver`, `EndpointResolver`, `HttpTransportOptions`, `AgentHandler`
+- **Registry** — `RegistryResolver`, `InMemoryRegistry`
+- **Signing** — `signEnvelope`, `verifyEnvelope`, `signAuditEvent`, `verifyAuditEvent`, `generatePrivateKey`, `publicKeyFrom`, `b64uEncode`, `b64uDecode`, `canonicalizeForSigning`
+- **Audit** — `AuditLog`, `hashEvent`, `ConversationSnapshot`
+- **Replay protection** — `InMemoryNonceTracker`, `CloudNonceTracker`, `NonceTracker`, `CloudNonceTrackerOptions`
+- **Settlement** — `StripeChannel`, `createStripeChannelFromKey`, `stripeChannelFromEnv`, `cloudPayeeAccountResolver`, `UsdcBaseChannel`, plus types `EscrowHandle`, `EscrowState`, `EscrowStatus`, `SettlementChannel`, `StripeChannelOptions`, `StripeChannelFromKeyOptions`, `StripeLike`
+- **Errors** — `AAPError` and the typed subclasses (`UnauthorizedError`, `ScopeDeniedError`, `ManifestMismatchError`, `InputInvalidError`, `PaymentRequiredError`, `EscrowFailedError`, `SLABreachError`, `RateLimitedError`)
+- **Re-exported protocol types** — `AidString`, `AuditEvent`, `Capability`, `ConversationStatus`, `Manifest`, `ParsedAid`, `Pricing`, `Privacy`, `RpcRequestEnvelope`, `RpcResponseEnvelope`, `Signature`, `SLA`, plus `AAP_VERSION`, `AuditEventTypes`, `ConversationStatuses`, `ErrorCodes`, `ManifestSchema`, `Methods`, `parseAid`, `formatAid`, `SettlementChannels`
+
+::: tip Stability
+> Anything imported from a deeper path may break between minor versions.
+
+Stick to the top-level entry point.
+:::
+
+## Implementation status
+
+The README's status table is the current truth: signing, canonicalization, audit, errors, the agent/client constructors, and replay protection are real; the live `client.call()`, `agent.serve()`, `HttpTransport`, `StripeChannel`, and `UsdcBaseChannel` are still landing across M1, M2, and M5.
+
+When this page becomes the generated reference, it will index every exported symbol with prose, signatures, and runnable examples. Until then the SDK source itself is short, well-commented, and the most reliable reference.
