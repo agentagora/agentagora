@@ -1,3 +1,6 @@
 node_modules
 .vitepress/cache
 .vitepress/dist
+
+# Generated TypeDoc reference (built from packages/sdk by `pnpm typedoc`).
+sdk-reference
