@@ -9,6 +9,7 @@
 import type { AuditEvent, Manifest } from "@agentagora/protocol";
 import type {
   AgentRecord,
+  ConversationSummary,
   DisputeReason,
   DisputeRecord,
   OauthSessionRecord,
@@ -65,6 +66,18 @@ export class D1Storage implements Storage {
   async listAgents(): Promise<AgentRecord[]> {
     const { results } = await this.db
       .prepare(`SELECT ${SELECT_COLS} FROM agents ORDER BY published_at DESC`)
+      .all<AgentRow>();
+    return results.map(rowToRecord);
+  }
+
+  async listAgentsByOwner(ownerId: string): Promise<AgentRecord[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT ${SELECT_COLS} FROM agents
+         WHERE published_by = ?
+         ORDER BY published_at DESC`,
+      )
+      .bind(ownerId)
       .all<AgentRow>();
     return results.map(rowToRecord);
   }
@@ -165,6 +178,60 @@ export class D1Storage implements Storage {
     return results.map((r) => JSON.parse(r.event_json) as AuditEvent);
   }
 
+  async listConversationsByActor(actorAid: string): Promise<ConversationSummary[]> {
+    // Closed-alpha approximation: pull every event the actor signed,
+    // group + roll up in app code. Cheaper than the equivalent SQL
+    // (correlated subqueries don't index well in SQLite/D1) and at v0
+    // scale (≤ a few thousand events / actor) the wire cost is fine.
+    // Promote to a server-side aggregate or materialized view if this
+    // ever shows up in profiling.
+    const { results } = await this.db
+      .prepare(
+        `SELECT conversation_id,
+                json_extract(event_json, '$.type') AS type,
+                timestamp
+         FROM audit_events
+         WHERE actor_aid = ?
+         ORDER BY timestamp ASC`,
+      )
+      .bind(actorAid)
+      .all<{ conversation_id: string; type: string; timestamp: string }>();
+
+    const groups = new Map<
+      string,
+      { firstSeenAt: string; lastSeenAt: string; eventCount: number; latestType: string }
+    >();
+    for (const row of results) {
+      const existing = groups.get(row.conversation_id);
+      if (!existing) {
+        groups.set(row.conversation_id, {
+          firstSeenAt: row.timestamp,
+          lastSeenAt: row.timestamp,
+          eventCount: 1,
+          latestType: row.type,
+        });
+        continue;
+      }
+      existing.eventCount++;
+      // Rows arrive ASC by timestamp, so the last write wins for
+      // last-seen / latest-type.
+      existing.lastSeenAt = row.timestamp;
+      existing.latestType = row.type;
+    }
+    const out: ConversationSummary[] = [];
+    for (const [conversationId, g] of groups) {
+      out.push({
+        conversationId,
+        firstSeenAt: g.firstSeenAt,
+        lastSeenAt: g.lastSeenAt,
+        eventCount: g.eventCount,
+        latestEventType: g.latestType,
+      });
+    }
+    out.sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
+    return out;
+  }
+
   async createDispute(record: DisputeRecord): Promise<void> {
     await this.db
       .prepare(
@@ -215,6 +282,36 @@ export class D1Storage implements Storage {
          ORDER BY filed_at ASC`,
       )
       .bind(conversationId)
+      .all<DisputeRow>();
+    return results.map(rowToDispute);
+  }
+
+  async listDisputesByFiler(filerAid: string): Promise<DisputeRecord[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT dispute_id, conversation_id, filed_by, filer_aid, respondent_aid,
+                reason, narrative, claimed_remedy, state, filed_at,
+                resolved_at, resolution
+         FROM disputes
+         WHERE filer_aid = ?
+         ORDER BY filed_at DESC`,
+      )
+      .bind(filerAid)
+      .all<DisputeRow>();
+    return results.map(rowToDispute);
+  }
+
+  async listDisputesByRespondent(respondentAid: string): Promise<DisputeRecord[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT dispute_id, conversation_id, filed_by, filer_aid, respondent_aid,
+                reason, narrative, claimed_remedy, state, filed_at,
+                resolved_at, resolution
+         FROM disputes
+         WHERE respondent_aid = ?
+         ORDER BY filed_at DESC`,
+      )
+      .bind(respondentAid)
       .all<DisputeRow>();
     return results.map(rowToDispute);
   }

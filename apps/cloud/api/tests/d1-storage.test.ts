@@ -95,6 +95,27 @@ describe("D1Storage", () => {
     ]);
   });
 
+  it("listAgentsByOwner filters by published_by, newest first", async () => {
+    await storage.putAgent({
+      ...record("aid:agentagora:a/x", {}, "2026-05-01T00:00:00.000Z"),
+      publishedBy: "alice",
+    });
+    await storage.putAgent({
+      ...record("aid:agentagora:b/y", {}, "2026-05-03T00:00:00.000Z"),
+      publishedBy: "alice",
+    });
+    await storage.putAgent({
+      ...record("aid:agentagora:c/z", {}, "2026-05-02T00:00:00.000Z"),
+      publishedBy: "bob",
+    });
+    const alice = await storage.listAgentsByOwner("alice");
+    expect(alice.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:b/y", "aid:agentagora:a/x"]);
+    const bob = await storage.listAgentsByOwner("bob");
+    expect(bob.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:c/z"]);
+    const ghost = await storage.listAgentsByOwner("ghost");
+    expect(ghost).toEqual([]);
+  });
+
   describe("searchAgents", () => {
     beforeEach(async () => {
       await storage.putAgent(record("aid:agentagora:weijt606/code-review"));
@@ -205,6 +226,63 @@ describe("D1Storage", () => {
       const events = await storage.getConversationEvents("convo-x");
       expect(events).toHaveLength(1);
     });
+
+    it("listConversationsByActor groups by conversation_id with roll-up metadata", async () => {
+      const e1 = AuditEventSchema.parse({
+        event_id: "e1",
+        conversation_id: "convo-a",
+        type: "rpc.request.received",
+        timestamp: "2026-05-01T00:00:00.000Z",
+        actor_aid: "aid:agentagora:weijt606/code-review",
+        previous_event_hash: null,
+        data: {},
+        signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
+      });
+      const e2 = AuditEventSchema.parse({
+        event_id: "e2",
+        conversation_id: "convo-a",
+        type: "settlement.completed",
+        timestamp: "2026-05-01T00:00:01.000Z",
+        actor_aid: "aid:agentagora:weijt606/code-review",
+        previous_event_hash: "sha256:aaa",
+        data: {},
+        signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
+      });
+      const e3 = AuditEventSchema.parse({
+        event_id: "e3",
+        conversation_id: "convo-b",
+        type: "rpc.request.received",
+        timestamp: "2026-05-02T00:00:00.000Z",
+        actor_aid: "aid:agentagora:weijt606/code-review",
+        previous_event_hash: null,
+        data: {},
+        signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
+      });
+      // Event from a different actor — should not appear.
+      const e4 = AuditEventSchema.parse({
+        event_id: "e4",
+        conversation_id: "convo-c",
+        type: "rpc.request.received",
+        timestamp: "2026-05-03T00:00:00.000Z",
+        actor_aid: "aid:agentagora:other/agent",
+        previous_event_hash: null,
+        data: {},
+        signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
+      });
+      await storage.ingestAuditEvent(e1, "now");
+      await storage.ingestAuditEvent(e2, "now");
+      await storage.ingestAuditEvent(e3, "now");
+      await storage.ingestAuditEvent(e4, "now");
+      const summaries = await storage.listConversationsByActor(
+        "aid:agentagora:weijt606/code-review",
+      );
+      expect(summaries.map((s) => s.conversationId)).toEqual(["convo-b", "convo-a"]);
+      const a = summaries.find((s) => s.conversationId === "convo-a");
+      expect(a?.eventCount).toBe(2);
+      expect(a?.firstSeenAt).toBe("2026-05-01T00:00:00.000Z");
+      expect(a?.lastSeenAt).toBe("2026-05-01T00:00:01.000Z");
+      expect(a?.latestEventType).toBe("settlement.completed");
+    });
   });
 
   describe("disputes", () => {
@@ -263,6 +341,39 @@ describe("D1Storage", () => {
       );
       const got = await storage.getOpenDisputesByConversation("convo-d1");
       expect(got.map((d) => d.disputeId)).toEqual(["disp_open"]);
+    });
+
+    it("listDisputesByFiler / listDisputesByRespondent return matching rows newest-first", async () => {
+      await storage.createDispute(
+        dispute({
+          disputeId: "disp_a",
+          filerAid: "aid:agentagora:alice/x",
+          respondentAid: "aid:agentagora:bob/y",
+          filedAt: "2026-05-01T00:00:00.000Z",
+        }),
+      );
+      await storage.createDispute(
+        dispute({
+          disputeId: "disp_b",
+          filerAid: "aid:agentagora:alice/x",
+          respondentAid: "aid:agentagora:carol/z",
+          filedAt: "2026-05-02T00:00:00.000Z",
+        }),
+      );
+      await storage.createDispute(
+        dispute({
+          disputeId: "disp_c",
+          filerAid: "aid:agentagora:carol/z",
+          respondentAid: "aid:agentagora:bob/y",
+          filedAt: "2026-05-03T00:00:00.000Z",
+        }),
+      );
+      const filer = await storage.listDisputesByFiler("aid:agentagora:alice/x");
+      expect(filer.map((d) => d.disputeId)).toEqual(["disp_b", "disp_a"]);
+      const respondent = await storage.listDisputesByRespondent("aid:agentagora:bob/y");
+      expect(respondent.map((d) => d.disputeId)).toEqual(["disp_c", "disp_a"]);
+      const ghost = await storage.listDisputesByFiler("aid:agentagora:ghost/none");
+      expect(ghost).toEqual([]);
     });
 
     it("resolveDispute transitions only open disputes; redelivery is a no-op", async () => {

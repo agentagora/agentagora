@@ -1,21 +1,21 @@
 /**
- * Conversations — lookup-by-ID view.
+ * Conversations — lookup-by-ID view + owner-scoped inbox.
  *
- * The cloud-api exposes `GET /v1/conversations/:id` (read one chain
- * by ID) but no owner-scoped index. Until a `published_by` join
- * lands server-side, the dashboard cannot enumerate "conversations
- * involving my agents" — so this page is intentionally a single-ID
- * lookup driven by a query param.
- *
- * TODO(cloud-api): expose `GET /v1/conversations?actor=<aid>` (or
- * `?owner=<id>`) so the dashboard can list owner-scoped chains
- * without forcing the operator to copy IDs out of audit emissions.
- * Tracked in `docs/m3-launch-checklist.md` §A.1.
+ *   `?id=<conversation_id>`  → render that chain (single GET).
+ *   no query                 → list every conversation any of the
+ *                              caller's AIDs has signed events in,
+ *                              via `GET /v1/conversations?actor=<aid>`.
  */
 
 import Link from "next/link";
 import { requireOwner } from "../../../lib/auth";
-import { type ConversationEvent, getConversation } from "../../../lib/cloud-api";
+import {
+  type ConversationEvent,
+  type OwnedConversationSummary,
+  getConversation,
+  getOwnedAgents,
+  listOwnedConversations,
+} from "../../../lib/cloud-api";
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
@@ -23,7 +23,7 @@ interface PageProps {
 }
 
 export default async function ConversationsPage({ searchParams }: PageProps) {
-  await requireOwner();
+  const session = await requireOwner();
   const id = typeof searchParams.id === "string" ? searchParams.id.trim() : "";
 
   return (
@@ -31,14 +31,192 @@ export default async function ConversationsPage({ searchParams }: PageProps) {
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ margin: 0, marginBottom: 4 }}>Conversations</h1>
         <p style={{ color: "#555", marginTop: 0 }}>
-          Look up an audit chain by <code>conversation_id</code>. Owner-scoped indexing lands once
-          the cloud-api can join conversations to <code>published_by</code> via the audit log.
+          Look up an audit chain by <code>conversation_id</code>, or browse the conversations your
+          agents have participated in.
         </p>
       </header>
 
       <LookupForm initialId={id} />
 
-      {id ? <ChainView id={id} /> : <EmptyState />}
+      {id ? (
+        <ChainView id={id} />
+      ) : (
+        <OwnerInbox bearer={session.bearer} ownerLogin={session.githubLogin} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Owner-scoped inbox: enumerate the bearer's agents via the new
+ * `?owner=` index, then for each AID fan out to
+ * `?actor=<aid>` and merge the per-AID summaries. We dedup by
+ * conversation_id (two of the bearer's AIDs in the same chain
+ * collapse to one row), and order newest-active first.
+ */
+async function OwnerInbox({
+  bearer,
+  ownerLogin,
+}: {
+  bearer: string;
+  ownerLogin: string | undefined;
+}) {
+  const ownerId = ownerLogin ? `gh:${ownerLogin}` : null;
+  if (!ownerId) {
+    // Static / paste sessions don't store an owner ID; without one we
+    // can't enumerate owned AIDs to fan out from.
+    return <NeedOwnerHint />;
+  }
+  const agents = await getOwnedAgents(bearer, ownerId, 50);
+  if (agents.length === 0) {
+    return <NoAgentsHint />;
+  }
+  const responses = await Promise.all(agents.map((a) => listOwnedConversations(bearer, a.aid)));
+  // Dedup: a conversation may surface under multiple of the caller's
+  // AIDs (e.g. an agent that's both buyer and seller in the same
+  // chain). Keep the row whose `last_seen_at` is newest.
+  const merged = new Map<string, OwnedConversationSummary & { actor_aids: string[] }>();
+  responses.forEach((resp, i) => {
+    const aid = agents[i]?.aid ?? "";
+    for (const c of resp.conversations) {
+      const existing = merged.get(c.conversation_id);
+      if (!existing) {
+        merged.set(c.conversation_id, { ...c, actor_aids: [aid] });
+        continue;
+      }
+      existing.actor_aids.push(aid);
+      if (c.last_seen_at > existing.last_seen_at) {
+        existing.last_seen_at = c.last_seen_at;
+        existing.latest_event_type = c.latest_event_type;
+        existing.event_count = Math.max(existing.event_count, c.event_count);
+      }
+      if (c.first_seen_at < existing.first_seen_at) {
+        existing.first_seen_at = c.first_seen_at;
+      }
+    }
+  });
+  const rows = [...merged.values()].sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at));
+
+  if (rows.length === 0) {
+    return <EmptyInbox />;
+  }
+  return (
+    <section>
+      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 12 }}>
+        Your conversations ({rows.length})
+      </h2>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {rows.map((row) => (
+          <ConversationRow key={row.conversation_id} row={row} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ConversationRow({
+  row,
+}: {
+  row: OwnedConversationSummary & { actor_aids: string[] };
+}) {
+  return (
+    <li
+      style={{
+        border: "1px solid #e3e3e3",
+        borderRadius: 8,
+        padding: 14,
+        marginBottom: 10,
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "baseline",
+        }}
+      >
+        <Link
+          href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
+          style={{ fontWeight: 600, color: "#0366d6", textDecoration: "none" }}
+        >
+          <code>{row.conversation_id}</code>
+        </Link>
+        <span style={{ fontSize: 12, color: "#888" }}>{row.last_seen_at}</span>
+      </div>
+      <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>
+        <code>{row.latest_event_type}</code>
+        <span style={{ color: "#888", marginLeft: 12 }}>
+          {row.event_count} event{row.event_count === 1 ? "" : "s"} as{" "}
+          {row.actor_aids.map((a, i) => (
+            <span key={a}>
+              {i > 0 ? ", " : null}
+              <code>{a}</code>
+            </span>
+          ))}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function EmptyInbox() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ margin: 0 }}>
+        Your agents haven't participated in any conversations yet. Once they emit signed audit
+        events, the chains they appear in will show up here.
+      </p>
+    </div>
+  );
+}
+
+function NoAgentsHint() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ margin: 0 }}>
+        You haven't published any agents yet. <Link href="/agents/new">Publish one →</Link>
+      </p>
+    </div>
+  );
+}
+
+function NeedOwnerHint() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ marginTop: 0, marginBottom: 8 }}>
+        Sign in via GitHub to see the conversations your agents have participated in. The
+        owner-scoped index needs the dashboard to know your owner ID.
+      </p>
+      <p style={{ margin: 0 }}>
+        For now, you can still look up any chain by <code>conversation_id</code> using the form
+        above.
+      </p>
     </div>
   );
 }
@@ -182,33 +360,6 @@ function EventCard({ event }: { event: ConversationEvent }) {
         </pre>
       </details>
     </li>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 8 }}>
-        How do I find a conversation ID?
-      </h2>
-      <p style={{ marginTop: 0 }}>
-        Conversation IDs are emitted with every audit event your agents produce. The SDK logs them
-        via its <code>auditEmit</code> hook; copy one out of your agent runtime logs and paste it
-        above.
-      </p>
-      <p style={{ marginBottom: 0 }}>
-        You can also navigate from any agent in <Link href="/agents">/agents</Link>; once an
-        owner-scoped index ships, this page will list chains directly.
-      </p>
-    </div>
   );
 }
 

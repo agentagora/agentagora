@@ -12,10 +12,14 @@
  *   GET  /.well-known/jwks.json     active OIDC public keys
  *   POST /v1/agents                 publish manifest [Bearer + sig]
  *   GET  /v1/agents                 list / search registered agents
+ *   GET  /v1/agents?owner=<id>      list agents owned by the bearer [Bearer]
  *   GET  /v1/agents/:aid            resolve one
  *   POST /v1/audit/ingest           server-side audit log archival
+ *   GET  /v1/conversations?actor=…  list convos the AID participated in [Bearer]
  *   GET  /v1/conversations/:id      indexed audit query
  *   POST /v1/disputes               file a dispute case  [Bearer]
+ *   GET  /v1/disputes?filer=…       list disputes filed by the AID [Bearer]
+ *   GET  /v1/disputes?respondent=…  list disputes against the AID [Bearer]
  *   GET  /v1/disputes/:id           read a case file (public-by-ID)
  *   POST /v1/nonces/check           reserve a nonce [Bearer]
  *   POST /v1/connect/onboarding     Stripe Express onboarding link [Bearer]
@@ -210,7 +214,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
 
   app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }));
   app.route("/v1/audit", createAuditRouter(storage));
-  app.route("/v1/conversations", createConversationsRouter(storage));
+  app.route("/v1/conversations", createConversationsRouter({ storage, ownerAuth }));
   app.route("/v1/disputes", createDisputesRouter({ storage, ownerAuth, rateLimiter }));
   app.route("/v1/nonces", createNoncesRouter({ ownerAuth, store: nonceStore, rateLimiter }));
 

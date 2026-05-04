@@ -217,6 +217,68 @@ export function createDisputesRouter({
     return c.json(disputeView(record), 201);
   });
 
+  // Owner-scoped dispute index. Filter by filer AID, respondent AID,
+  // or both. Bearer must own *every* AID supplied — otherwise the
+  // listing leaks "did this AID file a dispute?" cross-tenant.
+  router.get("/", async (c) => {
+    const filerAid = c.req.query("filer");
+    const respondentAid = c.req.query("respondent");
+
+    if (filerAid === undefined && respondentAid === undefined) {
+      return c.json(
+        {
+          error: "missing_filter",
+          message: "specify ?filer=<aid> and/or ?respondent=<aid>",
+        },
+        400,
+      );
+    }
+
+    const token = extractBearer(c.req.header("authorization"));
+    if (!token) {
+      return c.json({ error: "unauthorized", message: "missing bearer token" }, 401);
+    }
+    const ownerId = await ownerAuth.resolve(token);
+    if (!ownerId) {
+      return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+    }
+
+    // Verify ownership of every AID the caller is querying. We treat
+    // unknown AID + AID-owned-by-someone-else as the same 403 so the
+    // endpoint can't be used as an aid-existence oracle.
+    for (const aid of [filerAid, respondentAid]) {
+      if (aid === undefined) continue;
+      const agent = await storage.getAgent(aid);
+      if (!agent || agent.publishedBy !== ownerId) {
+        return c.json(
+          {
+            error: "forbidden",
+            message: "queried AID is not owned by the bearer",
+          },
+          403,
+        );
+      }
+    }
+
+    let records: DisputeRecord[];
+    if (filerAid !== undefined && respondentAid !== undefined) {
+      // Both filters: AND. Pull by the (typically smaller) filer set
+      // then narrow on respondent in app code; we expect at most a
+      // handful of disputes per AID so the in-memory filter is fine.
+      const byFiler = await storage.listDisputesByFiler(filerAid);
+      records = byFiler.filter((r) => r.respondentAid === respondentAid);
+    } else if (filerAid !== undefined) {
+      records = await storage.listDisputesByFiler(filerAid);
+    } else {
+      records = await storage.listDisputesByRespondent(respondentAid as string);
+    }
+
+    return c.json({
+      total: records.length,
+      disputes: records.map(disputeView),
+    });
+  });
+
   router.get("/:id", async (c) => {
     const id = decodeURIComponent(c.req.param("id"));
     const record = await storage.getDispute(id);

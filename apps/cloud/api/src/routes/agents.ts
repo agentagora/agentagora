@@ -173,8 +173,39 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
     });
   });
 
-  // List / search.
+  // List / search. The `?owner=<id>` mode is bearer-gated (closed
+  // alpha: only self-lookup) and bypasses the capability/accepts/q
+  // filters — they're list-time hints meant for catalog browsing, not
+  // for "what do I own". Mixing them silently would just be confusing.
   router.get("/", async (c) => {
+    const owner = c.req.query("owner");
+    if (owner !== undefined) {
+      const token = extractBearer(c.req.header("authorization"));
+      if (!token) {
+        return c.json({ error: "unauthorized", message: "missing bearer token" }, 401);
+      }
+      const ownerId = await ownerAuth.resolve(token);
+      if (!ownerId) {
+        return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+      }
+      // Closed alpha: bearer's resolved owner must equal ?owner=<id>.
+      // No admin-override path yet — when one lands it'll branch here.
+      if (ownerId !== owner) {
+        return c.json(
+          {
+            error: "forbidden",
+            message: "owner query param does not match the bearer's owner",
+          },
+          403,
+        );
+      }
+      const records = await storage.listAgentsByOwner(ownerId);
+      return c.json({
+        total: records.length,
+        agents: records.map(viewAgent),
+      });
+    }
+
     const capability = c.req.query("capability");
     const accepts = c.req.query("accepts");
     const q = c.req.query("q");
@@ -186,20 +217,29 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
 
     return c.json({
       total: records.length,
-      agents: records.map((rec) => ({
-        aid: rec.manifest.aid,
-        description: rec.manifest.description,
-        capabilities: rec.manifest.capabilities.map((cap) => ({
-          name: cap.name,
-          pricing: cap.pricing,
-          accepts: cap.accepts,
-        })),
-        published_at: rec.publishedAt,
-      })),
+      agents: records.map(viewAgent),
     });
   });
 
   return router;
+}
+
+function viewAgent(rec: AgentRecord): {
+  aid: string;
+  description: string | undefined;
+  capabilities: { name: string; pricing: unknown; accepts: string[] }[];
+  published_at: string;
+} {
+  return {
+    aid: rec.manifest.aid,
+    description: rec.manifest.description,
+    capabilities: rec.manifest.capabilities.map((cap) => ({
+      name: cap.name,
+      pricing: cap.pricing,
+      accepts: cap.accepts,
+    })),
+    published_at: rec.publishedAt,
+  };
 }
 
 function extractBearer(header: string | undefined): string | undefined {

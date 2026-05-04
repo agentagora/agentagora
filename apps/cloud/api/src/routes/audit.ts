@@ -16,6 +16,7 @@
 import { type AuditEvent, AuditEventSchema } from "@agentagora/protocol";
 import { Hono } from "hono";
 import { b64uDecode, hashAuditEvent, verifyAuditEvent } from "../_crypto.js";
+import type { OwnerAuthenticator } from "../auth.js";
 import type { Storage } from "../storage.js";
 
 interface IngestResultOk {
@@ -72,8 +73,97 @@ export function createAuditRouter(storage: Storage): Hono {
   return router;
 }
 
-export function createConversationsRouter(storage: Storage): Hono {
+interface ConversationsRouterDeps {
+  storage: Storage;
+  /** Required for the actor-scoped `?actor=` index; omit for the
+   *  legacy public read-by-id only mount used by tests that don't
+   *  exercise the index path. */
+  ownerAuth?: OwnerAuthenticator;
+}
+
+export function createConversationsRouter(storageOrDeps: Storage | ConversationsRouterDeps): Hono {
+  // Tolerate the historical `createConversationsRouter(storage)` shape
+  // so existing test fixtures don't have to change. The owner-scoped
+  // path is gated behind ownerAuth; without it the router still serves
+  // GET /:id exactly as before. We discriminate by whether the arg has
+  // a `getAgent` method — every Storage impl exposes it; the deps
+  // bag is a plain object that doesn't.
+  const isStorage = typeof (storageOrDeps as Partial<Storage>).getAgent === "function";
+  const deps: ConversationsRouterDeps = isStorage
+    ? { storage: storageOrDeps as Storage }
+    : (storageOrDeps as ConversationsRouterDeps);
+  const { storage, ownerAuth } = deps;
   const router = new Hono();
+
+  // GET /v1/conversations?actor=<aid>  — owner-scoped index. Bearer
+  // must own the AID. Without `?actor=` we fall through to the public
+  // `:id` read below; mounted as a single Hono router so the existing
+  // `/v1/conversations/:id` URL keeps working.
+  router.get("/", async (c) => {
+    const actor = c.req.query("actor");
+    if (actor === undefined) {
+      // No supported list mode without a filter today; return a hint
+      // rather than a giant unscoped dump.
+      return c.json(
+        {
+          error: "missing_filter",
+          message: "specify ?actor=<aid> to list conversations for an actor you own",
+        },
+        400,
+      );
+    }
+    if (!ownerAuth) {
+      return c.json(
+        {
+          error: "not_configured",
+          message: "owner authenticator is not wired into this conversations router",
+        },
+        503,
+      );
+    }
+    const token = extractBearer(c.req.header("authorization"));
+    if (!token) {
+      return c.json({ error: "unauthorized", message: "missing bearer token" }, 401);
+    }
+    const ownerId = await ownerAuth.resolve(token);
+    if (!ownerId) {
+      return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+    }
+    const agent = await storage.getAgent(actor);
+    if (!agent) {
+      // The bearer may be valid but pointed at a ghost AID — treat
+      // this as a 403 not a 404 because the request is fundamentally
+      // a permissions claim against an AID that the bearer can't own.
+      return c.json(
+        {
+          error: "forbidden",
+          message: "actor AID does not exist or is not owned by the bearer",
+        },
+        403,
+      );
+    }
+    if (agent.publishedBy !== ownerId) {
+      return c.json(
+        {
+          error: "forbidden",
+          message: "actor AID is not owned by the bearer",
+        },
+        403,
+      );
+    }
+
+    const summaries = await storage.listConversationsByActor(actor);
+    return c.json({
+      total: summaries.length,
+      conversations: summaries.map((s) => ({
+        conversation_id: s.conversationId,
+        first_seen_at: s.firstSeenAt,
+        last_seen_at: s.lastSeenAt,
+        event_count: s.eventCount,
+        latest_event_type: s.latestEventType,
+      })),
+    });
+  });
 
   router.get("/:id", async (c) => {
     const id = decodeURIComponent(c.req.param("id"));
@@ -86,6 +176,12 @@ export function createConversationsRouter(storage: Storage): Hono {
   });
 
   return router;
+}
+
+function extractBearer(header: string | undefined): string | undefined {
+  if (!header) return undefined;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match?.[1]?.trim() || undefined;
 }
 
 async function ingestOne(

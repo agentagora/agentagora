@@ -95,35 +95,127 @@ export async function getAgent(aid: string): Promise<AgentDetail | null> {
 }
 
 /**
- * Filter the public agent list down to those whose manifests look
- * like they belong to the bearer's owner. The cloud-api's list
- * endpoint doesn't expose `published_by` today, so we use a
- * best-effort heuristic: hit GET /v1/agents/:aid for each entry and
- * check `published_by` against `expectedOwner`. To bound work, we
- * only resolve the first `limit` entries; the dashboard pagination
- * lands once the cloud-api adds an owner-scoped index.
+ * List the agents owned by `expectedOwner` via the cloud-api's
+ * `GET /v1/agents?owner=<id>` endpoint (Bearer-authed; the cloud-api
+ * checks that the bearer's resolved owner matches).
  *
- * Calling this with `expectedOwner === null` returns every public
- * entry — useful while the dashboard hasn't yet learned the owner ID
- * from a successful publish.
+ * `limit` is preserved for backwards compatibility with the previous
+ * detail-fetch heuristic but no longer applied — the cloud-api
+ * returns the full owner-scoped list in one round trip. Calling with
+ * `expectedOwner === null` returns the public catalog (useful while
+ * the dashboard hasn't yet learned the owner ID from publish).
  */
 export async function getOwnedAgents(
   bearer: string,
   expectedOwner: string | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   limit = 50,
 ): Promise<AgentListEntry[]> {
-  // The bearer isn't actually needed for the list endpoint (it's
-  // public), but accepting it keeps the call sites consistent and
-  // lets us add owner-scoped filtering later without changing the
-  // signature. Suppress the unused-var lint by reading length:
-  void bearer.length;
+  if (!expectedOwner) {
+    const { agents } = await listAgents();
+    return agents;
+  }
+  const url = `${BASE_URL}/v1/agents?owner=${encodeURIComponent(expectedOwner)}`;
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { authorization: `Bearer ${bearer}` },
+    });
+    if (!res.ok) {
+      console.error(`[cloud-api] /v1/agents?owner= responded ${res.status}`);
+      return [];
+    }
+    const body = (await res.json()) as AgentListResponse;
+    return body.agents;
+  } catch (err) {
+    console.error("[cloud-api] /v1/agents?owner= unreachable", err);
+    return [];
+  }
+}
 
-  const { agents } = await listAgents();
-  if (!expectedOwner) return agents;
+/**
+ * `GET /v1/conversations?actor=<aid>` — distinct conversations the
+ * AID has signed an event in, with roll-up metadata. Bearer-authed;
+ * the cloud-api 403s if the bearer doesn't own the AID.
+ */
+export interface OwnedConversationSummary {
+  conversation_id: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  event_count: number;
+  latest_event_type: string;
+}
 
-  const slice = agents.slice(0, limit);
-  const detailed = await Promise.all(slice.map((entry) => getAgent(entry.aid)));
-  return slice.filter((_entry, i) => detailed[i]?.published_by === expectedOwner);
+export interface OwnedConversationsResponse {
+  total: number;
+  conversations: OwnedConversationSummary[];
+}
+
+export async function listOwnedConversations(
+  bearer: string,
+  aid: string,
+): Promise<OwnedConversationsResponse> {
+  const url = `${BASE_URL}/v1/conversations?actor=${encodeURIComponent(aid)}`;
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { authorization: `Bearer ${bearer}` },
+    });
+    if (!res.ok) {
+      console.error(`[cloud-api] /v1/conversations?actor= responded ${res.status}`);
+      return { total: 0, conversations: [] };
+    }
+    return (await res.json()) as OwnedConversationsResponse;
+  } catch (err) {
+    console.error("[cloud-api] /v1/conversations?actor= unreachable", err);
+    return { total: 0, conversations: [] };
+  }
+}
+
+/**
+ * `GET /v1/disputes?filer=<aid>` + `?respondent=<aid>` — disputes the
+ * bearer's AID is on either side of. Bearer-authed; the cloud-api
+ * 403s on cross-owner queries. Two calls because the endpoint ANDs
+ * filer+respondent when both are present, but we want the union.
+ */
+export interface OwnedDisputeListResponse {
+  total: number;
+  disputes: DisputeResponse[];
+}
+
+export async function listOwnedDisputes(
+  bearer: string,
+  aid: string,
+): Promise<OwnedDisputeListResponse> {
+  const queries: ("filer" | "respondent")[] = ["filer", "respondent"];
+  try {
+    const responses = await Promise.all(
+      queries.map(async (role) => {
+        const url = `${BASE_URL}/v1/disputes?${role}=${encodeURIComponent(aid)}`;
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers: { authorization: `Bearer ${bearer}` },
+        });
+        if (!res.ok) {
+          console.error(`[cloud-api] /v1/disputes?${role}= responded ${res.status}`);
+          return { total: 0, disputes: [] } as OwnedDisputeListResponse;
+        }
+        return (await res.json()) as OwnedDisputeListResponse;
+      }),
+    );
+    // Merge + dedup by dispute_id (a dispute where filer===respondent
+    // would otherwise show up twice — vanishingly rare but cheap to
+    // guard against).
+    const byId = new Map<string, DisputeResponse>();
+    for (const r of responses) {
+      for (const d of r.disputes) byId.set(d.dispute_id, d);
+    }
+    const disputes = [...byId.values()].sort((a, b) => b.filed_at.localeCompare(a.filed_at));
+    return { total: disputes.length, disputes };
+  } catch (err) {
+    console.error("[cloud-api] /v1/disputes?filer/respondent unreachable", err);
+    return { total: 0, disputes: [] };
+  }
 }
 
 export interface ConversationEvent {

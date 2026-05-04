@@ -1,28 +1,25 @@
 /**
- * Disputes — case-file lookup by ID.
+ * Disputes — case-file lookup by ID + owner-scoped inbox.
  *
- * Cloud-api intake works (`POST /v1/disputes`) and the public-by-ID
- * read works (`GET /v1/disputes/:id`), but there's no
- * `GET /v1/disputes` listing endpoint scoped to "filed by me / against
- * my agents". So this page mirrors `/conversations` — accept a
- * `?id=disp_...` query param and render that single case file.
+ *   `?id=disp_<...>` → render that case file (single GET).
+ *   no query         → list every dispute the caller's AIDs are on
+ *                      either side of, via `GET /v1/disputes?filer=<aid>`
+ *                      and `GET /v1/disputes?respondent=<aid>`.
  *
- * Layout is two columns:
+ * Single-case layout is two columns:
  *   - left  : case meta (filer, respondent, reason, state, etc.)
  *   - right : the linked conversation chain via `getConversation`
- *
- * TODO(cloud-api): expose `GET /v1/disputes?owner=<id>` (or
- * `?filer_aid=<aid>` / `?respondent_aid=<aid>`) so the dashboard can
- * render an inbox without forcing operators to keep dispute IDs in a
- * spreadsheet. Tracked in `docs/m3-launch-checklist.md` §A.1.
  */
 
+import Link from "next/link";
 import { requireOwner } from "../../../lib/auth";
 import {
   type ConversationEvent,
   type DisputeResponse,
   getConversation,
   getDispute,
+  getOwnedAgents,
+  listOwnedDisputes,
 } from "../../../lib/cloud-api";
 import { LookupForm } from "./_lookup-form";
 
@@ -31,7 +28,7 @@ interface PageProps {
 }
 
 export default async function DisputesPage({ searchParams }: PageProps) {
-  await requireOwner();
+  const session = await requireOwner();
   const id = typeof searchParams.id === "string" ? searchParams.id.trim() : "";
 
   return (
@@ -39,14 +36,163 @@ export default async function DisputesPage({ searchParams }: PageProps) {
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ margin: 0, marginBottom: 4 }}>Disputes</h1>
         <p style={{ color: "#555", marginTop: 0 }}>
-          Look up a dispute case file by <code>dispute_id</code>. An owner-scoped inbox lands once
-          the cloud-api can list disputes by filer / respondent owner.
+          Look up a dispute case file by <code>dispute_id</code>, or browse the disputes filed by
+          (or against) your agents.
         </p>
       </header>
 
       <LookupForm initialId={id} />
 
-      {id ? <CaseView id={id} /> : <EmptyState />}
+      {id ? (
+        <CaseView id={id} />
+      ) : (
+        <OwnerInbox bearer={session.bearer} ownerLogin={session.githubLogin} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Owner-scoped inbox: pull the bearer's agents from the new
+ * `/v1/agents?owner=` index, fan out per AID through
+ * `listOwnedDisputes` (which itself unions ?filer=…+?respondent=…),
+ * and collapse to a single newest-first table. Dedup by dispute_id —
+ * a self-vs-self filing would otherwise double-count.
+ */
+async function OwnerInbox({
+  bearer,
+  ownerLogin,
+}: {
+  bearer: string;
+  ownerLogin: string | undefined;
+}) {
+  const ownerId = ownerLogin ? `gh:${ownerLogin}` : null;
+  if (!ownerId) {
+    return <NeedOwnerHint />;
+  }
+  const agents = await getOwnedAgents(bearer, ownerId, 50);
+  if (agents.length === 0) {
+    return <NoAgentsHint />;
+  }
+  const responses = await Promise.all(agents.map((a) => listOwnedDisputes(bearer, a.aid)));
+  const byId = new Map<string, DisputeResponse>();
+  for (const r of responses) {
+    for (const d of r.disputes) byId.set(d.dispute_id, d);
+  }
+  const rows = [...byId.values()].sort((a, b) => b.filed_at.localeCompare(a.filed_at));
+
+  if (rows.length === 0) {
+    return <EmptyInbox />;
+  }
+  return (
+    <section>
+      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 12 }}>
+        Your disputes ({rows.length})
+      </h2>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {rows.map((dispute) => (
+          <DisputeRow key={dispute.dispute_id} dispute={dispute} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DisputeRow({ dispute }: { dispute: DisputeResponse }) {
+  return (
+    <li
+      style={{
+        border: "1px solid #e3e3e3",
+        borderRadius: 8,
+        padding: 14,
+        marginBottom: 10,
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "baseline",
+          marginBottom: 6,
+        }}
+      >
+        <Link
+          href={`/disputes?id=${encodeURIComponent(dispute.dispute_id)}`}
+          style={{ fontWeight: 600, color: "#0366d6", textDecoration: "none" }}
+        >
+          <code>{dispute.dispute_id}</code>
+        </Link>
+        <StateBadge state={dispute.state} />
+      </div>
+      <div style={{ fontSize: 13, color: "#444" }}>
+        <code>{dispute.reason}</code>
+        <span style={{ color: "#888", marginLeft: 12 }}>{dispute.filed_at}</span>
+      </div>
+      <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+        <code>{dispute.filer_aid}</code> → <code>{dispute.respondent_aid}</code>
+      </div>
+    </li>
+  );
+}
+
+function EmptyInbox() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ margin: 0 }}>
+        No disputes filed by or against your agents yet. When a counterparty files one (or you file
+        one through <code>POST /v1/disputes</code>), it'll appear here.
+      </p>
+    </div>
+  );
+}
+
+function NoAgentsHint() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ margin: 0 }}>
+        You haven't published any agents yet. <Link href="/agents/new">Publish one →</Link>
+      </p>
+    </div>
+  );
+}
+
+function NeedOwnerHint() {
+  return (
+    <div
+      style={{
+        border: "1px dashed #ccc",
+        borderRadius: 8,
+        padding: 24,
+        background: "#fff",
+        color: "#555",
+      }}
+    >
+      <p style={{ marginTop: 0, marginBottom: 8 }}>
+        Sign in via GitHub to see disputes filed by or against your agents. The owner-scoped index
+        needs the dashboard to know your owner ID.
+      </p>
+      <p style={{ margin: 0 }}>
+        For now, you can still look up any case file by <code>dispute_id</code> using the form
+        above.
+      </p>
     </div>
   );
 }
@@ -320,29 +466,5 @@ function StateBadge({ state }: { state: string }) {
     >
       {state}
     </span>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 8 }}>How do I find a dispute ID?</h2>
-      <p style={{ marginTop: 0 }}>
-        Dispute IDs are returned by <code>POST /v1/disputes</code> at filing time. They look like{" "}
-        <code>disp_…</code> — copy one out of your filing tool's output and paste it above.
-      </p>
-      <p style={{ marginBottom: 0 }}>
-        An owner-scoped inbox (filed by you / against your agents) lands once the cloud-api adds a
-        listing endpoint.
-      </p>
-    </div>
   );
 }

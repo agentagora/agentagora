@@ -108,12 +108,33 @@ export interface RefundRecord {
   reason?: string;
 }
 
+/**
+ * Compact view of a conversation an actor participated in. Returned by
+ * `listConversationsByActor` so the dashboard can render an inbox
+ * without round-tripping every chain just to discover its existence.
+ */
+export interface ConversationSummary {
+  conversationId: string;
+  /** ISO 8601 — earliest event the actor signed in this conversation. */
+  firstSeenAt: string;
+  /** ISO 8601 — most recent event the actor signed in this conversation. */
+  lastSeenAt: string;
+  /** Total number of events the actor signed in this conversation. */
+  eventCount: number;
+  /** `type` field of the actor's most recent event. Useful for UI hints
+   *  ("settlement.completed", "dispute.opened", etc.) without forcing a
+   *  full chain fetch. */
+  latestEventType: string;
+}
+
 export interface Storage {
   // Agents
   getAgent(aid: string): Promise<AgentRecord | undefined>;
   putAgent(record: AgentRecord): Promise<void>;
   searchAgents(filter: SearchFilter): Promise<AgentRecord[]>;
   listAgents(): Promise<AgentRecord[]>;
+  /** Owner-scoped index. Used by the dashboard's "my agents" view. */
+  listAgentsByOwner(ownerId: string): Promise<AgentRecord[]>;
 
   // Audit events
   /** Idempotent insert. No-op if event_id already exists. */
@@ -124,6 +145,12 @@ export interface Storage {
   getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined>;
   /** Full chain for a conversation, ordered by timestamp ascending. */
   getConversationEvents(conversationId: string): Promise<AuditEvent[]>;
+  /**
+   * Distinct conversations the actor has signed an event in, with
+   * roll-up metadata. Ordered by lastSeenAt DESC so the dashboard's
+   * inbox shows the freshest activity first.
+   */
+  listConversationsByActor(actorAid: string): Promise<ConversationSummary[]>;
 
   // Disputes
   /** Insert a fresh dispute. Caller pre-allocates the dispute_id. */
@@ -136,6 +163,10 @@ export interface Storage {
    * filed before the refund landed.
    */
   getOpenDisputesByConversation(conversationId: string): Promise<DisputeRecord[]>;
+  /** All disputes the AID filed (newest first). */
+  listDisputesByFiler(filerAid: string): Promise<DisputeRecord[]>;
+  /** All disputes filed against the AID (newest first). */
+  listDisputesByRespondent(respondentAid: string): Promise<DisputeRecord[]>;
   /**
    * Mark a dispute as resolved. No-op if the dispute is already
    * resolved/closed/rejected — keeps webhook redelivery idempotent.
@@ -204,6 +235,17 @@ export class InMemoryStorage implements Storage {
     return [...this.agents.values()];
   }
 
+  async listAgentsByOwner(ownerId: string): Promise<AgentRecord[]> {
+    const out: AgentRecord[] = [];
+    for (const rec of this.agents.values()) {
+      if (rec.publishedBy === ownerId) out.push(rec);
+    }
+    // Mirror D1's `ORDER BY published_at DESC` so the InMemory + D1
+    // paths produce the same ordering for tests asserting on shape.
+    out.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    return out;
+  }
+
   async ingestAuditEvent(event: AuditEvent, _ingestedAt: string): Promise<void> {
     if (this.auditEvents.has(event.event_id)) return;
     this.auditEvents.set(event.event_id, event);
@@ -226,6 +268,52 @@ export class InMemoryStorage implements Storage {
     return [...(this.auditByConversation.get(conversationId) ?? [])];
   }
 
+  async listConversationsByActor(actorAid: string): Promise<ConversationSummary[]> {
+    // Closed-alpha approximation — mirrors the D1 query: pull every
+    // event the actor signed, group by conversation_id, roll up
+    // first/last/count + the latest event's type.
+    const groups = new Map<
+      string,
+      {
+        firstSeenAt: string;
+        lastSeenAt: string;
+        eventCount: number;
+        latestType: string;
+      }
+    >();
+    for (const event of this.auditEvents.values()) {
+      if (event.actor_aid !== actorAid) continue;
+      const existing = groups.get(event.conversation_id);
+      if (!existing) {
+        groups.set(event.conversation_id, {
+          firstSeenAt: event.timestamp,
+          lastSeenAt: event.timestamp,
+          eventCount: 1,
+          latestType: event.type,
+        });
+        continue;
+      }
+      existing.eventCount++;
+      if (event.timestamp < existing.firstSeenAt) existing.firstSeenAt = event.timestamp;
+      if (event.timestamp >= existing.lastSeenAt) {
+        existing.lastSeenAt = event.timestamp;
+        existing.latestType = event.type;
+      }
+    }
+    const out: ConversationSummary[] = [];
+    for (const [conversationId, g] of groups) {
+      out.push({
+        conversationId,
+        firstSeenAt: g.firstSeenAt,
+        lastSeenAt: g.lastSeenAt,
+        eventCount: g.eventCount,
+        latestEventType: g.latestType,
+      });
+    }
+    out.sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
+    return out;
+  }
+
   async createDispute(record: DisputeRecord): Promise<void> {
     if (this.disputes.has(record.disputeId)) {
       throw new Error(`dispute ${record.disputeId} already exists`);
@@ -245,6 +333,24 @@ export class InMemoryStorage implements Storage {
         out.push({ ...rec });
       }
     }
+    return out;
+  }
+
+  async listDisputesByFiler(filerAid: string): Promise<DisputeRecord[]> {
+    const out: DisputeRecord[] = [];
+    for (const rec of this.disputes.values()) {
+      if (rec.filerAid === filerAid) out.push({ ...rec });
+    }
+    out.sort((a, b) => b.filedAt.localeCompare(a.filedAt));
+    return out;
+  }
+
+  async listDisputesByRespondent(respondentAid: string): Promise<DisputeRecord[]> {
+    const out: DisputeRecord[] = [];
+    for (const rec of this.disputes.values()) {
+      if (rec.respondentAid === respondentAid) out.push({ ...rec });
+    }
+    out.sort((a, b) => b.filedAt.localeCompare(a.filedAt));
     return out;
   }
 
