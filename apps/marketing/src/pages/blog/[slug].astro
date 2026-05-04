@@ -1,5 +1,6 @@
 ---
 import HeadMeta from "../../components/HeadMeta.astro";
+import { links } from "../../lib/links";
 import "../../styles/global.css";
 import { getCollection, type CollectionEntry } from "astro:content";
 
@@ -71,17 +72,14 @@ const { display: dateDisplay, iso: dateIso } = formatDate(post.data.pubDate);
         </a>
         <nav aria-label="Primary" class="flex items-center gap-6 text-sm text-accent-600">
           <a href="/blog" class="hidden hover:text-accent-900 sm:inline">Blog</a>
-          <a
-            href="https://github.com/agentagora/agentagora/tree/main/docs"
-            class="hidden hover:text-accent-900 sm:inline"
-          >
-            Docs
+          <a href={links.docs.href} class="hidden hover:text-accent-900 sm:inline">
+            {links.docs.label}
           </a>
           <a
-            href="https://github.com/agentagora/agentagora"
+            href={links.repoNav.href}
             class="rounded-md border border-accent-200 px-3 py-1.5 text-accent-800 transition-colors hover:border-accent-800 hover:text-accent-900"
           >
-            GitHub
+            {links.repoNav.label}
           </a>
         </nav>
       </div>
@@ -156,25 +154,10 @@ const { display: dateDisplay, iso: dateIso } = formatDate(post.data.pubDate);
           </span>
         </div>
         <nav aria-label="Footer" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-accent-600">
-          <a
-            href="https://github.com/agentagora/agentagora/tree/main/docs"
-            class="hover:text-accent-900"
-          >
-            Docs
-          </a>
+          <a href={links.docs.href} class="hover:text-accent-900">{links.docs.label}</a>
           <a href="/blog" class="hover:text-accent-900">Blog</a>
-          <a
-            href="https://github.com/agentagora/agentagora"
-            class="hover:text-accent-900"
-          >
-            GitHub
-          </a>
-          <a
-            href="https://github.com/agentagora/agentagora/issues"
-            class="hover:text-accent-900"
-          >
-            Status
-          </a>
+          <a href={links.repoNav.href} class="hover:text-accent-900">{links.repoNav.label}</a>
+          <a href={links.issues.href} class="hover:text-accent-900">{links.issues.label}</a>
         </nav>
       </div>
     </footer>

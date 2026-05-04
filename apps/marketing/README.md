@@ -48,6 +48,8 @@ ships to the client at runtime.
 | `SITE_URL` | `https://agentagora.dev` | Canonical origin used by `<HeadMeta>` + `@astrojs/sitemap` to emit absolute URLs. |
 | `AGENTAGORA_CLOUD_URL` | `https://api.agentagora.dev` | Source of `GET /v1/agents` for the "Discover agents" section on the landing page (M3 §B.3 catalog). |
 | `AGENTAGORA_DASHBOARD_URL` | `https://dashboard.agentagora.dev` | Base URL for per-card "View on dashboard" CTAs (`/agents/<aid>`). |
+| `REPO_PUBLIC` | `false` | When `true`, header / hero / footer links route to GitHub. When unset / `false`, they degrade to mailto fallbacks targeting `CONTACT_EMAIL`. Flip to `true` after the repo flips public (see `docs/launch-runbook.md` §6). |
+| `CONTACT_EMAIL` | `weijt606@gmail.com` | Where mailto fallbacks land while `REPO_PUBLIC=false`. |
 
 ### Sharing + SEO
 
