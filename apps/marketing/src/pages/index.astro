@@ -61,7 +61,12 @@ async function loadCatalog(): Promise<CatalogState> {
       return { kind: "unreachable" };
     }
     const body = (await res.json()) as { agents?: CatalogAgent[] };
-    const agents = Array.isArray(body.agents) ? body.agents : [];
+    const all = Array.isArray(body.agents) ? body.agents : [];
+    // Filter out smoke-test probes — every `pnpm cloud-api smoke` run
+    // publishes one (timestamp-suffixed AID) and the cloud-api has no
+    // DELETE /v1/agents/:aid yet, so they accumulate. The public
+    // catalog should show real agents, not operational artefacts.
+    const agents = all.filter((a) => !a.aid.startsWith("aid:agentagora:smoke-test/"));
     if (agents.length === 0) return { kind: "empty" };
     return { kind: "ok", agents: agents.slice(0, 9) };
   } catch (err) {

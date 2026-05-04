@@ -39,3 +39,17 @@ pnpm --filter @agentagora/docs typecheck  # tsc --noEmit
 - **Each page ≤ 600 words.** Concept pages may quote spec excerpts plus their own framing.
 - **Stub pages must say what's coming and link to the canonical source.** No fake-detailed content.
 - **Edit the source, not the doc.** When the AAP spec, the SDK README, or the Cloud API README change, refresh the relevant excerpts here.
+
+## When to deploy this
+
+Wait until the repo is public — see [`docs/launch-runbook.md`](../../docs/launch-runbook.md) for the trigger framework.
+
+Most pages link to source files at `https://github.com/agentagora/agentagora/blob/...`. While the repo is private, every "Lifted from `apps/examples/two-agents/...`" reference 404s for anonymous visitors. Unlike the marketing site (which has been hardened with a `REPO_PUBLIC` env-var flag and mailto fallbacks at `apps/marketing/src/lib/links.ts`), the docs site's value proposition **is** the source-link density. Replacing those with mailtos would degrade the read experience worse than just deferring deploy.
+
+The TypeDoc-generated `sdk-reference/` block emits the same shape: every type and method links back to `packages/sdk/src/...` on GitHub. That's a feature when the repo is public; a footgun before.
+
+The simple deploy story:
+
+1. Don't deploy the docs site until Trigger 2 of the launch runbook (= repo flips public).
+2. Deploy on the same day you flip — pages live, links live, you're done.
+3. Until then, `pnpm dev` locally if you want to read.

@@ -12,12 +12,12 @@
 
 ## Status as of 2026-05-04
 
-**Marker counts**: 14 ✅ · 1 🟡 · 6 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜ — every item was open when the checklist was first drafted.
+**Marker counts**: 15 ✅ · 1 🟡 · 5 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜ — every item was open when the checklist was first drafted.
 
 **Top blockers for M3 launch (priority order)**:
 1. **C.1 lighthouse outreach list** — without 20 named candidates we have nothing to point at the launch blog post on day one.
-2. **D.5 deployed-Worker E2E test** — closes the last "we ship code we can't actually exercise on prod" gap; compounds with D.6 below.
-3. **D.6 PIT restore drill against production D1** — RUNBOOK §1.4 + §3.4 explicitly call this out as un-rehearsed; we cannot promise data durability we have not exercised.
+2. **D.6 PIT restore drill against production D1** — RUNBOOK §1.4 + §3.4 explicitly call this out as un-rehearsed; we cannot promise data durability we have not exercised. Manual ops drill — code can't help here.
+3. **B.4 / B.5** — Discussions toggle + Projects board, both manual GitHub Settings actions, both pending you ([this conversation](#)).
 
 **Done by code, awaiting human action** (not blocked on engineering):
 - **B.4 GitHub Discussions** — flip the toggle in repo Settings → Features and pin the welcome thread. Owner: weijt606.
@@ -128,7 +128,7 @@
 - [x] Stripe webhook secret rotation drill rehearsed — RUNBOOK §2.4.
 - [x] `OIDC_SIGNING_KEY` rotation procedure documented — RUNBOOK §2.2.
 - [x] Bundle-size budget for cloud-api (matching SDK's existing 250KiB / 60KiB) — commit `4d61107`; CI gate enforces ≤ 320 KiB raw / ≤ 75 KiB gzipped (RUNBOOK §4.1).
-- [ ] Cloud-api E2E test against a deployed preview Worker (currently only `app.request()`)
+- [x] Cloud-api E2E test against a deployed preview Worker — operator-run smoke script at `apps/cloud/api/scripts/smoke.ts` (commit `bdcd5d3`); RUNBOOK §1.6 documents how to invoke it after every deploy. CI doesn't run it without Cloudflare credentials yet — promotes to a CI gate when deploy-preview tokens are wired.
 - [x] Coverage threshold on protocol + SDK promoted from informational to gate — commit `9d64648`.
 - [x] Status page / public uptime indicator (cheapest: stat.us or a 1-line Worker) — `apps/status/` Worker shipped in commit `2e01152`.
 - [ ] PIT restore drill against production D1 — RUNBOOK §3.4 explicitly flags as un-rehearsed.
