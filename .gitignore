@@ -64,6 +64,13 @@ target/
 # ===== Cloudflare Wrangler =====
 .wrangler/
 .dev.vars
+# security-review-2026-05 §M1: wrangler.jsonc carries production D1 / KV
+# resource IDs that must NOT be checked into the repo. The committed
+# template lives at `wrangler.jsonc.example`; bootstrap a fresh checkout
+# with `cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc`
+# and paste in the real IDs from `wrangler d1 create` /
+# `wrangler kv namespace create`.
+apps/cloud/api/wrangler.jsonc
 
 # ===== Test coverage =====
 coverage/

@@ -44,21 +44,30 @@ export interface SessionPayload {
   githubLogin?: string;
 }
 
-/** Cookie name. Prefixed `__Host-`-style would require Secure + Path=/
- *  + no Domain — we set those flags but keep the name plain so it
- *  works in `next dev` over http://localhost. */
-export const COOKIE_NAME = "agentagora_session";
+/**
+ * Cookie name. In production we use the `__Host-` prefix so browsers
+ * refuse to set the cookie unless it carries `Secure`, `Path=/`, and
+ * no `Domain` attribute — this blocks parent-domain / sibling-subdomain
+ * cookie-overwrite attacks (security-review-2026-05 §H2).
+ *
+ * `__Host-` is incompatible with `next dev` over plain http://localhost
+ * (no Secure → browser refuses), so dev keeps a plain cookie name. The
+ * production code path always sets Secure + Path=/ + no Domain anyway.
+ */
+export const COOKIE_NAME =
+  process.env.NODE_ENV === "production" ? "__Host-agentagora_session" : "agentagora_session_dev";
 
 let cachedSecretWarning = false;
 
 /**
  * Resolve a 32-byte AES key from `DASHBOARD_COOKIE_SECRET`.
  *
- * If the env var is unset we fall back to a *process-stable* random
- * value so dev sessions survive across requests within the same
- * `next dev` invocation. We log a warning the first time so the user
- * knows to set a real secret before deploying. The fallback explicitly
- * does NOT persist across restarts — that's the whole point.
+ * In production (NODE_ENV === "production") we fail closed — a missing
+ * or short secret throws at first use, so the deploy can't silently
+ * mint cookies under a per-process random key (security-review-2026-05
+ * §H1). In development we keep the ephemeral fallback so `next dev`
+ * works without manual setup; we surface the warning via console.error
+ * (rather than warn) so it's visible in streaming logs.
  */
 async function getKey(): Promise<CryptoKey> {
   const secret = resolveSecret();
@@ -72,14 +81,31 @@ function resolveSecret(): string {
   const fromEnv = process.env.DASHBOARD_COOKIE_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
 
+  // security-review-2026-05 §H1: in production, refuse to use a
+  // per-process random key — a missing/short secret would silently log
+  // every replica out on roll-outs and mask the misconfiguration. Throw
+  // so the operator notices at the first request.
+  if (process.env.NODE_ENV === "production") {
+    if (fromEnv) {
+      throw new Error(
+        "[dashboard] DASHBOARD_COOKIE_SECRET is shorter than 32 bytes — refusing to start in production. " +
+          "Set a 32+ byte random value (e.g. `openssl rand -base64 48`).",
+      );
+    }
+    throw new Error(
+      "[dashboard] DASHBOARD_COOKIE_SECRET is not set — refusing to start in production. " +
+        "Set a 32+ byte random value (e.g. `openssl rand -base64 48`).",
+    );
+  }
+
   if (!cachedSecretWarning) {
     cachedSecretWarning = true;
     if (fromEnv && fromEnv.length < 32) {
-      console.warn(
+      console.error(
         "[dashboard] DASHBOARD_COOKIE_SECRET is shorter than 32 bytes — generating an ephemeral fallback. Set a 32+ byte random value before deploying.",
       );
     } else {
-      console.warn(
+      console.error(
         "[dashboard] DASHBOARD_COOKIE_SECRET is not set — generating an ephemeral fallback for this process. Sessions will NOT survive a restart. Set a 32+ byte random value before deploying.",
       );
     }

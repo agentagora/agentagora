@@ -348,6 +348,122 @@ describe("OauthSessionAuth resolves OAuth-issued bearers like OWNER_TOKENS beare
   });
 });
 
+// security-review-2026-05 §H3: state may carry a SHA-256 hash of a
+// browser-bound nonce. The callback then requires the matching raw
+// nonce to be re-presented; without it (or with a mismatched value)
+// the response is 401 with `reason: "state_nonce_mismatch"`.
+describe("POST /v1/auth/github/start with nonce_hash + callback nonce binding [§H3]", () => {
+  async function sha256B64u(input: string): Promise<string> {
+    const enc = new TextEncoder();
+    const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
+    const bytes = new Uint8Array(digest);
+    let s = "";
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  it("POST /start accepts a nonce_hash and binds it into the signed state", async () => {
+    const { app } = await setup();
+    const nonce = "test-raw-nonce-12345678901234567890";
+    const nonceHash = await sha256B64u(nonce);
+    const res = await app.request("/v1/auth/github/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce_hash: nonceHash }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { authorize_url: string; state: string };
+    expect(body.state).toContain(".");
+    // Decode the state body and confirm the hash made it in.
+    const parsed = JSON.parse(
+      Buffer.from(
+        body.state.split(".")[0]!.replace(/-/g, "+").replace(/_/g, "/"),
+        "base64",
+      ).toString("utf-8"),
+    ) as { issuedAt: number; nonceHash?: string };
+    expect(parsed.nonceHash).toBe(nonceHash);
+  });
+
+  it("callback rejects with state_nonce_mismatch when nonce is missing from the body", async () => {
+    const { app } = await setup();
+    const nonce = "test-raw-nonce-required";
+    const nonceHash = await sha256B64u(nonce);
+    const startRes = await app.request("/v1/auth/github/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce_hash: nonceHash }),
+    });
+    const start = (await startRes.json()) as { state: string };
+
+    // No nonce in the callback body — state requires one.
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state }),
+    });
+    expect(cbRes.status).toBe(401);
+    const body = (await cbRes.json()) as { error: string; reason?: string };
+    expect(body.error).toBe("unauthorized");
+    expect(body.reason).toBe("state_nonce_mismatch");
+  });
+
+  it("callback rejects with state_nonce_mismatch when the wrong nonce is presented", async () => {
+    const { app } = await setup();
+    const nonce = "the-real-nonce";
+    const nonceHash = await sha256B64u(nonce);
+    const startRes = await app.request("/v1/auth/github/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce_hash: nonceHash }),
+    });
+    const start = (await startRes.json()) as { state: string };
+
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state, nonce: "different-nonce" }),
+    });
+    expect(cbRes.status).toBe(401);
+    const body = (await cbRes.json()) as { error: string; reason?: string };
+    expect(body.reason).toBe("state_nonce_mismatch");
+  });
+
+  it("callback succeeds when the matching raw nonce is presented", async () => {
+    const { app } = await setup();
+    const nonce = "matching-raw-nonce-1234";
+    const nonceHash = await sha256B64u(nonce);
+    const startRes = await app.request("/v1/auth/github/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce_hash: nonceHash }),
+    });
+    const start = (await startRes.json()) as { state: string };
+
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state, nonce }),
+    });
+    expect(cbRes.status).toBe(201);
+    const body = (await cbRes.json()) as { bearer: string };
+    expect(body.bearer).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+  });
+
+  it("GET /start (no nonce_hash) still works for non-browser callers", async () => {
+    const { app } = await setup();
+    const startRes = await app.request("/v1/auth/github/start");
+    const start = (await startRes.json()) as { state: string };
+    // Callback without nonce should still succeed because state has no
+    // nonce binding embedded.
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state }),
+    });
+    expect(cbRes.status).toBe(201);
+  });
+});
+
 describe("Storage.deleteExpiredOauthSessions", () => {
   it("removes only rows with expires_at ≤ now", async () => {
     const storage = new InMemoryStorage();

@@ -173,4 +173,36 @@ describe("POST /v1/agents — signature verification", () => {
     const stored = await storage.getAgent(validManifest.aid);
     expect(stored?.pubkey).toBe(aliceKey.pubkeyB64u);
   });
+
+  // security-review-2026-05 §M2: legacy / failed-migration rows can
+  // carry an empty `pubkey` (NOT NULL DEFAULT ''). The previous truthy
+  // guard `existing.pubkey && …` short-circuited on those rows,
+  // letting any owner-controlled bearer rotate the signing key past
+  // the TOFU pin. The fix tightens to an explicit empty-string check
+  // and refuses publish until ops resets the row.
+  it("rejects publish against an existing empty-pubkey row (403, no implicit pin) [§M2]", async () => {
+    const { app, storage } = setup();
+
+    // Seed a legacy row whose `pubkey` is the empty default. This
+    // simulates a manifest published before migration 0002 where the
+    // row was never republished afterwards.
+    await storage.putAgent({
+      manifest: validManifest as never,
+      identityJwt: "mock.legacy",
+      publishedAt: "2026-01-01T00:00:00.000Z",
+      publishedBy: "alice",
+      pubkey: "",
+    });
+
+    const res = await publish(app);
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("forbidden");
+    expect(body.message).toMatch(/no pinned signing key/);
+
+    // The empty-pubkey row is left as-is — fix is "ops resets it",
+    // not "the next caller silently claims it".
+    const stored = await storage.getAgent(validManifest.aid);
+    expect(stored?.pubkey).toBe("");
+  });
 });

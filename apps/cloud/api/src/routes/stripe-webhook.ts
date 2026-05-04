@@ -58,9 +58,17 @@ export function createStripeWebhookRouter({
       // but NOT for permanent shape mismatches (those should never
       // recur). Distinguishing is hard server-side; default to 500
       // and rely on Stripe's exponential backoff.
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[stripe-webhook] handler failed for ${event.type}`, message);
-      return c.json({ error: "handler_failed", event_id: event.id, message }, 500);
+      //
+      // security-review-2026-05 §L1: keep the verbose error server-side
+      // (console.error) and surface only a request_id to the caller so
+      // we don't leak Stripe-side trace data / IDs. Operators correlate
+      // by the request_id printed in logs.
+      const requestId = newRequestId();
+      console.error(
+        `[stripe-webhook] handler failed for ${event.type} (request_id=${requestId})`,
+        err,
+      );
+      return c.json({ error: "handler_failed", event_id: event.id, request_id: requestId }, 500);
     }
   });
 
@@ -202,6 +210,18 @@ function pickLatestRefund(charge: Record<string, unknown>): StripeRefundLite | u
 function pickRefundedAmount(charge: Record<string, unknown>): number {
   const v = charge.amount_refunded;
   return typeof v === "number" ? v : 0;
+}
+
+/**
+ * Generate a fresh request-id for log correlation. 16 random bytes,
+ * base64url-encoded. Used by the §L1 sanitised error path.
+ */
+function newRequestId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function centsToDecimal(cents: number): string {

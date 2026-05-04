@@ -72,6 +72,14 @@ See [docs/tech-stack.md](../../docs/tech-stack.md) for full architecture and con
 | `StripeChannel` | 🚧 NotImplemented (M2 task #10) |
 | `UsdcBaseChannel` | 🚧 NotImplemented (M5) |
 
+## Operational caveats
+
+### `CloudNonceTracker` fails open by default (security-review-2026-05 §M3)
+
+When you opt into cloud-coordinated replay protection by passing a `CloudNonceTracker`, the tracker falls back to an in-memory (per-isolate) store if `/v1/nonces/check` is unreachable or returns an unexpected status. **This is intentional**: the tradeoff is "agents stay available during a cloud-api incident" over "replay attempts get rejected uniformly across the fleet". The SDK logs `console.warn` on every fallback so the degradation is visible.
+
+If your deployment cannot tolerate any replay-during-outage window — e.g. because settlement amounts are large enough that a coordinated replayer landing duplicate calls across isolates is more expensive than a downtime period — wrap the cloud tracker with your own no-op fallback. We may make this the default in a future release; for now the documented behaviour is "fail open, log warn".
+
 ## License
 
 [Apache-2.0](../../LICENSE)

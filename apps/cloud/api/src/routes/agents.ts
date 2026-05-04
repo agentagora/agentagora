@@ -123,11 +123,28 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
           403,
         );
       }
-      if (existing.pubkey && existing.pubkey !== pubkeyHeader) {
+      // security-review-2026-05 §M2: legacy / failed-migration rows
+      // can have an empty `pubkey` (the column was added with
+      // `NOT NULL DEFAULT ''` in 0002_pubkey.sql). The previous truthy
+      // guard `existing.pubkey && …` short-circuited on those rows,
+      // letting any owner-controlled bearer rotate the signing key
+      // past the TOFU pin. Compare against the empty string explicitly
+      // so an empty pin always fails closed against a presented key.
+      const pinnedPubkey = existing.pubkey;
+      if (pinnedPubkey !== "" && pinnedPubkey !== pubkeyHeader) {
         return c.json(
           {
             error: "forbidden",
             message: `aid ${manifest.aid} is pinned to a different signing key`,
+          },
+          403,
+        );
+      }
+      if (pinnedPubkey === "") {
+        return c.json(
+          {
+            error: "forbidden",
+            message: `aid ${manifest.aid} has no pinned signing key — contact ops to reset`,
           },
           403,
         );

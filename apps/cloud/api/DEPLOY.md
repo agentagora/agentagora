@@ -19,6 +19,14 @@ End-to-end deploy steps for the AgentAgora Cloud control-plane Worker. Run from 
 
 ## 1. Provision the D1 database (one-time)
 
+> **First-run bootstrap (security-review-2026-05 §M1)**: a fresh checkout has no `apps/cloud/api/wrangler.jsonc` — the file is git-ignored to prevent shipping placeholder UUIDs to production. Copy the example and edit it:
+>
+> ```bash
+> cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc
+> ```
+>
+> The example carries `REPLACE_BEFORE_DEPLOY` sentinels. Wrangler will refuse those at provisioning time, so the deploy fails fast instead of silently binding to placeholder resources.
+
 ```bash
 pnpm --filter @agentagora/cloud-api exec wrangler d1 create agentagora-cloud
 ```
@@ -36,7 +44,7 @@ Wrangler prints a UUID. Paste it into `apps/cloud/api/wrangler.jsonc` at:
 ]
 ```
 
-Commit the change. The placeholder UUID `00000000-0000-0000-0000-000000000000` in the repo is a sentinel — the real one only lives in your account.
+**Do not commit the change.** `apps/cloud/api/wrangler.jsonc` is git-ignored — the real D1 / KV IDs only ever live in your local checkout (and on Cloudflare). The committed template is `wrangler.jsonc.example`.
 
 ## 1b. Provision the KV namespaces (one-time)
 
@@ -225,6 +233,20 @@ D1 migrations are forward-only (no built-in down migrations). To roll back a rel
 3. Schema rollback (if needed) is a manual SQL operation; write a compensating `000N_revert_*.sql` and apply it
 
 D1 keeps automatic backups; `wrangler d1 backup` can restore at the row level if a migration corrupts data. Always test migrations on `--local` first.
+
+---
+
+## 6b. Triaging Stripe failures (`request_id` correlation)
+
+When `/v1/connect/*` returns `502 stripe_unavailable` or `/v1/stripe/webhook` returns `500 handler_failed`, the response body carries an opaque `request_id` (no Stripe-side trace data — security-review-2026-05 §L1). The verbose Stripe error is logged server-side. To triage:
+
+```bash
+# Tail Worker logs and grep by the request_id the client reported.
+pnpm --filter @agentagora/cloud-api exec wrangler tail \
+  --search "request_id=<paste id here>"
+```
+
+The matching `[connect] Stripe …` or `[stripe-webhook] handler failed …` log line carries the full Stripe error (status + body) for diagnosis.
 
 ---
 

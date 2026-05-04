@@ -175,15 +175,46 @@ export function createGithubOauthRouter({
 }: RouterDeps): Hono {
   const router = new Hono();
 
-  router.get("/start", async (c) => {
+  /**
+   * Build a `{ authorize_url, state }` payload with an optional
+   * browser-bound nonce-hash baked into the signed state
+   * (security-review-2026-05 §H3).
+   */
+  async function buildStartResponse(nonceHash: string | undefined) {
     const issuedAt = now().getTime();
-    const state = await signState(stateSigningKey, { issuedAt });
+    const payload: StatePayload = { issuedAt };
+    if (nonceHash !== undefined) payload.nonceHash = nonceHash;
+    const state = await signState(stateSigningKey, payload);
     const url = new URL(GITHUB_AUTHORIZE_URL);
     url.searchParams.set("client_id", config.clientId);
     url.searchParams.set("scope", config.scope ?? DEFAULT_SCOPE);
     url.searchParams.set("state", state);
     if (config.redirectUri) url.searchParams.set("redirect_uri", config.redirectUri);
-    return c.json({ authorize_url: url.toString(), state });
+    return { authorize_url: url.toString(), state };
+  }
+
+  // GET /start — backward-compatible entry point that mints a state
+  // with no nonce binding. Useful for callers that don't go through a
+  // browser (CI smoke tests, manual curl) where binding to a browser
+  // session is not meaningful.
+  router.get("/start", async (c) => {
+    return c.json(await buildStartResponse(undefined));
+  });
+
+  // POST /start — accepts an optional `nonce_hash` field which (when
+  // present) is embedded into the signed state. The dashboard always
+  // posts it; cloud-api's callback then requires the matching raw
+  // nonce to be presented back. security-review-2026-05 §H3.
+  router.post("/start", async (c) => {
+    let nonceHash: string | undefined;
+    const raw = await c.req.json().catch(() => null);
+    if (raw && typeof raw === "object") {
+      const candidate = (raw as { nonce_hash?: unknown }).nonce_hash;
+      if (typeof candidate === "string" && candidate.length > 0) {
+        nonceHash = candidate;
+      }
+    }
+    return c.json(await buildStartResponse(nonceHash));
   });
 
   router.post("/callback", async (c) => {
@@ -193,6 +224,7 @@ export function createGithubOauthRouter({
     }
     const code = (raw as { code?: unknown }).code;
     const stateRaw = (raw as { state?: unknown }).state;
+    const nonceRaw = (raw as { nonce?: unknown }).nonce;
     if (typeof code !== "string" || !code) {
       return c.json({ error: "invalid_body", message: "code is required" }, 400);
     }
@@ -200,10 +232,37 @@ export function createGithubOauthRouter({
       return c.json({ error: "invalid_body", message: "state is required" }, 400);
     }
 
-    // Verify state (HMAC + freshness).
-    const stateOk = await verifyState(stateSigningKey, stateRaw, now().getTime());
-    if (!stateOk) {
+    // security-review-2026-05 §H3: verify state HMAC + freshness AND
+    // (when state carries a nonce-hash) require the caller to present
+    // the raw nonce that hashes to the embedded value. This binds the
+    // state to the browser that initiated the flow — a leaked state
+    // alone is no longer enough to complete a callback.
+    const verdict = await verifyStateDetailed(stateSigningKey, stateRaw, now().getTime());
+    if (!verdict.ok) {
       return c.json({ error: "unauthorized", message: "invalid or expired state" }, 401);
+    }
+    if (verdict.payload.nonceHash !== undefined) {
+      if (typeof nonceRaw !== "string" || nonceRaw.length === 0) {
+        return c.json(
+          {
+            error: "unauthorized",
+            reason: "state_nonce_mismatch",
+            message: "state requires a browser nonce but none was provided",
+          },
+          401,
+        );
+      }
+      const presentedHash = await sha256B64u(nonceRaw);
+      if (!constantTimeEquals(presentedHash, verdict.payload.nonceHash)) {
+        return c.json(
+          {
+            error: "unauthorized",
+            reason: "state_nonce_mismatch",
+            message: "browser nonce does not match the state",
+          },
+          401,
+        );
+      }
     }
 
     // Exchange the code with GitHub.
@@ -346,6 +405,12 @@ export async function deriveStateSigningKey(input: Uint8Array): Promise<Uint8Arr
 interface StatePayload {
   /** ms since epoch when the state was issued. */
   issuedAt: number;
+  /**
+   * Optional SHA-256(raw nonce) base64url-encoded — when present, the
+   * callback requires the matching raw nonce to be presented back in
+   * the request body (security-review-2026-05 §H3).
+   */
+  nonceHash?: string;
 }
 
 /**
@@ -365,9 +430,24 @@ async function signState(key: Uint8Array, payload: StatePayload): Promise<string
   return `${body}.${b64uEncode(sig)}`;
 }
 
-async function verifyState(key: Uint8Array, value: string, nowMs: number): Promise<boolean> {
+interface StateVerdict {
+  ok: boolean;
+  payload: StatePayload;
+}
+
+/**
+ * Verify a state token's HMAC + freshness window and return the parsed
+ * payload so the caller can apply additional checks (e.g.
+ * security-review-2026-05 §H3 nonce binding).
+ */
+async function verifyStateDetailed(
+  key: Uint8Array,
+  value: string,
+  nowMs: number,
+): Promise<StateVerdict> {
+  const empty: StatePayload = { issuedAt: 0 };
   const idx = value.indexOf(".");
-  if (idx <= 0 || idx === value.length - 1) return false;
+  if (idx <= 0 || idx === value.length - 1) return { ok: false, payload: empty };
   const body = value.slice(0, idx);
   const sig = value.slice(idx + 1);
 
@@ -375,7 +455,7 @@ async function verifyState(key: Uint8Array, value: string, nowMs: number): Promi
   try {
     sigBytes = b64uDecode(sig);
   } catch {
-    return false;
+    return { ok: false, payload: empty };
   }
   const macKey = await crypto.subtle.importKey(
     "raw",
@@ -387,18 +467,41 @@ async function verifyState(key: Uint8Array, value: string, nowMs: number): Promi
   // Web Crypto's verify is constant-time across same-length inputs;
   // mismatched lengths are rejected as `false` without timing leaks.
   const ok = await crypto.subtle.verify("HMAC", macKey, sigBytes, ENC.encode(body));
-  if (!ok) return false;
+  if (!ok) return { ok: false, payload: empty };
 
   let payload: StatePayload;
   try {
     payload = JSON.parse(DEC.decode(b64uDecode(body))) as StatePayload;
   } catch {
-    return false;
+    return { ok: false, payload: empty };
   }
-  if (typeof payload.issuedAt !== "number") return false;
+  if (typeof payload.issuedAt !== "number") return { ok: false, payload: empty };
   const age = nowMs - payload.issuedAt;
-  if (age < 0 || age > STATE_TTL_MS) return false;
-  return true;
+  if (age < 0 || age > STATE_TTL_MS) return { ok: false, payload };
+  return { ok: true, payload };
+}
+
+/**
+ * SHA-256 of a UTF-8 string, base64url-encoded. Used to compare the
+ * dashboard-supplied raw nonce against the state-embedded hash.
+ */
+async function sha256B64u(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", ENC.encode(input));
+  return b64uEncode(new Uint8Array(digest));
+}
+
+/**
+ * Constant-time string compare. Both inputs are ASCII (base64url) so
+ * comparing as char codes is safe; the loop is fixed-length to avoid
+ * leaking the position of the first differing byte.
+ */
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 function b64uEncode(bytes: Uint8Array): string {

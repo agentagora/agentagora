@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agentagora-cloud-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+  "observability": {
+    "enabled": true
+  },
+  // ─────────────────────────────────────────────────────────────────
+  // security-review-2026-05 §M1: this file is the COMMITTED EXAMPLE.
+  // The real `wrangler.jsonc` (which holds the production D1 / KV
+  // resource IDs) is git-ignored. Before deploying:
+  //
+  //   1. cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc
+  //   2. Replace every REPLACE_BEFORE_DEPLOY sentinel with the real
+  //      ID printed by `wrangler d1 create` / `wrangler kv namespace
+  //      create`. See DEPLOY.md §1 for the full sequence.
+  //
+  // The sentinels are NOT valid Cloudflare resource IDs, so a stray
+  // deploy from a fresh checkout fails fast at provisioning instead
+  // of silently binding to placeholder resources.
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // Local dev / preview seeds against the local SQLite under
+  // .wrangler/state. Production binds to the real D1 instance after
+  // running `wrangler d1 create agentagora-cloud` and pasting the
+  // returned UUID into `database_id` below.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agentagora-cloud",
+      "database_id": "REPLACE_BEFORE_DEPLOY",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // KV-backed global nonce store. Provision with
+  //   wrangler kv:namespace create NONCES
+  // and paste the printed `id` into the `id` field below.
+  "kv_namespaces": [
+    {
+      "binding": "NONCES",
+      "id": "REPLACE_BEFORE_DEPLOY"
+    },
+    {
+      "binding": "RATE_LIMITS",
+      "id": "REPLACE_BEFORE_DEPLOY"
+    }
+  ]
+  // Still pending:
+  //   - R2 bucket for long-term audit log storage
+  //   - secrets: STRIPE_SECRET_KEY (M2 Phase 4)
+}
