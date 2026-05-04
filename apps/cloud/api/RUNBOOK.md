@@ -158,6 +158,9 @@ node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("b
 
 # 2. Build the new comma-separated list (drop revoked owners):
 #    <ownerId>:<token>,<ownerId>:<token>,...
+#    ownerId is opaque for OWNER_TOKENS bearers; OAuth-issued sessions use
+#    `gh:<login>` (see commit af9c416, src/oauth-github.ts). Both shapes
+#    coexist — OWNER_TOKENS rotation only affects the static-bearer set.
 
 # 3. Replace + redeploy.
 pnpm --filter @agentagora/cloud-api exec wrangler secret put OWNER_TOKENS
@@ -342,6 +345,12 @@ vercel env add DASHBOARD_COOKIE_SECRET production
 
 ```bash
 URL=https://agentagora-cloud-api.<account>.workers.dev
+STATUS_URL=https://<status-worker-host>  # see apps/status/wrangler.jsonc
+
+# 0. Outside vantage point — the status Worker probes UPSTREAM_HEALTHZ per
+#    request, so this tells you whether cloud-api was reachable from a
+#    different network in the last few seconds.
+curl -s "$STATUS_URL/status.json" | python3 -m json.tool
 
 # 1. Liveness — should be 200 with `{ ok: true }`.
 curl -i "$URL/healthz"
@@ -512,7 +521,7 @@ The CI `latency-bench` job starts `wrangler dev` against a fresh build and runs 
 
 - **No formal SLO.** "p95 < 200ms" is a PRD §9.3 #4 target, not a paged-on alert.
 - **No on-call rotation.** Maintainer is on-call.
-- **No status page.** M3 hardening checklist D.7 — not started.
+- **Status page.** `apps/status/` is a live stateless Worker that probes `UPSTREAM_HEALTHZ` per request and serves HTML at `/` plus JSON at `/status.json`. Deploy with `pnpm --filter @agentagora/status deploy`; monitor via `wrangler tail` against the `@agentagora/status` Worker. Configuration + thresholds are in `apps/status/README.md`.
 - **No prod log aggregation** beyond the Cloudflare dashboard.
 - **No PIT-restore drill** against production D1 (§3.4).
 - **No multi-secret support** for `STRIPE_WEBHOOK_SECRET` (§2.4 brief dual-deploy is the workaround).
