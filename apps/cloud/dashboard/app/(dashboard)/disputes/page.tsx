@@ -33,12 +33,37 @@ export default async function DisputesPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Disputes</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
-          Look up a dispute case file by <code>dispute_id</code>, or browse the disputes filed by
-          (or against) your agents.
-        </p>
+      <header
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, marginBottom: 4 }}>Disputes</h1>
+          <p style={{ color: "#555", marginTop: 0 }}>
+            Look up a dispute case file by <code>dispute_id</code>, or browse the disputes filed by
+            (or against) your agents.
+          </p>
+        </div>
+        <Link
+          href="/disputes/new"
+          style={{
+            padding: "8px 14px",
+            background: "#0366d6",
+            color: "#fff",
+            borderRadius: 6,
+            textDecoration: "none",
+            fontWeight: 600,
+            fontSize: 14,
+            whiteSpace: "nowrap",
+          }}
+        >
+          File a dispute
+        </Link>
       </header>
 
       <LookupForm initialId={id} />

@@ -343,6 +343,62 @@ export async function getDispute(id: string): Promise<DisputeResponse | null> {
 }
 
 /**
+ * `POST /v1/disputes` — file a dispute. Bearer-authed; the caller must
+ * own `filer_aid`. Provided here for completeness / typed-client parity
+ * with the read paths; the dashboard's file-dispute form posts directly
+ * browser → cloud-api so the bearer never round-trips through the
+ * Next.js server (same security pattern as the publish form).
+ */
+export interface FileDisputeBody {
+  conversation_id: string;
+  filer_aid: string;
+  respondent_aid: string;
+  reason: "non_delivery" | "wrong_output" | "fraud" | "other";
+  narrative?: string;
+  claimed_remedy?: string;
+}
+
+export type FileDisputeResult =
+  | { kind: "ok"; dispute: DisputeResponse }
+  | { kind: "error"; status: number; error: string; message: string; field?: string };
+
+export async function fileDispute(
+  bearer: string,
+  body: FileDisputeBody,
+): Promise<FileDisputeResult> {
+  const url = `${BASE_URL}/v1/disputes`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${bearer}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.status === 201) {
+      return { kind: "ok", dispute: json as unknown as DisputeResponse };
+    }
+    return {
+      kind: "error",
+      status: res.status,
+      error: typeof json.error === "string" ? json.error : `http_${res.status}`,
+      message: typeof json.message === "string" ? json.message : `HTTP ${res.status}`,
+      field: typeof json.field === "string" ? json.field : undefined,
+    };
+  } catch (err) {
+    return {
+      kind: "error",
+      status: 0,
+      error: "unreachable",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
  * Validate a bearer token by hitting cloud-api's healthz with the
  * Authorization header and confirming the API is reachable. The
  * cloud-api doesn't expose a `/v1/whoami`, so we can't actually

@@ -39,7 +39,7 @@ export default async function ConversationsPage({ searchParams }: PageProps) {
       <LookupForm initialId={id} />
 
       {id ? (
-        <ChainView id={id} />
+        <ChainView id={id} bearer={session.bearer} ownerLogin={session.githubLogin} />
       ) : (
         <OwnerInbox bearer={session.bearer} ownerLogin={session.githubLogin} />
       )}
@@ -221,7 +221,15 @@ function NeedOwnerHint() {
   );
 }
 
-async function ChainView({ id }: { id: string }) {
+async function ChainView({
+  id,
+  bearer,
+  ownerLogin,
+}: {
+  id: string;
+  bearer: string;
+  ownerLogin: string | undefined;
+}) {
   const chain = await getConversation(id);
 
   if (!chain) {
@@ -243,6 +251,25 @@ async function ChainView({ id }: { id: string }) {
     );
   }
 
+  // Pick a likely respondent: the most-frequent actor AID in the chain
+  // that is NOT one of the bearer's owned AIDs. If the bearer owns
+  // every actor in the chain (self-vs-self conversation), leave the
+  // respondent slot blank — the user can fill it in manually.
+  const ownerId = ownerLogin ? `gh:${ownerLogin}` : null;
+  const owned = ownerId ? await getOwnedAgents(bearer, ownerId, 50) : [];
+  const ownedSet = new Set(owned.map((a) => a.aid));
+  const counterCounts = new Map<string, number>();
+  for (const ev of chain.events) {
+    if (typeof ev.actor_aid !== "string") continue;
+    if (ownedSet.has(ev.actor_aid)) continue;
+    counterCounts.set(ev.actor_aid, (counterCounts.get(ev.actor_aid) ?? 0) + 1);
+  }
+  const likelyRespondent = [...counterCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+
+  const fileHref = likelyRespondent
+    ? `/disputes/new?conversation_id=${encodeURIComponent(chain.conversation_id)}&respondent_aid=${encodeURIComponent(likelyRespondent)}`
+    : `/disputes/new?conversation_id=${encodeURIComponent(chain.conversation_id)}`;
+
   return (
     <section>
       <div
@@ -251,14 +278,32 @@ async function ChainView({ id }: { id: string }) {
           justifyContent: "space-between",
           alignItems: "baseline",
           marginBottom: 12,
+          gap: 12,
         }}
       >
         <h2 style={{ fontSize: 16, margin: 0 }}>
           <code>{chain.conversation_id}</code>
         </h2>
-        <span style={{ fontSize: 13, color: "#666" }}>
-          {chain.total} event{chain.total === 1 ? "" : "s"}
-        </span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+          <span style={{ fontSize: 13, color: "#666" }}>
+            {chain.total} event{chain.total === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={fileHref}
+            style={{
+              padding: "6px 12px",
+              background: "#0366d6",
+              color: "#fff",
+              borderRadius: 6,
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            File a dispute
+          </Link>
+        </div>
       </div>
 
       {chain.events.length === 0 ? (
