@@ -4,7 +4,7 @@ The AgentAgora marketing site. Single landing page, Astro 4 + Tailwind, static-f
 
 ## What's here
 
-- `src/pages/index.astro` — the landing page (hero, problem, how-it-works, why-now, footer)
+- `src/pages/index.astro` — the landing page (hero, problem, how-it-works, discover-agents, why-now, footer)
 - `src/styles/global.css` — Tailwind directives + light reset
 - `tailwind.config.mjs` — graphite accent palette, Inter font stack
 - `public/favicon.svg` — geometric favicon mark
@@ -37,7 +37,24 @@ The build output is fully static (`./dist`). To deploy on Cloudflare Pages:
 - **Root directory** (advanced): repository root — Pages needs to see the workspace
 - **Node version**: 24+ (matches monorepo `engines`)
 
-No SSR, no edge functions, no environment variables required for the current page.
+No SSR, no edge functions. The build is fully static — env vars below are
+read at **build time only** and inlined into the rendered HTML; nothing
+ships to the client at runtime.
+
+### Build-time environment variables
+
+| Variable | Default | Used for |
+|---|---|---|
+| `AGENTAGORA_CLOUD_URL` | `https://api.agentagora.dev` | Source of `GET /v1/agents` for the "Discover agents" section on the landing page (M3 §B.3 catalog). |
+| `AGENTAGORA_DASHBOARD_URL` | `https://dashboard.agentagora.dev` | Base URL for per-card "View on dashboard" CTAs (`/agents/<aid>`). |
+
+When the cloud-api is unreachable at build time the landing page renders a
+"Catalog temporarily unavailable; check status." fallback with a link to
+`/status`, so the build always succeeds. Verify locally:
+
+```sh
+AGENTAGORA_CLOUD_URL=http://127.0.0.1:1 pnpm --filter @agentagora/marketing build
+```
 
 ## Constraints
 

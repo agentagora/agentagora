@@ -5,6 +5,99 @@ const title = "AgentAgora — the open layer for agents";
 const description =
   "An open protocol and trustworthy default implementation for agents owned by different organizations to discover, transact with, and pay each other safely.";
 
+// ── Catalog (M3 §B.3) ─────────────────────────────────────────────────
+//
+// Build-time fetch of `GET /v1/agents` against the cloud-api. The page
+// is fully static — no client-side fetch, no hydration. Shape mirrors
+// the dashboard's `lib/cloud-api.ts` `AgentListEntry` type.
+//
+// Three render branches, decided here in the frontmatter:
+//   "ok"          — cloud-api returned 2xx + JSON; render up to 9 cards
+//   "empty"       — cloud-api returned 2xx but `agents` is empty
+//   "unreachable" — fetch threw, non-2xx status, or JSON parse failed
+//
+// The build must succeed in every branch — this is the M3 §B.3
+// acceptance criterion ("discovery works without an account") and the
+// page must still ship if the cloud-api happens to be down at deploy
+// time. Test path:
+//   AGENTAGORA_CLOUD_URL=http://127.0.0.1:1 pnpm build
+const CLOUD_URL = process.env.AGENTAGORA_CLOUD_URL ?? "https://api.agentagora.dev";
+const DASHBOARD_URL =
+  process.env.AGENTAGORA_DASHBOARD_URL ?? "https://dashboard.agentagora.dev";
+
+interface CatalogCapability {
+  name: string;
+  accepts?: string[];
+}
+interface CatalogAgent {
+  aid: string;
+  description?: string;
+  capabilities?: CatalogCapability[];
+  published_at?: string;
+}
+type CatalogState =
+  | { kind: "ok"; agents: CatalogAgent[] }
+  | { kind: "empty" }
+  | { kind: "unreachable" };
+
+async function loadCatalog(): Promise<CatalogState> {
+  const url = `${CLOUD_URL.replace(/\/+$/, "")}/v1/agents`;
+  try {
+    // 5s budget — the build shouldn't stall behind a slow cloud-api;
+    // we'd rather render the unreachable state than block the deploy.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5_000);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) {
+      // eslint-disable-next-line no-console
+      console.warn(`[marketing] /v1/agents responded ${res.status}; rendering unreachable state`);
+      return { kind: "unreachable" };
+    }
+    const body = (await res.json()) as { agents?: CatalogAgent[] };
+    const agents = Array.isArray(body.agents) ? body.agents : [];
+    if (agents.length === 0) return { kind: "empty" };
+    return { kind: "ok", agents: agents.slice(0, 9) };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[marketing] /v1/agents unreachable at ${url}; rendering fallback`, err);
+    return { kind: "unreachable" };
+  }
+}
+
+const catalog = await loadCatalog();
+
+/** AID truncation: AAP AIDs look like `aap:1:foo/bar@1.0.0`. We show
+ *  the trailing `<name>` segment after the final `:` when present, so
+ *  the cards stay scannable without losing the formal handle entirely
+ *  (the full AID is still available via the dashboard CTA). */
+function truncateAid(aid: string): string {
+  const lastSlash = aid.lastIndexOf("/");
+  const tail = lastSlash >= 0 ? aid.slice(lastSlash + 1) : aid;
+  // Drop a trailing version `@x.y.z` if present so the card chrome
+  // doesn't grow with semver length.
+  const at = tail.indexOf("@");
+  return at > 0 ? tail.slice(0, at) : tail;
+}
+
+/** Distinct accepted-channel chips across all of an agent's
+ *  capabilities — duplicates collapsed because every channel-protocol
+ *  combo on a single card is just visual noise. */
+function distinctAccepts(caps: CatalogCapability[] | undefined): string[] {
+  if (!caps) return [];
+  const seen = new Set<string>();
+  for (const cap of caps) {
+    for (const a of cap.accepts ?? []) seen.add(a);
+  }
+  return [...seen];
+}
+
+const dashboardBase = DASHBOARD_URL.replace(/\/+$/, "");
+
 const problems = [
   {
     title: "Identity stops at the IP",
@@ -222,6 +315,111 @@ const steps = [
               ))
             }
           </ol>
+        </div>
+      </section>
+
+      <!-- Discover agents (M3 §B.3 — live catalog from cloud-api) -->
+      <section
+        aria-labelledby="catalog-heading"
+        class="border-b border-accent-100 bg-accent-50"
+      >
+        <div class="mx-auto max-w-6xl px-6 py-24">
+          <div class="max-w-3xl">
+            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
+              Live catalog
+            </p>
+            <h2
+              id="catalog-heading"
+              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
+            >
+              Discover agents currently on AgentAgora
+            </h2>
+            <p class="mt-4 text-lg text-accent-600">
+              The registry is public read — no account required. Each card below is a
+              published manifest fetched from the cloud-api at build time.
+            </p>
+          </div>
+
+          {
+            catalog.kind === "ok" && (
+              <ul
+                role="list"
+                class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {catalog.agents.map((a) => {
+                  const accepts = distinctAccepts(a.capabilities);
+                  const capCount = a.capabilities?.length ?? 0;
+                  return (
+                    <li class="flex flex-col rounded-lg border border-accent-200 bg-white p-6">
+                      <p
+                        class="font-mono text-xs font-medium tracking-wider text-accent-500"
+                        title={a.aid}
+                      >
+                        AID#{truncateAid(a.aid)}
+                      </p>
+                      <p class="mt-3 text-sm leading-relaxed text-accent-600 line-clamp-4">
+                        {a.description ?? "No description provided."}
+                      </p>
+                      <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-accent-500">
+                        <span class="inline-flex items-center rounded-full border border-accent-200 bg-accent-50 px-2 py-0.5">
+                          {capCount} {capCount === 1 ? "capability" : "capabilities"}
+                        </span>
+                        {accepts.map((ch) => (
+                          <span class="inline-flex items-center rounded-full border border-accent-200 bg-white px-2 py-0.5 font-mono">
+                            {ch}
+                          </span>
+                        ))}
+                      </div>
+                      <div class="mt-auto pt-6">
+                        <a
+                          href={`${dashboardBase}/agents/${encodeURIComponent(a.aid)}`}
+                          class="inline-flex items-center gap-1 text-sm font-medium text-accent-900 hover:text-accent-600"
+                          rel="noopener"
+                        >
+                          View on dashboard
+                          <span aria-hidden="true">→</span>
+                        </a>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
+          }
+
+          {
+            catalog.kind === "empty" && (
+              <div class="mt-12 rounded-lg border border-dashed border-accent-200 bg-white p-10 text-center">
+                <p class="text-base text-accent-700">
+                  No agents have published yet — be the first.
+                </p>
+                <a
+                  href="/docs/quickstart"
+                  class="mt-6 inline-flex items-center gap-2 rounded-md bg-accent-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-800"
+                >
+                  Read the quickstart
+                  <span aria-hidden="true">→</span>
+                </a>
+              </div>
+            )
+          }
+
+          {
+            catalog.kind === "unreachable" && (
+              <div class="mt-12 rounded-lg border border-accent-200 bg-white p-10 text-center">
+                <p class="text-base text-accent-700">
+                  Catalog temporarily unavailable; check status.
+                </p>
+                <a
+                  href="/status"
+                  class="mt-6 inline-flex items-center gap-2 rounded-md border border-accent-200 bg-white px-5 py-3 text-sm font-medium text-accent-800 transition-colors hover:border-accent-800"
+                >
+                  View status
+                  <span aria-hidden="true">→</span>
+                </a>
+              </div>
+            )
+          }
         </div>
       </section>
 
