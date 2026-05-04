@@ -142,6 +142,37 @@ pnpm --filter @agentagora/cloud-api exec wrangler d1 delete agentagora-restore-d
 
 ---
 
+### 1.6 Post-deploy smoke test
+
+**When to do this.** Every time after `pnpm --filter @agentagora/cloud-api deploy` returns, before declaring the rollout done.
+
+**Why.** A successful `wrangler deploy` only proves the bundle uploaded — it doesn't prove the bindings, secrets, and route wiring actually compose. The smoke script (M3 §D.5) walks the same arc as the integration test but against the deployed Worker, so a broken deploy fails loud in seconds rather than at the next user request.
+
+**Steps.**
+
+```bash
+pnpm --filter @agentagora/cloud-api smoke -- \
+  --url=https://<your-cloud-url> \
+  --bearer=<one of the OWNER_TOKENS> \
+  --owner-id=smoke-test
+```
+
+The script runs 8 sequential checks: `healthz` → `jwks` → `publish` → `resolve` → `catalog` → `conversation_lookup` → `owner_scoped` → `burst`. Output is a markdown PASS/FAIL table plus a JSON snapshot at `scripts/.smoke-results.json`. Exit code 0 iff every required step is `ok` or `skipped`; 1 if any is `failed`.
+
+Without `--bearer`, the write-path steps skip cleanly — useful when a machine without `OWNER_TOKENS` access wants a quick reachability check.
+
+**How to verify.** The script's own exit code. CI doesn't run this against production yet (no Cloudflare credentials configured); it's an on-demand operator tool. Once we wire deploy-preview credentials, this becomes a CI gate.
+
+**Rollback.** If the smoke fails:
+
+1. The most recent failed step is your hint — `healthz` failure means the deploy didn't bind, `publish` failure usually means a missing secret (most often `OIDC_SIGNING_KEY` or `OIDC_ISSUER`).
+2. `wrangler tail` to inspect logs — the smoke's `[req=…]` IDs let you grep precisely. See §3.1.
+3. If the deploy itself is bad (not a config issue), revert the deploying commit on `main` and redeploy.
+
+**Cleanup quirk.** Each smoke run publishes a fresh `aid:agentagora:smoke-test/probe-<timestamp>` agent. The cloud-api has no `DELETE /v1/agents/:aid` yet, so the agent stays. Multiple smokes don't conflict (timestamp suffix), but the public catalog accumulates probe entries. Filter them out client-side or wait for the delete route.
+
+---
+
 ## 2. Rotation drills
 
 Same shape every time: **set the new secret, redeploy, verify, decommission the old credential at the source**. `wrangler secret put NAME` overwrites in place — there's no staging slot — so the redeploy is what makes the new value visible to running isolates.

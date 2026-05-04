@@ -11,7 +11,8 @@
     "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "bench": "tsx bench/bench.ts"
+    "bench": "tsx bench/bench.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@agentagora/protocol": "workspace:*",

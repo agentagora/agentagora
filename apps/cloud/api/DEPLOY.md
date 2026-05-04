@@ -188,9 +188,22 @@ pnpm --filter @agentagora/cloud-api deploy
 
 The deploy output prints the production URL (`https://agentagora-cloud-api.<account>.workers.dev` by default; override with `routes` in `wrangler.jsonc` once a custom domain is bound).
 
+**Right after the deploy command returns, run the smoke script** so a broken deploy fails loud before anyone notices traffic-side:
+
+```bash
+pnpm --filter @agentagora/cloud-api smoke -- \
+  --url=https://<your-cloud-url> \
+  --bearer=<one of the OWNER_TOKENS> \
+  --owner-id=smoke-test
+```
+
+The script walks 8 sequential checks (healthz → JWKS → publish → resolve → catalog → conversation lookup → owner-scoped → burst), prints a markdown PASS/FAIL table, and exits 1 on any failure. Full description in `scripts/smoke.ts`. Without a bearer the write-path steps skip gracefully — useful for a quick health check from a machine that doesn't have OWNER_TOKENS.
+
 ---
 
-## 5. Smoke test
+## 5. Smoke test (manual `curl` walkthrough)
+
+For deeper poking — or when the smoke script's table isn't enough — these are the same routes the script hits, in shell form:
 
 ```bash
 URL=https://agentagora-cloud-api.<account>.workers.dev
