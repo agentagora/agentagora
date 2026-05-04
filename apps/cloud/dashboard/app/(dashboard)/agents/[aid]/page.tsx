@@ -32,9 +32,33 @@ export default async function AgentDetailPage({ params }: { params: Params }) {
         <Link href="/agents" style={{ fontSize: 13, color: "#0366d6" }}>
           ← All agents
         </Link>
-        <h1 style={{ marginTop: 8, marginBottom: 4 }}>{detail.aid}</h1>
+        {/* TODO(delete): no DELETE /v1/agents/:aid in cloud-api — manifests are append-only. Withdrawal flow (publish a "withdrawn" stub) lands later; no Delete button until then. */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            gap: 16,
+            marginTop: 8,
+          }}
+        >
+          <h1 style={{ margin: 0 }}>{detail.aid}</h1>
+          <Link
+            href={`/agents/${encodeURIComponent(detail.aid)}/edit`}
+            style={{
+              fontSize: 13,
+              color: "#0366d6",
+              textDecoration: "none",
+              border: "1px solid #0366d6",
+              padding: "4px 10px",
+              borderRadius: 6,
+            }}
+          >
+            Edit
+          </Link>
+        </div>
         {detail.manifest.description ? (
-          <p style={{ color: "#555", marginTop: 0 }}>{detail.manifest.description}</p>
+          <p style={{ color: "#555", marginTop: 4 }}>{detail.manifest.description}</p>
         ) : null}
       </header>
 
