@@ -14,6 +14,7 @@
  */
 
 import { type Context, Hono } from "hono";
+import { getRequestId } from "../_request-id.js";
 import type { OwnerAuthenticator } from "../auth.js";
 import type { Storage, StripeAccountRecord } from "../storage.js";
 import type { StripeApiClient } from "../stripe.js";
@@ -222,22 +223,12 @@ function stripeFailure(c: Context, op: string, err: unknown): Response {
   // security-review-2026-05 §L1: do not forward Stripe's verbose error
   // body to the client — the response body sometimes echoes
   // PaymentIntent / Connect account IDs and other PII back. Keep the
-  // verbose form server-side via console.error and ship only an opaque
-  // request_id the client can quote when escalating to ops.
-  const requestId = newRequestId();
-  console.error(`[connect] Stripe ${op} failed (request_id=${requestId})`, err);
+  // verbose form server-side via console.error and ship only the
+  // per-request id (already minted by `requestIdMiddleware`) so the
+  // client can quote it when escalating to ops.
+  const requestId = getRequestId(c);
+  console.error(`[req=${requestId}] [connect] Stripe ${op} failed`, err);
   return c.json({ error: "stripe_unavailable", op, request_id: requestId }, 502);
-}
-
-function newRequestId(): string {
-  // 16 random bytes → base64url ≈ 22 chars. No dependency on the SDK's
-  // own id helpers; this is a per-failure correlation token, not a
-  // security boundary.
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function extractBearer(header: string | undefined): string | undefined {

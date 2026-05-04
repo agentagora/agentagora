@@ -34,6 +34,7 @@
  */
 
 import { Hono } from "hono";
+import { getRequestId, requestIdMiddleware } from "./_request-id.js";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
 import { D1Storage } from "./d1-storage.js";
 import { InMemoryNonceStore, KvNonceStore, type NonceStore } from "./nonces.js";
@@ -191,6 +192,10 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   const stripeWebhookVerifier = options.stripeWebhookVerifier;
   const app = new Hono();
 
+  // Mount request-id correlation FIRST so 404s, errors, and every
+  // route handler share a consistent X-Request-Id surface.
+  app.use("*", requestIdMiddleware());
+
   app.get("/", (c) =>
     c.json({
       name: "AgentAgora Cloud API",
@@ -262,11 +267,18 @@ export function createApi(options: CreateApiOptions = {}): Hono {
     );
   }
 
-  app.notFound((c) => c.json({ error: "not_found", path: c.req.path }, 404));
+  app.notFound((c) => {
+    const requestId = getRequestId(c);
+    return c.json({ error: "not_found", path: c.req.path, request_id: requestId }, 404);
+  });
 
   app.onError((err, c) => {
-    console.error("[cloud-api] unhandled error", err);
-    return c.json({ error: "internal", message: err.message }, 500);
+    const requestId = getRequestId(c);
+    // security-review §L1: keep the verbose error server-side so we
+    // don't leak internals (stack traces, third-party error bodies).
+    // The client gets the request_id and can quote it when escalating.
+    console.error(`[req=${requestId}] [cloud-api] unhandled error`, err);
+    return c.json({ error: "internal", request_id: requestId }, 500);
   });
 
   return app;

@@ -21,6 +21,7 @@
  */
 
 import { Hono } from "hono";
+import { getRequestId } from "../_request-id.js";
 import type { RefundRecord, Storage, StripeAccountRecord } from "../storage.js";
 import type { StripeEvent, WebhookVerifier } from "../stripe-webhook.js";
 
@@ -41,12 +42,14 @@ export function createStripeWebhookRouter({
     const rawBody = await c.req.text();
     const sigHeader = c.req.header("stripe-signature");
 
+    const requestId = getRequestId(c);
+
     let event: StripeEvent;
     try {
       event = await verifier.verify(rawBody, sigHeader);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn("[stripe-webhook] verification failed", message);
+      console.warn(`[req=${requestId}] [stripe-webhook] verification failed`, message);
       return c.json({ error: "invalid_signature", message }, 400);
     }
 
@@ -60,14 +63,9 @@ export function createStripeWebhookRouter({
       // and rely on Stripe's exponential backoff.
       //
       // security-review-2026-05 §L1: keep the verbose error server-side
-      // (console.error) and surface only a request_id to the caller so
-      // we don't leak Stripe-side trace data / IDs. Operators correlate
-      // by the request_id printed in logs.
-      const requestId = newRequestId();
-      console.error(
-        `[stripe-webhook] handler failed for ${event.type} (request_id=${requestId})`,
-        err,
-      );
+      // (console.error) and surface only the per-request id to the
+      // caller so we don't leak Stripe-side trace data / IDs.
+      console.error(`[req=${requestId}] [stripe-webhook] handler failed for ${event.type}`, err);
       return c.json({ error: "handler_failed", event_id: event.id, request_id: requestId }, 500);
     }
   });
@@ -210,18 +208,6 @@ function pickLatestRefund(charge: Record<string, unknown>): StripeRefundLite | u
 function pickRefundedAmount(charge: Record<string, unknown>): number {
   const v = charge.amount_refunded;
   return typeof v === "number" ? v : 0;
-}
-
-/**
- * Generate a fresh request-id for log correlation. 16 random bytes,
- * base64url-encoded. Used by the §L1 sanitised error path.
- */
-function newRequestId(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function centsToDecimal(cents: number): string {

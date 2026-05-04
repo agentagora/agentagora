@@ -28,6 +28,7 @@
  */
 
 import { Hono } from "hono";
+import { getRequestId } from "./_request-id.js";
 import type { OwnerAuthenticator } from "./auth.js";
 import type { OauthSessionRecord, Storage } from "./storage.js";
 
@@ -281,7 +282,7 @@ export function createGithubOauthRouter({
       if (config.redirectUri) exchangeInput.redirectUri = config.redirectUri;
       accessToken = await github.exchangeCode(exchangeInput);
     } catch (err) {
-      console.error("[oauth-github] code exchange failed", err);
+      console.error(`[req=${getRequestId(c)}] [oauth-github] code exchange failed`, err);
       return c.json({ error: "upstream_unavailable", message: "GitHub rejected the code" }, 502);
     }
 
@@ -292,7 +293,7 @@ export function createGithubOauthRouter({
     try {
       user = await github.fetchUser(accessToken);
     } catch (err) {
-      console.error("[oauth-github] user fetch failed", err);
+      console.error(`[req=${getRequestId(c)}] [oauth-github] user fetch failed`, err);
       return c.json({ error: "upstream_unavailable", message: "GitHub /user request failed" }, 502);
     }
 

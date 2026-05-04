@@ -349,10 +349,16 @@ STATUS_URL=https://<status-worker-host>  # see apps/status/wrangler.jsonc
 
 # 0. Outside vantage point — the status Worker probes UPSTREAM_HEALTHZ per
 #    request, so this tells you whether cloud-api was reachable from a
-#    different network in the last few seconds.
+#    different network in the last few seconds. If a user reported the
+#    incident, ask for the `X-Request-Id` from their failed response (or
+#    the `request_id` field in the JSON body) — every cloud-api response
+#    carries one and it lets you grep `wrangler tail` for the exact log
+#    lines for that request:
+#      pnpm --filter @agentagora/cloud-api exec wrangler tail --search "req=req_…"
 curl -s "$STATUS_URL/status.json" | python3 -m json.tool
 
-# 1. Liveness — should be 200 with `{ ok: true }`.
+# 1. Liveness — should be 200 with `{ ok: true }`. The response carries
+#    `X-Request-Id: req_…` like every other cloud-api response.
 curl -i "$URL/healthz"
 
 # 2. Cloudflare platform status (rules out platform outage).
