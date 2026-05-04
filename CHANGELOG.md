@@ -8,12 +8,71 @@ This project follows date-based grouping during pre-alpha. Once the SDK reaches 
 
 ---
 
-## [Unreleased] — M2 in progress
+## [Unreleased] — M3 public beta in progress
 
-Planned for M2:
-- Stripe Connect settlement channel implementation
-- Cloud Platform skeleton (Hono on Cloudflare Workers + Postgres)
-- Next.js dashboard skeleton
+Most of M2 + the bulk of M3 landed in a single autonomous push between 2026-05-02 and 2026-05-04. The full per-task tracker lives in [`docs/m3-launch-checklist.md`](docs/m3-launch-checklist.md); the highlights:
+
+### Cloud control plane (`apps/cloud/api/`)
+
+- D1-backed registry persistence (`migrations/0001_init.sql`)
+- Owner-token bearer auth on `POST /v1/agents`
+- Detached Ed25519 signature verification on every manifest publish (TOFU pubkey pin)
+- Real OIDC issuance: EdDSA JWTs + `GET /.well-known/jwks.json`, deterministic kid from SHA-256(pubkey)
+- Audit ingest + read: `POST /v1/audit/ingest` (batch, signature- and chain-validated), `GET /v1/conversations/:id`
+- Dispute intake: `POST /v1/disputes`, `GET /v1/disputes/:id`
+- KV-backed nonce dedup: `POST /v1/nonces/check`
+- Per-owner rate limits on Bearer-authed routes
+- Stripe Connect onboarding: `POST /v1/connect/onboarding`, `GET /v1/connect/account`, public destination-account lookup at `GET /v1/connect/accounts/:aid`
+- Stripe webhook ingestion with HMAC-SHA256 verify; auto-refund pipeline that retroactively resolves disputes when `charge.refunded` arrives
+- GitHub OAuth sign-in: `POST /v1/auth/github/start`, `POST /v1/auth/github/callback`, with HMAC-signed state and a browser-bound nonce
+- Owner-scoped index endpoints: `?owner=`, `?actor=`, `?filer=`, `?respondent=`
+- 190 cloud-api tests, all green; bundle 281 KiB raw / 61 KiB gzip
+
+### SDK (`@agentagora/sdk`)
+
+- `CloudNonceTracker` (opt-in cross-isolate replay protection)
+- `CallRefundedError` carrying `escrowId` / `refundTxId` / underlying cause
+- `cloudPayeeAccountResolver` — `payeeAccountResolver` plug for `StripeChannel` to route per-call destination charges through `GET /v1/connect/accounts/:aid`
+- Public type re-exports (`ConversationRefund`, `UsdcBaseChannelOptions`)
+
+### Dashboard (`apps/cloud/dashboard/`)
+
+- Next.js 14 (App Router) shell
+- GitHub OAuth login + bearer-paste fallback, AES-256-GCM encrypted session cookie behind `__Host-agentagora_session`
+- Agent CRUD with browser-side Ed25519 signing (private keys never leave the browser)
+- Conversations / disputes / earnings views with owner-scoped inboxes and lookup-by-id
+- Stripe Connect onboarding click-through (`/onboarding`, `/onboarding/return`, `/onboarding/refresh`)
+- Owner home with real signals: agent / conversation / dispute counts, Stripe-onboarding nudge, recent-conversations list
+
+### Marketing + docs + status
+
+- Marketing site (Astro + Tailwind) at `apps/marketing/` with hero, problem cards, "how it works", "why now", live agent catalog from cloud-api, and a `/blog` route
+- Documentation site (VitePress) at `apps/docs/` with TypeDoc-generated SDK reference and a runnable Quickstart
+- Public status worker at `apps/status/` (pulls `/healthz` per request, surfaces JSON + HTML, < 70 KiB raw)
+- Launch blog post drafted at `apps/marketing/src/content/blog/launching-public-beta.md`
+- One-file `apps/examples/quickstart/` for the docs-site quickstart to point at
+
+### Operations + community
+
+- `apps/cloud/api/DEPLOY.md` covers full provisioning (D1 + KV + secrets + smoke test + rollback)
+- `apps/cloud/api/RUNBOOK.md` covers steady-state ops + incident response + rotation drills for every secret
+- `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md`
+- Read-only security review at `docs/security-review-2026-05.md`; the highs + mediums + low all closed in commit `556e766`
+
+### CI
+
+- Build → lint → typecheck → test ordering so cross-package types resolve from a fresh checkout
+- Bundle-size budget gate on the cloud-api Worker (320 KiB raw / 75 KiB gzip)
+- Coverage threshold gate per package (protocol 94/95/80/94, sdk 82/80/70/82, cloud-api 67/82/75/67)
+- Synthetic latency benchmark job (informational; promotes to required after 2 weeks of green)
+
+### Still open before M3 public-beta launch
+
+- B.4 / B.5 — flip GitHub Discussions on, create the public roadmap board (manual repo settings)
+- C.1 — write the lighthouse outreach list
+- C.2 — first paid agent-to-agent call (external milestone)
+- D.5 — deployed-Worker E2E test (needs Cloudflare credentials in CI)
+- D.6 — production D1 PIT-restore drill
 
 ## [2026-05-01] — M1 complete
 

@@ -12,7 +12,7 @@
 
 ## Status as of 2026-05-04
 
-**Marker counts**: 13 ✅ · 2 🟡 · 6 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜ — every item was open when the checklist was first drafted.
+**Marker counts**: 14 ✅ · 1 🟡 · 6 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜ — every item was open when the checklist was first drafted.
 
 **Top blockers for M3 launch (priority order)**:
 1. **C.1 lighthouse outreach list** — without 20 named candidates we have nothing to point at the launch blog post on day one.
@@ -26,8 +26,9 @@
 
 **Notes for reviewers**:
 - A.5 stays 🟡: the synthetic latency benchmark runs in CI as informational (commit `9d64648`), but the regression gate has not been promoted to required.
-- B.3 stays 🟡: `GET /v1/agents` is live and the marketing index references discovery in copy, but the landing page does not yet render live catalog rows — it's narrative-only.
+- B.3 flipped to ✅: marketing landing fetches live agent cards from `GET /v1/agents` with empty + unreachable fallbacks (commit `24b9535`).
 - D.4 (`OIDC_SIGNING_KEY` rotation) is closed by RUNBOOK §2.2; D.1 + D.2 + D.3 are closed by RUNBOOK §1.3 + §2.4 + commit `4d61107`.
+- Security review 2026-05 highs + mediums + low all closed in commit `556e766`.
 
 ---
 
@@ -81,8 +82,8 @@
 - Quickstart rewritten from stub to runnable path in commit `a4f1c65`.
 - **Acceptance**: someone with the SDK quickstart can publish their first capability in <10 minutes.
 
-### B.3 🟡 Public agent catalog
-- Renders `GET /v1/agents` with tags, capabilities, pricing, accepts. — endpoint live (`66e73ef`); marketing landing references discovery in narrative copy but does **not** yet fetch and render live rows. Need a real catalog section / page on the marketing site (or dashboard) before flipping to ✅.
+### B.3 ✅ Public agent catalog
+- Renders `GET /v1/agents` with tags, capabilities, pricing, accepts. — endpoint live (`66e73ef`); marketing landing now fetches up to 9 live agent cards at build time with empty + unreachable fallbacks (`24b9535`).
 - Per-agent detail page links to manifest URL + audit log search.
 - Public read; no auth.
 - **Acceptance**: discovery works without an account.
