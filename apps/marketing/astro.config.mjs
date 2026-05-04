@@ -1,26 +1,32 @@
 import { defineConfig } from "astro/config";
+import sitemap from "@astrojs/sitemap";
 import tailwind from "@astrojs/tailwind";
 
 // https://astro.build/config
 //
-// Build-time env wiring for the catalog section on the landing page
-// (read via `process.env` in `src/pages/index.astro`'s frontmatter):
+// Build-time env wiring:
 //
+//   SITE_URL                 — canonical origin of the marketing site,
+//                              used as the `site` field so sitemap +
+//                              <HeadMeta> emit absolute URLs. Defaults
+//                              to https://agentagora.dev.
 //   AGENTAGORA_CLOUD_URL     — base URL of the cloud-api whose
-//                              `GET /v1/agents` we render at build time.
-//                              Default: production. Override at deploy
-//                              time to point at staging or a preview.
+//                              `GET /v1/agents` we render at build time
+//                              for the landing-page catalog section.
+//                              Override at deploy time for staging.
 //   AGENTAGORA_DASHBOARD_URL — base URL the "View on dashboard" CTA
-//                              links to (`/agents/<aid>`). Defaults to
-//                              the production dashboard.
+//                              links to (`/agents/<aid>`).
 //
-// Both are server-only — the catalog renders at build time and nothing
-// is hydrated into the client bundle.
+// All three are server-only — the catalog + meta render at build time
+// and nothing is hydrated into the client bundle.
+const SITE_URL = process.env.SITE_URL ?? "https://agentagora.dev";
+
 export default defineConfig({
-  site: "https://agentagora.dev",
+  site: SITE_URL,
   integrations: [
     tailwind({
       applyBaseStyles: false,
     }),
+    sitemap(),
   ],
 });

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="AgentAgora — the open layer for agents">
+  <defs>
+    <style><![CDATA[
+      .wordmark { font: 700 96px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; letter-spacing: -0.02em; fill: #f7f8fa; }
+      .tagline { font: 500 36px -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; letter-spacing: -0.01em; fill: #b8bcc4; }
+      .meta { font: 500 22px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; fill: #6c7280; text-transform: uppercase; }
+    ]]></style>
+  </defs>
+  <rect width="1200" height="630" fill="#23272f"/>
+  <g transform="translate(96 96)">
+    <rect width="84" height="84" rx="18" fill="#1a1d22"/>
+    <circle cx="42" cy="42" r="22" fill="none" stroke="#f7f8fa" stroke-width="6"/>
+    <circle cx="42" cy="42" r="6" fill="#f7f8fa"/>
+  </g>
+  <text x="96" y="380" class="wordmark">AgentAgora</text>
+  <text x="96" y="448" class="tagline">The open layer for agents.</text>
+  <text x="96" y="540" class="meta">Identity · Discovery · Settlement · Audit</text>
+  <text x="96" y="572" class="meta">Apache-2.0 · agentagora.dev</text>
+</svg>

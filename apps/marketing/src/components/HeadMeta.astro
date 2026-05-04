@@ -1,0 +1,64 @@
+---
+// HeadMeta — single source of truth for the page-level SEO + social
+// metadata stack on the marketing site.
+//
+// Renders:
+//   • <meta name="description">           — standard description
+//   • <meta property="og:*">              — OpenGraph (Facebook, LinkedIn,
+//                                            Slack unfurl, Discord, iMessage)
+//   • <meta name="twitter:*">             — Twitter/X large-image card
+//
+// The component intentionally does NOT render <title> or <link rel="icon">.
+// Those stay in each page's <head> so per-page <title> formatting (e.g. the
+// blog post title concatenation pattern) lives next to the page content.
+//
+// `image` defaults to /og-card.svg — the project's 1200×630 share asset.
+// Most modern unfurlers (Twitter, Slack, Discord, LinkedIn, Facebook,
+// iMessage) accept SVG; the few that don't simply fall back to no preview,
+// which is no worse than today.
+
+interface Props {
+  /** Title rendered into og:title and twitter:title. Page <title> is set separately. */
+  title: string;
+  /** ~155-char marketing blurb. Used for <meta name="description">, og:description, twitter:description. */
+  description: string;
+  /** OpenGraph type — "website" for index pages, "article" for blog posts. Defaults to "website". */
+  type?: "website" | "article";
+  /** Absolute or root-relative path to the share image. Defaults to /og-card.svg. */
+  image?: string;
+}
+
+const {
+  title,
+  description,
+  type = "website",
+  image = "/og-card.svg",
+} = Astro.props as Props;
+
+// Resolve the canonical absolute URL of the current page from the configured
+// `site` (see astro.config.mjs / SITE_URL env). When `site` is unset (e.g. a
+// preview build that forgot the env var) Astro.url is still defined and we
+// fall back to the request URL so og:url is never empty.
+const pageUrl = Astro.site
+  ? new URL(Astro.url.pathname, Astro.site).toString()
+  : Astro.url.toString();
+
+// Resolve the share image to an absolute URL too — Twitter and several
+// Slack-flavored unfurlers reject relative og:image values.
+const imageUrl = Astro.site
+  ? new URL(image, Astro.site).toString()
+  : image;
+---
+<meta name="description" content={description} />
+
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={type} />
+<meta property="og:url" content={pageUrl} />
+<meta property="og:image" content={imageUrl} />
+<meta property="og:site_name" content="AgentAgora" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />
