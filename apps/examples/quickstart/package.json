@@ -1,0 +1,21 @@
+{
+  "name": "@agentagora/example-quickstart",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Smallest possible AgentAgora demo: one agent, one capability, one in-process call. Pointed at from docs/quickstart.md.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "demo": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentagora/sdk": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.0"
+  }
+}
