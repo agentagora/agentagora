@@ -71,7 +71,7 @@ pnpm --filter @agentagora/cloud-api check # bundle dry-run
 
 ## Deploy
 
-End-to-end provisioning (D1, secrets, smoke test, rollback) lives in [DEPLOY.md](./DEPLOY.md). Day-to-day:
+End-to-end provisioning (D1, secrets, smoke test, rollback) lives in [DEPLOY.md](./DEPLOY.md). Steady-state ops + incident response (migrations, secret rotations, D1 backup drills) lives in [RUNBOOK.md](./RUNBOOK.md). Day-to-day:
 
 ```bash
 pnpm --filter @agentagora/cloud-api deploy
