@@ -2,7 +2,7 @@
 import HeadMeta from "../../components/HeadMeta.astro";
 import { links } from "../../lib/links";
 import "../../styles/global.css";
-import { getCollection, type CollectionEntry } from "astro:content";
+import { type CollectionEntry, getCollection } from "astro:content";
 
 export async function getStaticPaths() {
   const posts = await getCollection("blog");

@@ -28,12 +28,7 @@ interface Props {
   image?: string;
 }
 
-const {
-  title,
-  description,
-  type = "website",
-  image = "/og-card.svg",
-} = Astro.props as Props;
+const { title, description, type = "website", image = "/og-card.svg" } = Astro.props as Props;
 
 // Resolve the canonical absolute URL of the current page from the configured
 // `site` (see astro.config.mjs / SITE_URL env). When `site` is unset (e.g. a
@@ -45,9 +40,7 @@ const pageUrl = Astro.site
 
 // Resolve the share image to an absolute URL too — Twitter and several
 // Slack-flavored unfurlers reject relative og:image values.
-const imageUrl = Astro.site
-  ? new URL(image, Astro.site).toString()
-  : image;
+const imageUrl = Astro.site ? new URL(image, Astro.site).toString() : image;
 ---
 <meta name="description" content={description} />
 

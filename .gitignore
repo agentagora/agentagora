@@ -80,6 +80,9 @@ coverage/
 # ===== Latency benchmark output =====
 apps/cloud/api/bench/results.json
 
+# ===== Smoke-test output =====
+apps/cloud/api/scripts/.smoke-results.json
+
 # ===== Logs & runtime =====
 *.log
 logs/

@@ -32,13 +32,7 @@ export default {
           "Arial",
           "sans-serif",
         ],
-        mono: [
-          "ui-monospace",
-          "SFMono-Regular",
-          "Menlo",
-          "Consolas",
-          "monospace",
-        ],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       typography: ({ theme }) => ({
         // Map the `prose-accent` modifier onto our graphite palette so the

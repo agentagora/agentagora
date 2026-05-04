@@ -2,7 +2,7 @@
 import HeadMeta from "../../components/HeadMeta.astro";
 import { links } from "../../lib/links";
 import "../../styles/global.css";
-import { getCollection, type CollectionEntry } from "astro:content";
+import { type CollectionEntry, getCollection } from "astro:content";
 
 const title = "Blog — AgentAgora";
 const description =
@@ -10,20 +10,18 @@ const description =
 
 type BlogEntry = CollectionEntry<"blog">;
 
-const posts = (await getCollection("blog")).sort(
-  (a: BlogEntry, b: BlogEntry) => {
-    // pubDate is a string; placeholder values like "2026-05-XX" parse to NaN.
-    // Fall back to lexicographic comparison so ordering is stable even with placeholders.
-    const ta = Date.parse(a.data.pubDate);
-    const tb = Date.parse(b.data.pubDate);
-    if (Number.isNaN(ta) && Number.isNaN(tb)) {
-      return b.data.pubDate.localeCompare(a.data.pubDate);
-    }
-    if (Number.isNaN(ta)) return 1;
-    if (Number.isNaN(tb)) return -1;
-    return tb - ta;
-  },
-);
+const posts = (await getCollection("blog")).sort((a: BlogEntry, b: BlogEntry) => {
+  // pubDate is a string; placeholder values like "2026-05-XX" parse to NaN.
+  // Fall back to lexicographic comparison so ordering is stable even with placeholders.
+  const ta = Date.parse(a.data.pubDate);
+  const tb = Date.parse(b.data.pubDate);
+  if (Number.isNaN(ta) && Number.isNaN(tb)) {
+    return b.data.pubDate.localeCompare(a.data.pubDate);
+  }
+  if (Number.isNaN(ta)) return 1;
+  if (Number.isNaN(tb)) return -1;
+  return tb - ta;
+});
 
 function formatDate(raw: string): { display: string; iso: string | null } {
   const t = Date.parse(raw);

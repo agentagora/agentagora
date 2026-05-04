@@ -13,6 +13,10 @@
       "**/.next/**",
       "**/.turbo/**",
       "**/.wrangler/**",
+      "**/.astro/**",
+      "**/.vitepress/cache/**",
+      "**/.vitepress/dist/**",
+      "**/sdk-reference/**",
       "sdk/python/**",
       "**/*.md",
       "pnpm-lock.yaml"
@@ -61,6 +65,30 @@
         "rules": {
           "suspicious": {
             "noExportsInTest": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["apps/marketing/src/styles/**/*.css"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnknownFunction": "off"
+          },
+          "a11y": {
+            "useGenericFontNames": "off"
           }
         }
       }

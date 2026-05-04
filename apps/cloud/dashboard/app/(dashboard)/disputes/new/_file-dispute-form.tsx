@@ -209,7 +209,6 @@ export function FileDisputeForm({
           <span style={{ fontSize: 13, color: "#333" }}>reason</span>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {REASONS.map((r) => (
-              // biome-ignore lint/a11y/noLabelWithoutControl: <label> wraps the radio input.
               <label
                 key={r}
                 style={{

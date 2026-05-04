@@ -129,8 +129,7 @@ export async function getAgent(aid: string): Promise<AgentDetail | null> {
 export async function getOwnedAgents(
   bearer: string,
   expectedOwner: string | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  limit = 50,
+  _limit = 50,
 ): Promise<AgentListEntry[]> {
   if (!expectedOwner) {
     const { agents } = await listAgents();
