@@ -5,6 +5,11 @@ export default defineConfig({
   description: "The open layer for agent identity, discovery, settlement, and audit.",
   cleanUrls: true,
   lastUpdated: true,
+  // VitePress walks every .md under srcDir by default. README.md is the
+  // package readme, not a site page — and it links out to repo-relative
+  // paths (e.g. ../../docs/launch-runbook.md) that VitePress treats as
+  // dead links. Excluding it stops the build from failing on those.
+  srcExclude: ["README.md"],
   // The TypeDoc-generated SDK reference under /sdk-reference/ is produced by
   // `pnpm typedoc` (see package.json). When running `vitepress dev/build`
   // before typedoc has materialized the directory, those links are

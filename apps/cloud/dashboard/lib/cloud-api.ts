@@ -12,6 +12,27 @@ import type { Manifest } from "@agentagora/protocol";
 
 export const BASE_URL = process.env.AGENTAGORA_CLOUD_URL ?? "http://localhost:8787";
 
+/**
+ * Format a fetch failure for human-readable logs without dumping the
+ * raw error object. Node's `AggregateError` (e.g., ECONNREFUSED on a
+ * dual-stack host) renders as `[ [Error], [Error] ]` — and GitHub
+ * Actions's log annotator sees those `[Error]` substrings and lights
+ * up every build with red error annotations even when the build
+ * itself succeeded. Stringifying to a single line via this helper
+ * keeps the log informative while suppressing the annotator's
+ * false-positive surface.
+ */
+function fmtErr(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = (err as { cause?: unknown }).cause;
+    if (cause && typeof cause === "object" && "code" in cause) {
+      return `${err.message} (${(cause as { code: string }).code})`;
+    }
+    return err.message;
+  }
+  return String(err);
+}
+
 export interface AgentListEntry {
   aid: string;
   description?: string;
@@ -54,12 +75,12 @@ export async function listAgents(
       next: { revalidate: 60 },
     });
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/agents responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/agents responded ${res.status}`);
       return { total: 0, agents: [] };
     }
     return (await res.json()) as AgentListResponse;
   } catch (err) {
-    console.error("[cloud-api] /v1/agents unreachable", err);
+    console.warn(`[cloud-api] /v1/agents unreachable: ${fmtErr(err)}`);
     return { total: 0, agents: [] };
   }
 }
@@ -84,12 +105,12 @@ export async function getAgent(aid: string): Promise<AgentDetail | null> {
     const res = await fetch(url, { cache: "no-store" });
     if (res.status === 404) return null;
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/agents/${aid} responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/agents/${aid} responded ${res.status}`);
       return null;
     }
     return (await res.json()) as AgentDetail;
   } catch (err) {
-    console.error("[cloud-api] /v1/agents/:aid unreachable", err);
+    console.warn(`[cloud-api] /v1/agents/:aid unreachable: ${fmtErr(err)}`);
     return null;
   }
 }
@@ -122,13 +143,13 @@ export async function getOwnedAgents(
       headers: { authorization: `Bearer ${bearer}` },
     });
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/agents?owner= responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/agents?owner= responded ${res.status}`);
       return [];
     }
     const body = (await res.json()) as AgentListResponse;
     return body.agents;
   } catch (err) {
-    console.error("[cloud-api] /v1/agents?owner= unreachable", err);
+    console.warn(`[cloud-api] /v1/agents?owner= unreachable: ${fmtErr(err)}`);
     return [];
   }
 }
@@ -162,12 +183,12 @@ export async function listOwnedConversations(
       headers: { authorization: `Bearer ${bearer}` },
     });
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/conversations?actor= responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/conversations?actor= responded ${res.status}`);
       return { total: 0, conversations: [] };
     }
     return (await res.json()) as OwnedConversationsResponse;
   } catch (err) {
-    console.error("[cloud-api] /v1/conversations?actor= unreachable", err);
+    console.warn(`[cloud-api] /v1/conversations?actor= unreachable: ${fmtErr(err)}`);
     return { total: 0, conversations: [] };
   }
 }
@@ -197,7 +218,7 @@ export async function listOwnedDisputes(
           headers: { authorization: `Bearer ${bearer}` },
         });
         if (!res.ok) {
-          console.error(`[cloud-api] /v1/disputes?${role}= responded ${res.status}`);
+          console.warn(`[cloud-api] /v1/disputes?${role}= responded ${res.status}`);
           return { total: 0, disputes: [] } as OwnedDisputeListResponse;
         }
         return (await res.json()) as OwnedDisputeListResponse;
@@ -213,7 +234,7 @@ export async function listOwnedDisputes(
     const disputes = [...byId.values()].sort((a, b) => b.filed_at.localeCompare(a.filed_at));
     return { total: disputes.length, disputes };
   } catch (err) {
-    console.error("[cloud-api] /v1/disputes?filer/respondent unreachable", err);
+    console.warn(`[cloud-api] /v1/disputes?filer/respondent unreachable: ${fmtErr(err)}`);
     return { total: 0, disputes: [] };
   }
 }
@@ -241,12 +262,12 @@ export async function getConversation(id: string): Promise<ConversationResponse 
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/conversations/${id} responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/conversations/${id} responded ${res.status}`);
       return null;
     }
     return (await res.json()) as ConversationResponse;
   } catch (err) {
-    console.error("[cloud-api] /v1/conversations/:id unreachable", err);
+    console.warn(`[cloud-api] /v1/conversations/:id unreachable: ${fmtErr(err)}`);
     return null;
   }
 }
@@ -290,13 +311,13 @@ export async function getStripeAccount(bearer: string): Promise<StripeAccountRes
     });
     if (res.status === 404) return { kind: "missing" };
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/connect/account responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/connect/account responded ${res.status}`);
       return { kind: "unreachable" };
     }
     const body = (await res.json()) as StripeAccountResponse;
     return { kind: "ok", ...body };
   } catch (err) {
-    console.error("[cloud-api] /v1/connect/account unreachable", err);
+    console.warn(`[cloud-api] /v1/connect/account unreachable: ${fmtErr(err)}`);
     return { kind: "unreachable" };
   }
 }
@@ -332,12 +353,12 @@ export async function getDispute(id: string): Promise<DisputeResponse | null> {
     const res = await fetch(url, { cache: "no-store" });
     if (res.status === 404) return null;
     if (!res.ok) {
-      console.error(`[cloud-api] /v1/disputes/${id} responded ${res.status}`);
+      console.warn(`[cloud-api] /v1/disputes/${id} responded ${res.status}`);
       return null;
     }
     return (await res.json()) as DisputeResponse;
   } catch (err) {
-    console.error("[cloud-api] /v1/disputes/:id unreachable", err);
+    console.warn(`[cloud-api] /v1/disputes/:id unreachable: ${fmtErr(err)}`);
     return null;
   }
 }
