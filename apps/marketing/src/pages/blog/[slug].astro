@@ -1,0 +1,187 @@
+---
+import "../../styles/global.css";
+import { getCollection, type CollectionEntry } from "astro:content";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog");
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+type Props = { post: CollectionEntry<"blog"> };
+
+const { post } = Astro.props as Props;
+const { Content } = await post.render();
+
+const title = `${post.data.title} — AgentAgora`;
+const description = post.data.description;
+const canonical = post.data.canonicalUrl;
+
+function formatDate(raw: string): { display: string; iso: string | null } {
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) {
+    return { display: raw, iso: null };
+  }
+  const d = new Date(t);
+  return {
+    display: d.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
+    iso: d.toISOString().slice(0, 10),
+  };
+}
+
+const { display: dateDisplay, iso: dateIso } = formatDate(post.data.pubDate);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={post.data.title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="article" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={post.data.title} />
+    <meta name="twitter:description" content={description} />
+  </head>
+  <body class="bg-white text-accent-800">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent-800 focus:px-3 focus:py-2 focus:text-sm focus:text-white"
+    >
+      Skip to content
+    </a>
+
+    <header class="border-b border-accent-100">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <a href="/" class="flex items-center gap-2.5" aria-label="AgentAgora home">
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
+            aria-hidden="true"
+          >
+            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
+          </span>
+          <span class="text-sm font-semibold tracking-tight text-accent-900">AgentAgora</span>
+        </a>
+        <nav aria-label="Primary" class="flex items-center gap-6 text-sm text-accent-600">
+          <a href="/blog" class="hidden hover:text-accent-900 sm:inline">Blog</a>
+          <a
+            href="https://github.com/agentagora/agentagora/tree/main/docs"
+            class="hidden hover:text-accent-900 sm:inline"
+          >
+            Docs
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora"
+            class="rounded-md border border-accent-200 px-3 py-1.5 text-accent-800 transition-colors hover:border-accent-800 hover:text-accent-900"
+          >
+            GitHub
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <article class="mx-auto max-w-3xl px-6 py-16 sm:py-20">
+        <nav aria-label="Breadcrumb" class="mb-10">
+          <a
+            href="/blog"
+            class="inline-flex items-center gap-1.5 text-sm text-accent-600 transition-colors hover:text-accent-900"
+          >
+            <span aria-hidden="true">←</span>
+            Back to blog
+          </a>
+        </nav>
+
+        <header class="mb-10 border-b border-accent-100 pb-10">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-accent-500">
+            {dateIso ? <time datetime={dateIso}>{dateDisplay}</time> : <time>{dateDisplay}</time>}
+            <span aria-hidden="true">·</span>
+            <span>{post.data.author}</span>
+          </div>
+          <h1
+            class="mt-4 text-4xl font-semibold tracking-tight text-accent-900 sm:text-5xl"
+          >
+            {post.data.title}
+          </h1>
+          <p class="mt-5 text-lg text-accent-600">{post.data.description}</p>
+          {
+            post.data.tags.length > 0 && (
+              <ul class="mt-6 flex flex-wrap gap-2" aria-label="Tags">
+                {post.data.tags.map((tag) => (
+                  <li class="rounded-full border border-accent-200 bg-accent-50 px-2.5 py-0.5 text-xs font-medium text-accent-600">
+                    {tag}
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </header>
+
+        <div
+          class="prose prose-accent max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-accent-900 prose-p:text-accent-700 prose-a:text-accent-900 prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-accent-700 prose-strong:text-accent-900 prose-code:text-accent-900 prose-pre:border prose-pre:border-accent-200 prose-pre:bg-accent-50 prose-pre:text-accent-900 prose-li:text-accent-700"
+        >
+          <Content />
+        </div>
+
+        <footer class="mt-16 border-t border-accent-100 pt-8">
+          <a
+            href="/blog"
+            class="inline-flex items-center gap-1.5 text-sm text-accent-600 transition-colors hover:text-accent-900"
+          >
+            <span aria-hidden="true">←</span>
+            Back to blog
+          </a>
+        </footer>
+      </article>
+    </main>
+
+    <footer class="bg-white">
+      <div class="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-2.5">
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
+            aria-hidden="true"
+          >
+            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
+          </span>
+          <span class="text-sm text-accent-600">
+            AgentAgora · Apache-2.0 · pre-alpha
+          </span>
+        </div>
+        <nav aria-label="Footer" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-accent-600">
+          <a
+            href="https://github.com/agentagora/agentagora/tree/main/docs"
+            class="hover:text-accent-900"
+          >
+            Docs
+          </a>
+          <a href="/blog" class="hover:text-accent-900">Blog</a>
+          <a
+            href="https://github.com/agentagora/agentagora"
+            class="hover:text-accent-900"
+          >
+            GitHub
+          </a>
+          <a
+            href="https://github.com/agentagora/agentagora/issues"
+            class="hover:text-accent-900"
+          >
+            Status
+          </a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
