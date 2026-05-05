@@ -2,6 +2,8 @@
 
 Steady-state ops + incident response. First-time provisioning is in [DEPLOY.md](./DEPLOY.md). Commands run from the repo root and assume `wrangler login` has succeeded. The verbose `pnpm --filter @agentagora/cloud-api exec wrangler …` prefix is intentional — copy-paste accuracy beats shell aliases when you're paged.
 
+> **Paged in the first 24 h after launch?** This runbook is broad and comprehensive — slow to scan when half-awake. Go to [`docs/day-0-oncall.md`](../../../docs/day-0-oncall.md) instead: 5 most-likely scenarios, copy-paste commands, no preamble. Come back here once the bleeding stops.
+
 ---
 
 ## 1. Routine

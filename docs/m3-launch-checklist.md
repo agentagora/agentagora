@@ -19,6 +19,8 @@
 2. **D.6 PIT restore drill against production D1** — RUNBOOK §1.4 + §3.4 explicitly call this out as un-rehearsed; we cannot promise data durability we have not exercised. Manual ops drill — code can't help here.
 3. **B.4 / B.5** — Discussions toggle + Projects board, both manual GitHub Settings actions, both pending you ([this conversation](#)).
 
+> **Maintainer**: every M3 item that requires human action in an external system (B.4, B.5, C.1, C.2, D.6, A.5 gate promotion, plus ops-account setup the launch runbook assumes done) is consolidated as a top-to-bottom batch in [`docs/maintainer-tasks.md`](maintainer-tasks.md). Work that file in order; come back here to flip markers.
+
 **Done by code, awaiting human action** (not blocked on engineering):
 - **B.4 GitHub Discussions** — flip the toggle in repo Settings → Features and pin the welcome thread. Owner: weijt606.
 - **B.5 Public roadmap board** — create the GitHub Projects board mirroring PRD §10. Owner: weijt606.

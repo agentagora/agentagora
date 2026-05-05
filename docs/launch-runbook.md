@@ -286,3 +286,11 @@ For everything else, [`apps/cloud/api/RUNBOOK.md`](../apps/cloud/api/RUNBOOK.md)
 - Anything that happens after Trigger 3 — that's everything from M3 onward, not a launch concern
 
 When in doubt, the order is: **deploy → self-test → flip → soft → soak → announce**. Don't skip steps; the gating is what stops the "looks live but isn't" failure mode.
+
+---
+
+## Companion docs
+
+- [`docs/maintainer-tasks.md`](maintainer-tasks.md) — every M3 launch task that needs human action (Discussions, Projects board, ops accounts, PIT-restore drill, lighthouse outreach). Work it top-to-bottom **before** running this runbook.
+- [`docs/day-0-oncall.md`](day-0-oncall.md) — the 5 most likely incidents in the first 24 h after Trigger 2 / 3, with copy-paste recipes. Read once before launching so the patterns are fresh; jump back when paged.
+- [`apps/cloud/api/RUNBOOK.md`](../apps/cloud/api/RUNBOOK.md) — steady-state ops (rotations, migrations, capacity). What you go to once Day-0 is over.
