@@ -125,6 +125,15 @@ jobs:
       # and disputes wiring. Budget is set above the M2-closed-alpha steady
       # state (281 KiB raw / 61 KiB gzip) with headroom for M3 dashboard
       # server actions and Stripe charge handling.
+      #
+      # security-review-2026-05 §M1: the real wrangler.jsonc carries
+      # production D1 / KV resource IDs and is gitignored. CI stages
+      # the committed example with REPLACE_BEFORE_DEPLOY placeholders;
+      # `wrangler deploy --dry-run` doesn't validate binding IDs against
+      # Cloudflare, so the placeholders are fine for bundle-size sizing.
+      - name: Stage wrangler.jsonc for cloud-api dry-run
+        run: cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc
+
       - name: Bundle-size guard (cloud-api)
         run: pnpm --filter "@agentagora/cloud-api" check
 
@@ -188,6 +197,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # security-review-2026-05 §M1: real wrangler.jsonc is gitignored;
+      # stage the example for `wrangler dev` to read. Same rationale as
+      # the bundle-size guard above — local SQLite + KV state is fine
+      # for the synthetic bench.
+      - name: Stage wrangler.jsonc for cloud-api
+        run: cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc
 
       - name: Start cloud-api (wrangler dev) in the background
         run: |
