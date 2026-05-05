@@ -42,7 +42,7 @@
       "import": "./dist/constants.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": ["dist", "README.md", "CHANGELOG.md"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

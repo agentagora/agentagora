@@ -2,6 +2,8 @@
 
 > Wire types and Zod schemas for the AgentAgora Protocol (AAP). Single source of truth for protocol-level definitions.
 
+**Scope contract.** This package is the reference TypeScript implementation of AAP and **depends on no AgentAgora Cloud code**. It does not import from `apps/**`, does not assume Cloudflare Workers, D1, KV, or Stripe, and is not coupled to any single registry implementation. The intent is that this directory can be lifted into its own repository at any time without code changes — see [`docs/protocol-stewardship.md`](../../docs/protocol-stewardship.md) for the triggers that flip us to splitting it out. CI enforces the boundary in `tests/no-cloud-imports.test.ts`.
+
 This package defines, in TypeScript, every shape that crosses the wire in AAP:
 
 - **Identity** — `AID` URI, branded string, parser

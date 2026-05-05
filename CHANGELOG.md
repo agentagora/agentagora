@@ -5,6 +5,8 @@ All notable changes to AgentAgora are recorded here. The format is based on [Kee
 This project follows date-based grouping during pre-alpha. Once the SDK reaches `1.0.0`, entries will be grouped under semver version headers.
 
 > Per-package details (SDK methods added/changed, protocol fields, etc.) live in commit messages on `main`. This file captures milestone-level changes — what a returning visitor would want to know.
+>
+> The `@agentagora/protocol` package keeps an independent changelog at [`packages/protocol/CHANGELOG.md`](packages/protocol/CHANGELOG.md). Per [`docs/protocol-stewardship.md`](docs/protocol-stewardship.md), that file is committed to surviving the eventual protocol-repo split — third-party SDK authors should watch it, not this one, for surface-level breaking changes.
 
 ---
 

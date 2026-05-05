@@ -100,6 +100,7 @@ Full rationale:
 - 📋 [AAP Protocol Spec v0.1](docs/AAP-spec.md) — internal draft; public release at M6
 - 🛠 [SDK API Design (Python — secondary)](docs/sdk-api-python.md) — original Python-first design, kept as reference
 - 🛠 TypeScript SDK API Design — *coming in M1, will become canonical*
+- 🏛 [Protocol stewardship](docs/protocol-stewardship.md) — why the open protocol and the hosted Cloud share this repo today, and the triggers that flip them into separate repos
 
 ---
 

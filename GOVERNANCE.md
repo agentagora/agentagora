@@ -2,6 +2,8 @@
 
 This document explains how decisions get made in AgentAgora. It is deliberately short for the current stage and will grow with the project.
 
+> **Code organisation** — for why the open protocol (`packages/protocol/`) and the hosted Cloud (`apps/cloud/**`) currently share this repo, and what triggers will flip them into separate repos, see [`docs/protocol-stewardship.md`](docs/protocol-stewardship.md). That contract is enforced in CI by `packages/protocol/tests/no-cloud-imports.test.ts`.
+
 ## Current state (pre-M6)
 
 AgentAgora is a single-maintainer project. **weijt606** is the BDFL: any decision that doesn't have an obvious right answer is the maintainer's call. This is the right shape for a pre-public-beta codebase that's still finding its design.
