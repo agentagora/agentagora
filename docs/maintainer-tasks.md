@@ -213,6 +213,54 @@ These are the prerequisites the launch runbook §2 assumes are already done.
 
 ---
 
+## Group E — Deferred dependency upgrades (post-launch hardening)
+
+These are major-version bumps with breaking changes. They're not on the M3 critical path, and their advisories are mitigated for now (see "today's mitigation" notes). Do them in a quiet week after M3 stabilises, ideally one at a time so you can isolate regressions.
+
+The CI audit step at `.github/workflows/typescript.yml` runs at `--audit-level=high` and emits these as `::warning::` annotations rather than failing the job. Once both upgrades land, drop the level back to `moderate` so the gate has teeth again.
+
+### M.15  Bump `next` 14.x → 15.5.15+
+
+> Closes 2 high-severity advisories on `apps/cloud/dashboard`:
+>   - `>=13.0.0 <15.0.8` HTTP request deserialization DoS — `GHSA-h25m-26qc-wcjf`
+>   - `>=13.0.0 <15.5.15` Server Components DoS — `GHSA-q4gf-8mx6-v5v3`
+
+- **What:** upgrade `apps/cloud/dashboard` from Next 14.2.30 to 15.5.15+.
+- **Why:** both are remotely exploitable DoS — low likelihood of weaponisation against a single-tenant dashboard with auth-gated routes (most dashboard endpoints require an OAuth session), but worth fixing before public launch hits non-trivial traffic.
+- **Today's mitigation:** dashboard routes that take user input are auth-gated (`(dashboard)/...` group). Public routes (`(public)/...`, `/login`) take only the GitHub OAuth callback parameters which are validated against the HMAC-signed state. Risk is bounded.
+- **Migration shape:** Next 15 enables async `cookies()` / `headers()` / `params` / `searchParams` by default — every Server Component that uses them needs `await`. Run `npx @next/codemod@canary next-async-request-api .` from `apps/cloud/dashboard/` to auto-fix most call sites; review and run the typecheck.
+- **Acceptance:**
+  - `apps/cloud/dashboard/package.json` bumps `next` and `eslint-config-next` to 15.5.15+
+  - `pnpm --filter @agentagora/cloud-dashboard build` passes
+  - `pnpm --filter @agentagora/cloud-dashboard test` passes (the existing 64 lib tests don't touch Next surfaces, so they should be no-ops)
+  - Manual smoke: GitHub OAuth flow + agent CRUD round-trip, identical to today
+- **Time:** 2-4 hours (~30 min upgrade, the rest is touching every Server Component the codemod missed)
+
+### M.16  Bump `astro` 4.16 → 5.15.8+ (or 6+)
+
+> Closes 1 high-severity advisory on `apps/marketing`:
+>   - `<=5.15.6` reflected XSS via server islands — `GHSA-wrwg-2hg8-v723`
+> Also clears 1 moderate (`<6.1.6` define:vars XSS — `GHSA-j687-52p2-xcff`) if you go to 6+.
+
+- **What:** upgrade `apps/marketing` from Astro 4.16.18 to 5.15.8+. Going to 6+ in the same migration is cleaner.
+- **Why:** marketing site is fully public-facing (the literal entry point for the project). Reflected-XSS surface should be patched before HN traffic.
+- **Today's mitigation:** we don't use Astro server islands (`server:defer`) anywhere in `apps/marketing/src/`, so the XSS path isn't actually reachable in our build. Verify with `grep -r "server:defer" apps/marketing/src` — should be empty. Doesn't make the bump optional, but means there's no urgency to ship it before launch.
+- **Migration shape:** Astro 5 hardens default config (Content Layer GA, type-safe env, simplified routing). Run the official migration guide. Watch out for `@astrojs/sitemap` — we previously pinned to 3.2.1 because 3.7 crashed on Astro 4.16 (`pnpm-lock.yaml`). Astro 5/6 likely needs sitemap 4+. Test the sitemap output before merging.
+- **Acceptance:**
+  - `apps/marketing/package.json` bumps `astro` and `@astrojs/sitemap` (and any other `@astrojs/*` deps) to compatible versions
+  - `pnpm --filter @agentagora/marketing build` passes
+  - `apps/marketing/dist/sitemap-*.xml` exists and lists every page
+  - Manual smoke: the agent catalog at `/` renders live cards; OG cards on blog posts still resolve
+- **Time:** 3-6 hours (Astro is more migration-heavy than Next typically because Tailwind + the sitemap integration both have version-coupling)
+
+### M.17  After both upgrades: tighten the audit floor
+
+- **What:** in `.github/workflows/typescript.yml`, change the audit step from `--audit-level=high` back to `--audit-level=moderate`, and convert the `::warning::` annotation back into a hard `exit 1` so the gate fails the build on regressions.
+- **Acceptance:** CI run on a fresh push is green with the moderate floor.
+- **Time:** 5 min
+
+---
+
 ## After all of the above
 
 - Edit `docs/m3-launch-checklist.md` and flip every applicable `⬜ → ✅` / `🟡 → ✅`.

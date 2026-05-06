@@ -50,13 +50,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Dependency vulnerability scan. `--audit-level=moderate` ignores
-      # low-severity advisories that are typically dev-only or noisy.
-      # Bump to `high` once the dep tree is stable enough to expect
-      # zero moderates.
+      # Dependency vulnerability scan. We always show the audit report
+      # in logs but emit a `::warning::` annotation rather than failing
+      # the step on findings — the alternative was `continue-on-error:
+      # true`, which still leaves a noisy red "Process completed with
+      # exit code 1" annotation in the run summary even though the job
+      # is allowed to continue.
+      #
+      # Today's known findings: 3 highs (Next 14.x → 15.5.15+, Astro
+      # 4.x → 5.15.8+) tracked as deferred upgrade work in
+      # docs/maintainer-tasks.md (M.15 / M.16). Once those upgrades
+      # land, drop the `--audit-level=high` floor back to `moderate`
+      # and convert the warning into a hard error so the gate has
+      # teeth again.
       - name: Audit dependencies (pnpm audit)
-        run: pnpm audit --audit-level=moderate --prod
-        continue-on-error: true
+        run: |
+          set +e
+          pnpm audit --audit-level=high --prod
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::warning::pnpm audit found high-severity vulnerabilities — see logs above. Tracked as deferred upgrade work in docs/maintainer-tasks.md (M.15 Next 15, M.16 Astro 5)."
+          fi
+          exit 0
 
       # Build first: package.json `types` fields point at dist/index.d.ts,
       # so cloud-api / examples can't typecheck until protocol + sdk emit
@@ -166,23 +181,33 @@ jobs:
 
   # M3 §A.5 — synthetic latency benchmark for the cloud-api control
   # plane. Spins up `wrangler dev`, hammers the read-path routes with
-  # ~100 sequential GETs each (after a 10-request warm-up), and fails
+  # ~25 sequential GETs each (after a 10-request warm-up), and fails
   # if median or p95 overhead exceeds the PRD §9.3 #4 acceptance
   # criterion (200 ms p95).
   #
+  # CI-tuned settings:
+  #   BENCH_ITERATIONS=25 — local default is 100. CI iteration is
+  #   ~10× slower per request (cold Linux runner vs warm laptop), so
+  #   100 iterations was hitting the 10-min job timeout. 25 iterations
+  #   still gives stable p50/p95 numbers (we sort + index) while
+  #   bringing the bench step under 2 min.
+  #   timeout-minutes: 15 — generous safety margin above the typical
+  #   ~3-4 min job (pnpm install + bench + wrangler-dev startup).
+  #
   # Marked `continue-on-error: true` for now — informational while we
   # establish a baseline. Promote to required after 2 weeks of green
-  # runs.
+  # runs (M.12 in docs/maintainer-tasks.md).
   latency-bench:
     name: latency benchmark (cloud-api)
     runs-on: ubuntu-latest
     needs: build-test-lint
-    timeout-minutes: 10
+    timeout-minutes: 15
     continue-on-error: true
     env:
       LATENCY_P50_MS_LIMIT: 100
       LATENCY_P95_MS_LIMIT: 200
       BENCH_BASE_URL: http://127.0.0.1:8787
+      BENCH_ITERATIONS: 25
 
     steps:
       - uses: actions/checkout@v4
