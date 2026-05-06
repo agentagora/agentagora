@@ -10,7 +10,10 @@ The wire-protocol version (`AAP_VERSION` in `src/constants.ts`) and the package'
 
 ## [Unreleased] — pre-AAP-v0.1
 
-The protocol surface is locked by `tests/api-surface.test.ts` (snapshot of every public export) and `tests/no-cloud-imports.test.ts` (boundary guard: no imports from Cloud / SDK / Workers / Stripe — see [protocol stewardship](../../docs/protocol-stewardship.md) for the rationale).
+The protocol surface is locked by three layered tests:
+- `tests/api-surface.test.ts` — snapshot of every public TypeScript export name
+- `tests/no-cloud-imports.test.ts` — boundary guard (no imports from Cloud / SDK / Workers / Stripe — see [protocol stewardship](../../docs/protocol-stewardship.md))
+- `tests/json-schema-lock.test.ts` — JSON-Schema rendering of every public Zod schema (Manifest, Envelope, AuditEvent, Identity, RPC arms, …). Locks the **wire shape**, not just the TypeScript types — so a Zod refactor that preserves TS but changes JSON output is caught in PR review. Snapshots live in `tests/__snapshots__/json-schema-lock.test.ts.snap`. Update via `pnpm --filter @agentagora/protocol test -u`; treat the diff as a contract change.
 
 ### Surface (the contract third-party SDKs implement)
 

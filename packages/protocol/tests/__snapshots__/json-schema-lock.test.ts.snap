@@ -1,0 +1,1205 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > AapEnvelopeMetaSchema (AAP-specific extension on JSON-RPC 2.0) 1`] = `
+{
+  "$ref": "#/definitions/AapEnvelopeMeta",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AapEnvelopeMeta": {
+      "additionalProperties": false,
+      "properties": {
+        "conversation_id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "from": {
+          "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+          "type": "string",
+        },
+        "nonce": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "signature": {
+          "additionalProperties": false,
+          "properties": {
+            "alg": {
+              "const": "EdDSA",
+              "type": "string",
+            },
+            "key_id": {
+              "type": "string",
+            },
+            "value": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "alg",
+            "key_id",
+            "value",
+          ],
+          "type": "object",
+        },
+        "timestamp": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string",
+        },
+        "to": {
+          "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+          "type": "string",
+        },
+        "version": {
+          "const": "0.1",
+          "type": "string",
+        },
+      },
+      "required": [
+        "version",
+        "conversation_id",
+        "timestamp",
+        "nonce",
+        "from",
+        "to",
+        "signature",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > AuditEventSchema (one chained, signed audit log entry) 1`] = `
+{
+  "$ref": "#/definitions/AuditEvent",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AuditEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_aid": {
+          "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+          "type": "string",
+        },
+        "conversation_id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "data": {
+          "additionalProperties": {},
+          "default": {},
+          "type": "object",
+        },
+        "event_id": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "previous_event_hash": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "signature": {
+          "additionalProperties": false,
+          "properties": {
+            "alg": {
+              "const": "EdDSA",
+              "type": "string",
+            },
+            "key_id": {
+              "type": "string",
+            },
+            "value": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "alg",
+            "key_id",
+            "value",
+          ],
+          "type": "object",
+        },
+        "timestamp": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string",
+        },
+        "type": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "event_id",
+        "conversation_id",
+        "type",
+        "timestamp",
+        "actor_aid",
+        "previous_event_hash",
+        "signature",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > CapabilitySchema (one capability entry) 1`] = `
+{
+  "$ref": "#/definitions/Capability",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Capability": {
+      "additionalProperties": false,
+      "properties": {
+        "accepts": {
+          "default": [],
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "description": {
+          "type": "string",
+        },
+        "input_schema": {
+          "additionalProperties": {},
+          "type": "object",
+        },
+        "name": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string",
+        },
+        "output_schema": {
+          "additionalProperties": {},
+          "type": "object",
+        },
+        "pricing": {
+          "additionalProperties": false,
+          "properties": {
+            "amount": {
+              "pattern": "^\\d+(\\.\\d+)?$",
+              "type": "string",
+            },
+            "currency": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "model": {
+              "enum": [
+                "free",
+                "per_call",
+                "per_token",
+                "negotiated",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "model",
+          ],
+          "type": "object",
+        },
+        "sla": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "p50_ms": {
+              "exclusiveMinimum": 0,
+              "type": "integer",
+            },
+            "p99_ms": {
+              "exclusiveMinimum": 0,
+              "type": "integer",
+            },
+            "success_rate": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "required": [
+        "name",
+        "input_schema",
+        "output_schema",
+        "pricing",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > EndpointsSchema (transport endpoints declaration) 1`] = `
+{
+  "$ref": "#/definitions/Endpoints",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Endpoints": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "format": "uri",
+          "type": "string",
+        },
+        "rpc": {
+          "format": "uri",
+          "type": "string",
+        },
+      },
+      "required": [
+        "rpc",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > ManifestMetadataSchema (manifest envelope metadata) 1`] = `
+{
+  "$ref": "#/definitions/ManifestMetadata",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ManifestMetadata": {
+      "additionalProperties": true,
+      "properties": {
+        "languages": {
+          "default": [],
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "models_used": {
+          "default": [],
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > ManifestSchema (top-level capability declaration) 1`] = `
+{
+  "$ref": "#/definitions/Manifest",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "aid": {
+          "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+          "type": "string",
+        },
+        "capabilities": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "accepts": {
+                "default": [],
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "description": {
+                "type": "string",
+              },
+              "input_schema": {
+                "additionalProperties": {},
+                "type": "object",
+              },
+              "name": {
+                "minLength": 1,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string",
+              },
+              "output_schema": {
+                "additionalProperties": {},
+                "type": "object",
+              },
+              "pricing": {
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "pattern": "^\\d+(\\.\\d+)?$",
+                    "type": "string",
+                  },
+                  "currency": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "model": {
+                    "enum": [
+                      "free",
+                      "per_call",
+                      "per_token",
+                      "negotiated",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "model",
+                ],
+                "type": "object",
+              },
+              "sla": {
+                "additionalProperties": false,
+                "default": {},
+                "properties": {
+                  "p50_ms": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer",
+                  },
+                  "p99_ms": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer",
+                  },
+                  "success_rate": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number",
+                  },
+                },
+                "type": "object",
+              },
+            },
+            "required": [
+              "name",
+              "input_schema",
+              "output_schema",
+              "pricing",
+            ],
+            "type": "object",
+          },
+          "minItems": 1,
+          "type": "array",
+        },
+        "contact": {
+          "type": "string",
+        },
+        "description": {
+          "type": "string",
+        },
+        "endpoints": {
+          "additionalProperties": false,
+          "properties": {
+            "events": {
+              "format": "uri",
+              "type": "string",
+            },
+            "rpc": {
+              "format": "uri",
+              "type": "string",
+            },
+          },
+          "required": [
+            "rpc",
+          ],
+          "type": "object",
+        },
+        "homepage": {
+          "format": "uri",
+          "type": "string",
+        },
+        "manifest_version": {
+          "const": 1,
+          "type": "number",
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "default": {},
+          "properties": {
+            "languages": {
+              "default": [],
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "models_used": {
+              "default": [],
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "tags": {
+              "default": [],
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+        "privacy": {
+          "additionalProperties": false,
+          "default": {},
+          "properties": {
+            "data_retention_days": {
+              "default": 7,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "pii_handling": {
+              "default": "redact",
+              "enum": [
+                "store",
+                "redact",
+                "refuse",
+              ],
+              "type": "string",
+            },
+            "region_restriction": {
+              "default": [],
+              "items": {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string",
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+      },
+      "required": [
+        "manifest_version",
+        "aid",
+        "endpoints",
+        "capabilities",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > PricingModelSchema (the discriminated-union of pricing flavours) 1`] = `
+{
+  "$ref": "#/definitions/PricingModel",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "PricingModel": {
+      "enum": [
+        "free",
+        "per_call",
+        "per_token",
+        "negotiated",
+      ],
+      "type": "string",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > PricingSchema (per-capability pricing block) 1`] = `
+{
+  "$ref": "#/definitions/Pricing",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Pricing": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "pattern": "^\\d+(\\.\\d+)?$",
+          "type": "string",
+        },
+        "currency": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "model": {
+          "enum": [
+            "free",
+            "per_call",
+            "per_token",
+            "negotiated",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "model",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > PrivacySchema (privacy class) 1`] = `
+{
+  "$ref": "#/definitions/Privacy",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Privacy": {
+      "additionalProperties": false,
+      "properties": {
+        "data_retention_days": {
+          "default": 7,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "pii_handling": {
+          "default": "redact",
+          "enum": [
+            "store",
+            "redact",
+            "refuse",
+          ],
+          "type": "string",
+        },
+        "region_restriction": {
+          "default": [],
+          "items": {
+            "maxLength": 2,
+            "minLength": 2,
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcErrorResponseEnvelopeSchema (the error arm) 1`] = `
+{
+  "$ref": "#/definitions/RpcErrorResponseEnvelope",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RpcErrorResponseEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "aap": {
+          "additionalProperties": false,
+          "properties": {
+            "conversation_id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "from": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "nonce": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "signature": {
+              "additionalProperties": false,
+              "properties": {
+                "alg": {
+                  "const": "EdDSA",
+                  "type": "string",
+                },
+                "key_id": {
+                  "type": "string",
+                },
+                "value": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "alg",
+                "key_id",
+                "value",
+              ],
+              "type": "object",
+            },
+            "timestamp": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+              "type": "string",
+            },
+            "to": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "version": {
+              "const": "0.1",
+              "type": "string",
+            },
+          },
+          "required": [
+            "version",
+            "conversation_id",
+            "timestamp",
+            "nonce",
+            "from",
+            "to",
+            "signature",
+          ],
+          "type": "object",
+        },
+        "error": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "integer",
+            },
+            "data": {
+              "additionalProperties": {},
+              "type": "object",
+            },
+            "message": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "code",
+            "message",
+          ],
+          "type": "object",
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "jsonrpc": {
+          "const": "2.0",
+          "type": "string",
+        },
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "error",
+        "aap",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcErrorSchema (the inner error object) 1`] = `
+{
+  "$ref": "#/definitions/RpcError",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RpcError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "integer",
+        },
+        "data": {
+          "additionalProperties": {},
+          "type": "object",
+        },
+        "message": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "code",
+        "message",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcRequestEnvelopeSchema (JSON-RPC 2.0 request) 1`] = `
+{
+  "$ref": "#/definitions/RpcRequestEnvelope",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RpcRequestEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "aap": {
+          "additionalProperties": false,
+          "properties": {
+            "conversation_id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "from": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "nonce": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "signature": {
+              "additionalProperties": false,
+              "properties": {
+                "alg": {
+                  "const": "EdDSA",
+                  "type": "string",
+                },
+                "key_id": {
+                  "type": "string",
+                },
+                "value": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "alg",
+                "key_id",
+                "value",
+              ],
+              "type": "object",
+            },
+            "timestamp": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+              "type": "string",
+            },
+            "to": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "version": {
+              "const": "0.1",
+              "type": "string",
+            },
+          },
+          "required": [
+            "version",
+            "conversation_id",
+            "timestamp",
+            "nonce",
+            "from",
+            "to",
+            "signature",
+          ],
+          "type": "object",
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "jsonrpc": {
+          "const": "2.0",
+          "type": "string",
+        },
+        "method": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "params": {},
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "aap",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcResponseEnvelopeSchema (JSON-RPC 2.0 response, success | error) 1`] = `
+{
+  "$ref": "#/definitions/RpcResponseEnvelope",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RpcResponseEnvelope": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "aap": {
+              "additionalProperties": false,
+              "properties": {
+                "conversation_id": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "from": {
+                  "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+                  "type": "string",
+                },
+                "nonce": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "signature": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "alg": {
+                      "const": "EdDSA",
+                      "type": "string",
+                    },
+                    "key_id": {
+                      "type": "string",
+                    },
+                    "value": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "alg",
+                    "key_id",
+                    "value",
+                  ],
+                  "type": "object",
+                },
+                "timestamp": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                  "type": "string",
+                },
+                "to": {
+                  "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+                  "type": "string",
+                },
+                "version": {
+                  "const": "0.1",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "conversation_id",
+                "timestamp",
+                "nonce",
+                "from",
+                "to",
+                "signature",
+              ],
+              "type": "object",
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "integer",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "jsonrpc": {
+              "const": "2.0",
+              "type": "string",
+            },
+            "result": {},
+          },
+          "required": [
+            "jsonrpc",
+            "id",
+            "aap",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "aap": {
+              "additionalProperties": false,
+              "properties": {
+                "conversation_id": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "from": {
+                  "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+                  "type": "string",
+                },
+                "nonce": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "signature": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "alg": {
+                      "const": "EdDSA",
+                      "type": "string",
+                    },
+                    "key_id": {
+                      "type": "string",
+                    },
+                    "value": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "alg",
+                    "key_id",
+                    "value",
+                  ],
+                  "type": "object",
+                },
+                "timestamp": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                  "type": "string",
+                },
+                "to": {
+                  "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+                  "type": "string",
+                },
+                "version": {
+                  "const": "0.1",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "version",
+                "conversation_id",
+                "timestamp",
+                "nonce",
+                "from",
+                "to",
+                "signature",
+              ],
+              "type": "object",
+            },
+            "error": {
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "integer",
+                },
+                "data": {
+                  "additionalProperties": {},
+                  "type": "object",
+                },
+                "message": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "code",
+                "message",
+              ],
+              "type": "object",
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "integer",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "jsonrpc": {
+              "const": "2.0",
+              "type": "string",
+            },
+          },
+          "required": [
+            "jsonrpc",
+            "id",
+            "error",
+            "aap",
+          ],
+          "type": "object",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcSuccessResponseEnvelopeSchema (the success arm) 1`] = `
+{
+  "$ref": "#/definitions/RpcSuccessResponseEnvelope",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RpcSuccessResponseEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "aap": {
+          "additionalProperties": false,
+          "properties": {
+            "conversation_id": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "from": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "nonce": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "signature": {
+              "additionalProperties": false,
+              "properties": {
+                "alg": {
+                  "const": "EdDSA",
+                  "type": "string",
+                },
+                "key_id": {
+                  "type": "string",
+                },
+                "value": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "alg",
+                "key_id",
+                "value",
+              ],
+              "type": "object",
+            },
+            "timestamp": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+              "type": "string",
+            },
+            "to": {
+              "pattern": "^aid:(?<registry>[A-Za-z0-9.\\-]+):(?<namespace>[A-Za-z0-9_\\-]+)\\/(?<name>[A-Za-z0-9_\\-]+)(?:#(?<fragment>[A-Za-z0-9_\\-.]+))?$",
+              "type": "string",
+            },
+            "version": {
+              "const": "0.1",
+              "type": "string",
+            },
+          },
+          "required": [
+            "version",
+            "conversation_id",
+            "timestamp",
+            "nonce",
+            "from",
+            "to",
+            "signature",
+          ],
+          "type": "object",
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+            },
+            {
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "jsonrpc": {
+          "const": "2.0",
+          "type": "string",
+        },
+        "result": {},
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "aap",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > SLASchema (per-capability SLA declaration) 1`] = `
+{
+  "$ref": "#/definitions/SLA",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "SLA": {
+      "additionalProperties": false,
+      "properties": {
+        "p50_ms": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+        },
+        "p99_ms": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+        },
+        "success_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number",
+        },
+      },
+      "type": "object",
+    },
+  },
+}
+`;
+
+exports[`@agentagora/protocol JSON Schema wire-shape lock > SignatureSchema (detached signature shape) 1`] = `
+{
+  "$ref": "#/definitions/Signature",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "alg": {
+          "const": "EdDSA",
+          "type": "string",
+        },
+        "key_id": {
+          "type": "string",
+        },
+        "value": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "alg",
+        "key_id",
+        "value",
+      ],
+      "type": "object",
+    },
+  },
+}
+`;
