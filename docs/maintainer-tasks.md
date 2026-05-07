@@ -261,63 +261,45 @@ The CI audit step at `.github/workflows/typescript.yml` runs at `--audit-level=h
 
 ---
 
-## Group F — M4 spec-hardening decisions (deferred — engage after M3 launch)
+## Group F — M4 spec-hardening decisions
 
-These are decisions that gate M4 Phase 2 / 3 — see [`docs/m4-plan.md`](m4-plan.md) for the full plan. Phase 1 (compliance scaffold + Tier 1 tests) doesn't need them and is already in flight; Phases 2 + 3 hit the decision points below.
+> **Status: closed 2026-05-07.** All five F items decided. F.1-F.4 went with the recommendations; F.5 was overridden by the maintainer (Apache-2.0 wins over CC-BY for simplicity — single-license repo, less mental overhead). Decisions recorded in `docs/m4-plan.md`. Phase 2 of the M4 plan is now unblocked.
 
-These are **non-urgent during M3 launch**. Triage them when you sit down to start M4 spec hardening.
+### F.1 ✅ RFC-style structure for the Phase 3 spec rewrite
 
-### F.1  Pick an RFC-style structure for the Phase 3 spec rewrite
+**Decision: IETF style** (recommendation accepted).
 
-- **What:** decide whether the hardened `docs/AAP-spec.md` should follow IETF RFC structure (IANA considerations, security considerations, etc.), W3C TR style, or a homegrown shape inspired by but not bound to either.
-- **Why:** the choice affects how external SDK authors read the spec at M6 public release. IETF style is the most familiar to systems engineers; W3C style is more web-oriented. Homegrown is faster to write but less legible to standards readers.
-- **Recommendation:** IETF style. Mirrors how OAuth / OIDC specs read; minimum-friction for crypto-aware reviewers; supports inline `MUST` / `SHOULD` / `MAY` natively. But you decide.
-- **Acceptance:** `docs/m4-plan.md` Phase 3 section updated with the chosen structure; first hardened section uses it.
-- **Time:** 30 min reading + decision
+Modeled on OAuth / OIDC. Sections include: Introduction, Terminology (RFC 2119 keywords), normative requirements with explicit MUST/SHOULD/MAY, Security Considerations, IANA Considerations (placeholder), Acknowledgements. First hardened section will use this shape.
 
-### F.2  Define what level of compliance earns the "AgentAgora-compatible" badge
+### F.2 ✅ "AgentAgora-compatible" badge level
 
-- **What:** decide which tier(s) a second cloud implementation must pass to claim AgentAgora-compatibility:
-  - Tier 1 only (read-path, public surface) — minimum bar
-  - Tier 1 + Tier 2 (read + auth) — passable third-party registry
-  - All three tiers (incl. Tier 3 mutation paths) — full federation-ready
-- **Why:** badge level shapes adoption — too lax and "compatible" means nothing; too strict and nobody clears it. The right answer probably depends on how lighthouse partners react to early access.
-- **Recommendation:** Tier 1 + 2 for the public badge; Tier 3 for "registered as a peer registry" once federation is live (M10+).
-- **Acceptance:** decision recorded in `docs/m4-plan.md` and the compliance suite README; badge wording drafted.
-- **Time:** 1-2 hours (likely needs a couple of partner conversations first)
+**Decision: Tier 1 + Tier 2 for the public badge; Tier 3 reserved for "registered peer registry" status when federation goes live (M10+).** (Recommendation accepted.)
 
-### F.3  Decide Phase 2 Tier 3 fixture-setup approach
+Badge wording draft: *"This service implements AgentAgora Protocol v0.x — Tier 1 (public surface) + Tier 2 (auth)."* Wired into the suite's README in Phase 2.
 
-- **What:** Tier 3 tests need known-state setup (a published manifest, a known keypair, a seeded conversation). Choose between:
-  - **CLI provisioner:** `pnpm protocol-compliance --setup` writes fixtures via the candidate API
-  - **Declarative seed file:** YAML/JSON describing fixtures, runner applies them
-  - **Per-test setup hooks:** each test creates + tears down its own state
-- **Why:** the choice ripples into how a third-party impl runs the suite. CLI-provisioner is most ergonomic but assumes the candidate API supports the full publish flow first. Declarative seed is most portable. Per-test is most isolated but slowest.
-- **Recommendation:** CLI provisioner with a fallback declarative seed mode for impls that don't support the full publish flow yet (those run only Tier 1 + 2).
-- **Acceptance:** decision recorded in `docs/m4-plan.md` Phase 2; first Tier 3 test follows the chosen pattern.
-- **Time:** 30 min decision + design notes
+### F.3 ✅ Tier 3 fixture-setup approach
 
-### F.4  Decide M6 public-release scope
+**Decision: CLI provisioner is the primary path; declarative-seed mode is a fallback for impls that don't yet support full publish flow.** (Recommendation accepted.)
 
-- **What:** decide what ships together at M6:
-  - Just the spec (`docs/AAP-spec.md`)
-  - Spec + compliance suite (`packages/protocol-compliance/`)
-  - Spec + compliance suite + reference TypeScript impl (`packages/sdk` + `apps/cloud/api/`)
-- **Why:** more = more useful to early implementers; less = smaller blast radius if something is wrong on day 1.
-- **Recommendation:** spec + compliance suite. Reference impl is already public (Apache-2.0) by virtue of the repo flipping public, so this is mostly about how we frame the M6 launch post.
-- **Acceptance:** decision recorded; M6 launch post drafts mention the chosen scope; `docs/protocol-stewardship.md` trigger #1 (AAP v1.0 / first breaking change in production) updated with the M6 scope.
-- **Time:** 30 min
+Implications for code:
+- `packages/protocol-compliance/src/cli.ts` — entry point: `pnpm protocol-compliance --setup --base-url=…`
+- Provisioner writes a known keypair + manifest + seeded conversation through the candidate API
+- A `--seed-file=fixtures.json` flag bypasses provisioning when the candidate isn't full-impl
+- Tier 3 tests assume fixtures exist; emit clear error if not yet provisioned
 
-### F.5  Spec licensing decision
+### F.4 ✅ M6 public-release scope
 
-- **What:** decide whether to re-license `docs/AAP-spec.md` under a different license than the rest of the repo (Apache-2.0). Common alternatives:
-  - **CC-BY-4.0** — "anyone can implement; just credit AgentAgora as the originator"
-  - **CC-BY-SA-4.0** — same, but derivative specs must also be CC-BY-SA
-  - **Apache-2.0 (current)** — same license as the code; less common for prose specs but legally fine
-- **Why:** the spec is a different kind of artifact than the code — implementers want clarity that they can ship code under any license while implementing the spec. CC-BY signals "this is meant to be implemented widely."
-- **Recommendation:** CC-BY-4.0 for the spec at M6 launch. Code stays Apache-2.0 (per [GOVERNANCE.md](../GOVERNANCE.md)). Add a `docs/AAP-spec.md` header explaining the dual-license setup.
-- **Acceptance:** licensing decision in `docs/m4-plan.md`; spec header updated; `docs/protocol-stewardship.md` trigger #3 (relicense) updated.
-- **Time:** 30 min decision + read [https://creativecommons.org/share-your-work/](https://creativecommons.org/share-your-work/)
+**Decision: spec + compliance suite (no separate "reference impl" framing).** (Recommendation accepted.)
+
+The reference impl (`packages/sdk` + `apps/cloud/api`) is already part of the public repo by virtue of the M3 flip; M6 is positioned as "the protocol becomes referenceable, not just shipped" — spec doc + the compliance suite that gives `AgentAgora-compatible` an objective definition.
+
+### F.5 ✅ Spec licensing — Apache-2.0 (maintainer override)
+
+**Decision: spec stays Apache-2.0.** (Recommendation was CC-BY-4.0; maintainer chose to keep the repo single-license.)
+
+Rationale recorded by maintainer: lower mental overhead for downstream implementers (one license to scan, not two), simpler for the M6 launch post, no header gymnastics on every doc file. Apache-2.0 is unambiguous about implementation rights — the spec is "Apache-licensed prose" rather than "Apache-licensed code", but the legal effect of "you can implement it" is identical.
+
+`docs/protocol-stewardship.md` Trigger #3 ("Cloud relicenses to non-Apache-2.0") still applies as written; it now also implicitly applies to the spec since they share a license.
 
 ---
 

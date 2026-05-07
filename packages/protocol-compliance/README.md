@@ -4,7 +4,17 @@
 
 This package is **deliberately runtime-agnostic**: it does not import the cloud-api's source code, does not assume Cloudflare Workers / D1 / Stripe, and has no opinion on what storage or settlement layer the candidate uses. It only knows the wire shapes from `@agentagora/protocol` and the HTTP contract the AAP spec defines.
 
-Status: **Tier 1 (read-path public surface).** Tier 2 (auth) and Tier 3 (mutation) ship in later phases — see [`docs/m4-plan.md`](../../docs/m4-plan.md).
+Status: **Tier 1 (read-path public surface) + Tier 2 (auth read paths).** Tier 3 (mutation) ships in Phase 2b — see [`docs/m4-plan.md`](../../docs/m4-plan.md).
+
+## "AgentAgora-compatible" badge
+
+Per maintainer decision F.2 ([`docs/maintainer-tasks.md`](../../docs/maintainer-tasks.md)):
+
+> **Passing Tier 1 + Tier 2 earns the public "AgentAgora-compatible" badge.**
+>
+> Passing Tier 3 additionally earns "registered peer registry" status (relevant once federation goes live in M10+).
+
+Badge wording: *"This service implements AgentAgora Protocol v0.x — Tier 1 (public surface) + Tier 2 (auth)."*
 
 ## Quick start
 
@@ -12,8 +22,15 @@ Status: **Tier 1 (read-path public surface).** Tier 2 (auth) and Tier 3 (mutatio
 # 1. Have a cloud-api candidate running somewhere
 #    (the reference impl: `pnpm --filter @agentagora/cloud-api dev` in another terminal)
 
-# 2. Point the suite at it
+# 2a. Point the suite at it (Tier 1 only — public surface, no auth)
 AAP_BASE_URL=http://localhost:8787 \
+  pnpm --filter @agentagora/protocol-compliance test
+
+# 2b. Or run Tier 1 + Tier 2 (authenticated reads)
+AAP_BASE_URL=http://localhost:8787 \
+AAP_TEST_BEARER=<your-test-bearer> \
+AAP_TEST_OWNER_ID=<owner-id-the-bearer-resolves-to> \
+AAP_TEST_OWNED_AID=aid:agentagora:<owner>/<name> \
   pnpm --filter @agentagora/protocol-compliance test
 
 # 3. Read the report
@@ -27,36 +44,36 @@ The default `AAP_BASE_URL` is `http://localhost:8787` (i.e., a local `wrangler d
 - A self-host runtime (e.g., `https://my-cloud.example.com`)
 - A third-party registry (e.g., `https://aap.example.org`)
 
-## What's tested today (Tier 1)
+## What's tested today
 
-| Section | Test file | Spec requirement |
-|---|---|---|
-| Liveness | `tests/tier1-liveness.test.ts` | `GET /healthz` 200, JWKS publish, JWK shape (Ed25519, kid+x) |
-| Registry | `tests/tier1-registry.test.ts` | `GET /v1/agents` shape, `GET /v1/agents/:aid` 200/404 |
-| Errors | `tests/tier1-error-envelope.test.ts` | `{ error: snake_case, message?, request_id? }` envelope |
+### Tier 1 — public read paths (no auth, safe against production)
 
-Tier 1 tests:
-- Use no bearer-token auth
-- Make no destructive writes
-- Are safe to run against a production candidate
+| File | Spec requirement |
+|---|---|
+| `tests/tier1-liveness.test.ts` (4 tests) | `GET /healthz` 200, JWKS publish, JWK shape (Ed25519, kid+x), CORS |
+| `tests/tier1-registry.test.ts` (6 tests) | `GET /v1/agents` shape, `GET /v1/agents/:aid` 200/404, URL-decode |
+| `tests/tier1-error-envelope.test.ts` (5 tests) | `{ error: snake_case, message?, request_id? }` shape |
 
-## Tier 2 / 3 (coming in M4 Phase 2)
+Tier 1 makes no destructive writes; safe to run against a production candidate.
 
-Tier 2 — authenticated read paths (require `AAP_TEST_BEARER`):
+### Tier 2 — authenticated read paths (require `AAP_TEST_BEARER`)
 
-- `GET /v1/agents?owner=` ownership scoping
-- `GET /v1/conversations/:id` audit chain
-- `GET /v1/disputes?filer=`
-- `GET /v1/connect/account`
+| File | Spec requirement |
+|---|---|
+| `tests/tier2-auth.test.ts` (~12 tests) | `?owner=`, `?actor=`, `?filer=` ownership scoping; 401 on missing/invalid bearer; 403 on cross-owner; `/v1/connect/account` auth |
 
-Tier 3 — mutation paths (require `AAP_TEST_BEARER` + sandbox):
+Tier 2 makes no destructive writes either, but requires a test bearer that the candidate accepts. Some sub-tests additionally need `AAP_TEST_OWNER_ID` and/or `AAP_TEST_OWNED_AID` — those tests skip individually when those env vars are empty, so a partial run still produces useful signal.
 
-- `POST /v1/agents` (manifest publish + Ed25519 verify)
-- `POST /v1/audit/ingest` (chain integrity)
+### Tier 3 (coming in M4 Phase 2b)
+
+Tier 3 — mutation paths (sandbox-only; require fixture setup):
+
+- `POST /v1/agents` (manifest publish + Ed25519 verify + JCS canonicalisation)
+- `POST /v1/audit/ingest` (chain integrity / `broken_chain` detection)
 - `POST /v1/disputes`
 - `POST /v1/nonces/check`
 
-Tier 3 fixture-setup approach is a maintainer decision — see `docs/maintainer-tasks.md` §F.3.
+Setup approach (per F.3 decision): CLI provisioner. `pnpm protocol-compliance --setup --base-url=…` will write known fixtures via the candidate API; a `--seed-file=fixtures.json` fallback supports candidates that don't yet implement the full publish flow.
 
 ## How a third-party impl uses this
 

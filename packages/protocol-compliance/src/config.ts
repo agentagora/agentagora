@@ -21,10 +21,17 @@ export interface ComplianceConfig {
    */
   bearer: string;
   /**
-   * AID of an agent owned by `bearer`. Required for Tier 2 owner-
-   * scoped probes. Tier 1 ignores this.
+   * Owner-id the bearer resolves to (e.g. `gh:weijt606`). Used for
+   * `?owner=<id>` ownership-scoping probes. Required for some Tier 2
+   * tests; the suite skips just those tests when empty.
    */
-  testOwnerAid: string;
+  testOwnerId: string;
+  /**
+   * An AID the bearer owns. Used for `?actor=<aid>`, `?filer=<aid>`,
+   * `?respondent=<aid>` query probes. Required for some Tier 2 tests;
+   * the suite skips just those tests when empty.
+   */
+  testOwnedAid: string;
 }
 
 export function loadConfig(): ComplianceConfig {
@@ -34,7 +41,8 @@ export function loadConfig(): ComplianceConfig {
   return {
     baseUrl,
     bearer: process.env.AAP_TEST_BEARER ?? "",
-    testOwnerAid: process.env.AAP_TEST_OWNER_AID ?? "",
+    testOwnerId: process.env.AAP_TEST_OWNER_ID ?? "",
+    testOwnedAid: process.env.AAP_TEST_OWNED_AID ?? "",
   };
 }
 

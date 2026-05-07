@@ -58,21 +58,37 @@ Three phases, roughly two weeks of work each. Each phase ships independently —
 
 **Scope discipline**: Tier 1 is intentionally small — scaffolds the runner shape and proves the pattern. Real coverage is Phase 2.
 
-### Phase 2 — Tier 2 + Tier 3 tests (later session)
+### Phase 2 — Tier 2 + Tier 3 tests
 
-**Tier 2** — Authenticated read paths (require a test bearer):
-- `GET /v1/agents?owner=X` ownership scoping
-- `GET /v1/conversations/:id` audit chain integrity
-- `GET /v1/disputes?filer=X` auth boundaries
-- `GET /v1/connect/account` Stripe-attached account state
+Split into two sub-phases so they ship independently:
 
-**Tier 3** — Mutation paths (sandbox-only; require setup):
+**Phase 2a — Tier 2 (authenticated read paths)**
+
+Bearer-required reads, no destructive ops. The suite skips these tests when `AAP_TEST_BEARER` is unset (same opt-in pattern Tier 1 has for `AAP_BASE_URL`). Routes covered:
+
+- `GET /v1/agents?owner=<id>` — owner scoping; bearer's resolved owner must match
+- `GET /v1/conversations?actor=<aid>` — bearer must own the AID
+- `GET /v1/disputes?filer=<aid>` and `?respondent=<aid>` — auth boundaries
+- `GET /v1/connect/account` — bearer's Stripe Connect state
+
+For each: 401 on missing bearer, 401 on invalid bearer, 200 + correctly-scoped data on valid bearer, 403 on cross-owner queries (where applicable).
+
+**Phase 2b — Tier 3 (mutation paths)**
+
+Sandbox-only writes. Per F.3 decision:
+
+- **Primary**: CLI provisioner. `packages/protocol-compliance/src/cli.ts` exposes `pnpm protocol-compliance --setup --base-url=…` which:
+  1. Generates a known Ed25519 keypair
+  2. Publishes a fresh manifest via the candidate's `POST /v1/agents`
+  3. Seeds a conversation via `POST /v1/audit/ingest`
+  4. Persists fixture identifiers to a temp file the test runner reads
+- **Fallback**: `--seed-file=fixtures.json` accepts pre-provisioned fixtures from impls that don't support full publish flow yet — those impls run only Tier 1 + 2 toward the badge.
+
+Tier 3 routes covered:
 - `POST /v1/agents` manifest publish + Ed25519 verify + JCS canonicalisation
 - `POST /v1/audit/ingest` chain integrity (broken_chain detection)
 - `POST /v1/disputes` filer/respondent authz
 - `POST /v1/nonces/check` replay-protection semantics
-
-Tier 3 needs a "test fixtures" setup: a known keypair, a published manifest, a reset-between-runs storage seed. We design this in Phase 2 — likely a CLI (`pnpm protocol-compliance --setup`) that provisions known state, then runs the suite.
 
 ### Phase 3 — Spec hardening pass (later session)
 
@@ -80,15 +96,19 @@ After Phases 1 + 2 codify the protocol surface into runnable tests, the spec doc
 
 Output of Phase 3 is the version of `AAP-spec.md` that's a candidate for the M6 public release. It stays in `docs/` (private) until M6.
 
-## Maintainer decisions (Group F in `docs/maintainer-tasks.md`)
+## Maintainer decisions (Group F — closed 2026-05-07)
 
-Manual items — these don't unblock Phase 1, but Phase 2 / 3 hit decision points the maintainer has to make:
+All five M4 decisions are settled. F.1-F.4 went with the recommendations; F.5 was overridden to Apache-2.0 (single-license simplicity). Full rationale in [`docs/maintainer-tasks.md` §F](maintainer-tasks.md#group-f--m4-spec-hardening-decisions).
 
-- **F.1** Decide RFC-style structure (IETF / W3C / homegrown) for the Phase 3 spec rewrite.
-- **F.2** Decide what counts as the "AgentAgora-compatible" badge level: Tier-1-only, Tier-1+2, or all three.
-- **F.3** Decide Phase 2's Tier 3 fixture-setup approach: CLI-provisioned, declarative seed file, or per-test setup hooks.
-- **F.4** Decide M6 public-release scope (just the spec, or the spec + compliance suite + reference impl all together).
-- **F.5** After Phase 3, decide whether to re-license the spec doc separately from the codebase (e.g., spec under CC-BY for "all implementations free", code stays Apache-2.0).
+| # | Decision | Notes |
+|---|---|---|
+| F.1 | **IETF RFC style** | Sections: Introduction, Terminology (RFC 2119), normative MUST/SHOULD/MAY, Security Considerations, IANA Considerations placeholder. Phase 3 implements. |
+| F.2 | **Tier 1+2 = AgentAgora-compatible badge** | Tier 3 = "registered peer registry" (M10+). Badge wording lands in compliance suite README in Phase 2. |
+| F.3 | **CLI provisioner + declarative-seed fallback** | Phase 2 builds `packages/protocol-compliance/src/cli.ts`. `--setup --base-url=…` provisions; `--seed-file=fixtures.json` bypasses for impls that don't yet support publish. |
+| F.4 | **Spec + compliance suite at M6** | Reference impl is already public via M3 repo flip; M6 framing is "protocol becomes referenceable." |
+| F.5 | **Apache-2.0 (single license)** | Maintainer override of CC-BY recommendation. Reduces downstream cognitive load — one license to scan, no per-file headers, identical implementation rights. |
+
+These decisions are now baked into the Phase 2 / Phase 3 design below.
 
 ## What this plan does NOT cover
 
