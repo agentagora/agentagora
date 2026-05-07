@@ -261,6 +261,66 @@ The CI audit step at `.github/workflows/typescript.yml` runs at `--audit-level=h
 
 ---
 
+## Group F — M4 spec-hardening decisions (deferred — engage after M3 launch)
+
+These are decisions that gate M4 Phase 2 / 3 — see [`docs/m4-plan.md`](m4-plan.md) for the full plan. Phase 1 (compliance scaffold + Tier 1 tests) doesn't need them and is already in flight; Phases 2 + 3 hit the decision points below.
+
+These are **non-urgent during M3 launch**. Triage them when you sit down to start M4 spec hardening.
+
+### F.1  Pick an RFC-style structure for the Phase 3 spec rewrite
+
+- **What:** decide whether the hardened `docs/AAP-spec.md` should follow IETF RFC structure (IANA considerations, security considerations, etc.), W3C TR style, or a homegrown shape inspired by but not bound to either.
+- **Why:** the choice affects how external SDK authors read the spec at M6 public release. IETF style is the most familiar to systems engineers; W3C style is more web-oriented. Homegrown is faster to write but less legible to standards readers.
+- **Recommendation:** IETF style. Mirrors how OAuth / OIDC specs read; minimum-friction for crypto-aware reviewers; supports inline `MUST` / `SHOULD` / `MAY` natively. But you decide.
+- **Acceptance:** `docs/m4-plan.md` Phase 3 section updated with the chosen structure; first hardened section uses it.
+- **Time:** 30 min reading + decision
+
+### F.2  Define what level of compliance earns the "AgentAgora-compatible" badge
+
+- **What:** decide which tier(s) a second cloud implementation must pass to claim AgentAgora-compatibility:
+  - Tier 1 only (read-path, public surface) — minimum bar
+  - Tier 1 + Tier 2 (read + auth) — passable third-party registry
+  - All three tiers (incl. Tier 3 mutation paths) — full federation-ready
+- **Why:** badge level shapes adoption — too lax and "compatible" means nothing; too strict and nobody clears it. The right answer probably depends on how lighthouse partners react to early access.
+- **Recommendation:** Tier 1 + 2 for the public badge; Tier 3 for "registered as a peer registry" once federation is live (M10+).
+- **Acceptance:** decision recorded in `docs/m4-plan.md` and the compliance suite README; badge wording drafted.
+- **Time:** 1-2 hours (likely needs a couple of partner conversations first)
+
+### F.3  Decide Phase 2 Tier 3 fixture-setup approach
+
+- **What:** Tier 3 tests need known-state setup (a published manifest, a known keypair, a seeded conversation). Choose between:
+  - **CLI provisioner:** `pnpm protocol-compliance --setup` writes fixtures via the candidate API
+  - **Declarative seed file:** YAML/JSON describing fixtures, runner applies them
+  - **Per-test setup hooks:** each test creates + tears down its own state
+- **Why:** the choice ripples into how a third-party impl runs the suite. CLI-provisioner is most ergonomic but assumes the candidate API supports the full publish flow first. Declarative seed is most portable. Per-test is most isolated but slowest.
+- **Recommendation:** CLI provisioner with a fallback declarative seed mode for impls that don't support the full publish flow yet (those run only Tier 1 + 2).
+- **Acceptance:** decision recorded in `docs/m4-plan.md` Phase 2; first Tier 3 test follows the chosen pattern.
+- **Time:** 30 min decision + design notes
+
+### F.4  Decide M6 public-release scope
+
+- **What:** decide what ships together at M6:
+  - Just the spec (`docs/AAP-spec.md`)
+  - Spec + compliance suite (`packages/protocol-compliance/`)
+  - Spec + compliance suite + reference TypeScript impl (`packages/sdk` + `apps/cloud/api/`)
+- **Why:** more = more useful to early implementers; less = smaller blast radius if something is wrong on day 1.
+- **Recommendation:** spec + compliance suite. Reference impl is already public (Apache-2.0) by virtue of the repo flipping public, so this is mostly about how we frame the M6 launch post.
+- **Acceptance:** decision recorded; M6 launch post drafts mention the chosen scope; `docs/protocol-stewardship.md` trigger #1 (AAP v1.0 / first breaking change in production) updated with the M6 scope.
+- **Time:** 30 min
+
+### F.5  Spec licensing decision
+
+- **What:** decide whether to re-license `docs/AAP-spec.md` under a different license than the rest of the repo (Apache-2.0). Common alternatives:
+  - **CC-BY-4.0** — "anyone can implement; just credit AgentAgora as the originator"
+  - **CC-BY-SA-4.0** — same, but derivative specs must also be CC-BY-SA
+  - **Apache-2.0 (current)** — same license as the code; less common for prose specs but legally fine
+- **Why:** the spec is a different kind of artifact than the code — implementers want clarity that they can ship code under any license while implementing the spec. CC-BY signals "this is meant to be implemented widely."
+- **Recommendation:** CC-BY-4.0 for the spec at M6 launch. Code stays Apache-2.0 (per [GOVERNANCE.md](../GOVERNANCE.md)). Add a `docs/AAP-spec.md` header explaining the dual-license setup.
+- **Acceptance:** licensing decision in `docs/m4-plan.md`; spec header updated; `docs/protocol-stewardship.md` trigger #3 (relicense) updated.
+- **Time:** 30 min decision + read [https://creativecommons.org/share-your-work/](https://creativecommons.org/share-your-work/)
+
+---
+
 ## After all of the above
 
 - Edit `docs/m3-launch-checklist.md` and flip every applicable `⬜ → ✅` / `🟡 → ✅`.

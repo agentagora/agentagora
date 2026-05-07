@@ -1,0 +1,27 @@
+{
+  "name": "@agentagora/protocol-compliance",
+  "version": "0.0.1",
+  "description": "Conformance test suite for AgentAgora Protocol (AAP) — runnable against any cloud-api candidate URL via AAP_BASE_URL env var.",
+  "license": "Apache-2.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentagora/agentagora.git",
+    "directory": "packages/protocol-compliance"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests"
+  },
+  "dependencies": {
+    "@agentagora/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.9"
+  }
+}

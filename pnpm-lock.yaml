@@ -251,6 +251,22 @@ importers:
         specifier: ~3.23.5
         version: 3.23.5(zod@3.25.76)
 
+  packages/protocol-compliance:
+    dependencies:
+      '@agentagora/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.12.2
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@24.12.2)
+
   packages/sdk:
     dependencies:
       '@agentagora/protocol':
