@@ -90,9 +90,15 @@ Tier 3 routes covered:
 - `POST /v1/disputes` filer/respondent authz
 - `POST /v1/nonces/check` replay-protection semantics
 
-### Phase 3 — Spec hardening pass (later session)
+### Phase 3 — Spec hardening pass (✅ shipped)
 
-After Phases 1 + 2 codify the protocol surface into runnable tests, the spec doc itself gets the four-pass treatment from §"What spec hardening means" above. Each `MUST` / `SHOULD` in the spec gets a footnote pointing at the compliance test that enforces it. Anything without a test either gets a test or gets demoted from `MUST` to `MAY`.
+Three artifacts:
+
+1. **[`docs/AAP-spec.md`](AAP-spec.md) v0.1-rfc-draft** — header version bump; §13 Conformance now points at the compliance suite + traceability matrix; new §14 (IANA Considerations: AAP method names, error codes, audit event types, settlement channel IDs, pricing models) and §15 (Acknowledgements: JSON-RPC 2.0, RFC 8785, RFC 8037, RFC 7519, MCP, A2A); previous §14/§15 renumbered to §16/§17. Document History records the hardening pass with no protocol-surface changes.
+
+2. **[`docs/aap-traceability.md`](aap-traceability.md)** (new) — every `MUST` / `SHOULD` / `MAY` in the spec mapped to the test that enforces it. 36 of 39 (92%) requirements covered by automated tests; the 3 remaining (daily spend cap, 90-day audit retention, free-tier no-settlement, revocation list, PII handling) are documented as untested-with-rationale and tied to the milestone where their tests will land. A maintainer can audit "what's still aspirational" at a glance.
+
+3. **Updated F.1 + F.4 acceptance criteria** — IETF style applied; spec + compliance suite is the M6 release scope.
 
 Output of Phase 3 is the version of `AAP-spec.md` that's a candidate for the M6 public release. It stays in `docs/` (private) until M6.
 

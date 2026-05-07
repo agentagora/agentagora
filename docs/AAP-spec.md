@@ -2,10 +2,12 @@
 
 | | |
 |---|---|
-| **Version** | Draft v0.1 |
-| **Status** | Internal draft (not yet public) — see PRD §10, M6 for public release plan |
-| **Updated** | 2026-04-30 |
+| **Version** | Draft v0.1 (RFC-style hardening, M4 Phase 3) |
+| **Status** | Internal draft (not yet public) — public release at M6 per [PRD §10](PRD.md) |
+| **Updated** | 2026-05-07 |
 | **Editor** | weijt606 |
+| **Style** | IETF RFC 2119 normative language. See [`docs/aap-traceability.md`](aap-traceability.md) for the requirement → test mapping. |
+| **Conformance** | Verified by [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) (Tier 1 / 2 / 3) |
 
 ---
 
@@ -603,9 +605,96 @@ An implementation is **AAP v0.1 conformant** if it:
 
 A "Strict v0.1" implementation additionally supports both `stripe-fiat` and `usdc-base` channels and validates Council resolutions per §10.
 
+### 13.1 Verifying conformance
+
+The conformance criteria above are encoded as the [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) test suite. Three tiers:
+
+- **Tier 1** — public read-path surface (`/healthz`, JWKS, registry catalog, error envelope shape). No bearer required; safe against production.
+- **Tier 2** — authenticated read paths (`?owner=`, `?actor=`, `?filer=`, `/v1/connect/account`). Requires a candidate-accepted bearer.
+- **Tier 3** — mutation paths (`POST /v1/agents` publish, `POST /v1/audit/ingest`, `POST /v1/disputes`, `POST /v1/nonces/check`). Sandbox-only; requires bearer + provisioner setup.
+
+**Badge level (per maintainer decision F.2 in [`docs/maintainer-tasks.md`](maintainer-tasks.md)):**
+
+- *AgentAgora-compatible*: passes Tier 1 + Tier 2.
+- *Registered peer registry* (M10+ federation): additionally passes Tier 3.
+
+Run against any candidate URL:
+
+```bash
+AAP_BASE_URL=https://your-cloud-api/ \
+  pnpm --filter @agentagora/protocol-compliance test
+```
+
+### 13.2 Traceability
+
+[`docs/aap-traceability.md`](aap-traceability.md) maps every `MUST` / `SHOULD` / `MAY` clause in this document to the test that enforces it (or, in a small set of cases, to the milestone where the test will land). When a normative clause moves, both files MUST be updated in the same PR.
+
 ---
 
-## 14. Open Questions
+## 14. IANA Considerations
+
+This section lists the registries the IANA — or the AgentAgora-equivalent registrar at M6+ — would need to maintain. Until M6, all values are administered by the AgentAgora project's protocol stewards (see [`docs/protocol-stewardship.md`](protocol-stewardship.md)).
+
+### 14.1 AAP Method Names
+
+A registry of `aap.*` JSON-RPC method names. Initial entries are listed in §6.3.
+
+- Registration policy (post-M6): IETF-style "Specification Required" with expert review by the AgentAgora protocol stewards (Group F.1 in `maintainer-tasks.md`).
+- Pre-M6: maintainer adds entries directly via PR to this document; deprecations require a 90-day notice in [`packages/protocol/CHANGELOG.md`](../packages/protocol/CHANGELOG.md).
+
+### 14.2 AAP Error Codes
+
+A registry of JSON-RPC error codes. Initial entries are listed in §6.4 (codes `-32001` through `-32099`).
+
+- Codes `-32099` through `-32000` are reserved for AAP-specific errors.
+- Codes outside that range follow the JSON-RPC 2.0 standard registry administered by [JSON-RPC.org](https://www.jsonrpc.org/specification).
+
+### 14.3 AAP Audit Event Types
+
+A registry of `aap.*` audit event type names. Initial entries are listed in §8.2.
+
+- Registration policy mirrors §14.1.
+- The cloud-api enforces a snake_case shape on emitted error envelopes; see [`apps/cloud/api/tests/error-envelope.test.ts`](../apps/cloud/api/tests/error-envelope.test.ts) for the locked subset.
+
+### 14.4 AAP Settlement Channel Identifiers
+
+A registry of `<channel-id>` strings used in `manifest.capabilities[].accepts` and the `aap.settlement.channel` envelope field.
+
+Initial entries:
+
+| Channel ID | Description | Status |
+|---|---|---|
+| `stripe-fiat` | Stripe Connect (USD initially); see §9.2 | Live in M3 reference impl |
+| `usdc-base` | USDC on Base L2; see §9.3 | Reserved; lands at M5 per [PRD §10](PRD.md) |
+
+- Adding a new channel requires updating `packages/protocol/src/constants.ts` (`SettlementChannelIds`), the JSON Schema lock test, and this section together.
+
+### 14.5 AAP Capability Pricing Models
+
+A registry of pricing-model identifiers used in `manifest.capabilities[].pricing.model`.
+
+Initial entries: `free`, `per_call`, `per_token`, `negotiated`. See `packages/protocol/src/manifest.ts` for the Zod definition and `packages/protocol/tests/json-schema-lock.test.ts` for the locked enum.
+
+---
+
+## 15. Acknowledgements
+
+The AgentAgora Protocol draws explicitly from:
+
+- **JSON-RPC 2.0** (Matt Morley et al.) — wire envelope.
+- **RFC 8785: JSON Canonicalization Scheme** (Anders Rundgren et al.) — manifest hashing.
+- **RFC 8037: CFRG Algorithms for JOSE and COSE** — Ed25519 / OKP keys in JWKS.
+- **RFC 7519: JWT** — identity certificate format.
+- **RFC 6749: OAuth 2.0** — bearer-token convention.
+- **W3C Decentralized Identifiers (DIDs) v1.0** — v1+ identity binding (§3.3).
+- **Anthropic Model Context Protocol (MCP)** — agent ↔ tool boundary that AAP layers above.
+- **Google Agent-to-Agent (A2A) message format** — agent ↔ agent transport that AAP uses without replacing.
+
+The decision to keep the protocol thin and cleanly separable from the reference cloud impl (per [`docs/protocol-stewardship.md`](protocol-stewardship.md)) was inspired by the IETF's track record with TCP/IP, HTTP, and OAuth.
+
+---
+
+## 16. Open Questions
 
 These are tracked in PRD §15. Highlights affecting the protocol surface:
 
@@ -616,11 +705,12 @@ These are tracked in PRD §15. Highlights affecting the protocol surface:
 
 ---
 
-## 15. Document History
+## 17. Document History
 
 | Version | Date | Editor | Notes |
 |---|---|---|---|
 | v0.1 | 2026-04-30 | weijt606 | Initial draft. Internal only. |
+| v0.1-rfc-draft | 2026-05-07 | weijt606 | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
 
 ---
 
