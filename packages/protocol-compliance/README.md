@@ -4,7 +4,7 @@
 
 This package is **deliberately runtime-agnostic**: it does not import the cloud-api's source code, does not assume Cloudflare Workers / D1 / Stripe, and has no opinion on what storage or settlement layer the candidate uses. It only knows the wire shapes from `@agentagora/protocol` and the HTTP contract the AAP spec defines.
 
-Status: **Tier 1 (read-path public surface) + Tier 2 (auth read paths).** Tier 3 (mutation) ships in Phase 2b — see [`docs/m4-plan.md`](../../docs/m4-plan.md).
+Status: **Tier 1 (read-path public surface) + Tier 2 (auth read paths) + Tier 3 (mutation contracts).** Phase 3 (RFC-style spec hardening + traceability matrix) follows — see [`docs/m4-plan.md`](../../docs/m4-plan.md).
 
 ## "AgentAgora-compatible" badge
 
@@ -64,16 +64,49 @@ Tier 1 makes no destructive writes; safe to run against a production candidate.
 
 Tier 2 makes no destructive writes either, but requires a test bearer that the candidate accepts. Some sub-tests additionally need `AAP_TEST_OWNER_ID` and/or `AAP_TEST_OWNED_AID` — those tests skip individually when those env vars are empty, so a partial run still produces useful signal.
 
-### Tier 3 (coming in M4 Phase 2b)
+### Tier 3 — mutation contracts (sandbox-only)
 
-Tier 3 — mutation paths (sandbox-only; require fixture setup):
+| File | Spec requirement |
+|---|---|
+| `tests/tier3-publish.test.ts` (5 tests) | `POST /v1/agents` auth + signature header contract; published-AID round-trip via fixtures |
+| `tests/tier3-mutation-auth.test.ts` (9 tests) | `POST /v1/audit/ingest` body shape + empty-batch; `POST /v1/disputes` auth; `POST /v1/nonces/check` auth + replay protection (200 first / 409 conflict) |
 
-- `POST /v1/agents` (manifest publish + Ed25519 verify + JCS canonicalisation)
-- `POST /v1/audit/ingest` (chain integrity / `broken_chain` detection)
-- `POST /v1/disputes`
-- `POST /v1/nonces/check`
+Tier 3 makes destructive writes against the candidate's storage. Run only against a sandbox / dev candidate, never production. Some tests need fixtures from the provisioner — see "Provisioning fixtures" below.
 
-Setup approach (per F.3 decision): CLI provisioner. `pnpm protocol-compliance --setup --base-url=…` will write known fixtures via the candidate API; a `--seed-file=fixtures.json` fallback supports candidates that don't yet implement the full publish flow.
+### Provisioning fixtures (Tier 3)
+
+Per F.3 decision, the suite uses a **CLI provisioner** as the primary path:
+
+```bash
+# 1. Have a sandbox cloud-api running with an OWNER_TOKENS env var set,
+#    e.g. via wrangler dev --var OWNER_TOKENS:owner1:bearer-token-here
+
+# 2. Provision fixtures (publishes a fresh manifest, saves keypair)
+pnpm --filter @agentagora/protocol-compliance compliance:setup -- \
+  --setup \
+  --base-url=http://localhost:8788 \
+  --bearer=bearer-token-here
+
+# Output:
+#   ✓ Published manifest: aid:agentagora:compliance-suite/tier3-fixture
+#   ✓ fixtures saved to node_modules/.cache/protocol-compliance/fixtures.json
+
+# 3. Run the suite — fixture-gated tests now activate
+AAP_BASE_URL=http://localhost:8788 \
+AAP_TEST_BEARER=bearer-token-here \
+  pnpm --filter @agentagora/protocol-compliance test
+```
+
+Fallback for impls that don't yet support full publish flow:
+
+```bash
+# Hand-craft fixtures.json matching the Fixtures shape in src/setup.ts,
+# then copy it into the cache slot:
+pnpm --filter @agentagora/protocol-compliance compliance:setup -- \
+  --seed-file=path/to/your/fixtures.json
+```
+
+Those impls run only Tier 1 + 2 toward the badge.
 
 ## How a third-party impl uses this
 

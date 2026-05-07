@@ -40,7 +40,7 @@ This is the artifact PRD §10 M9 ("Self-host runtime open-sourced") implicitly a
 
 Three phases, roughly two weeks of work each. Each phase ships independently — the maintainer can interrupt the sequence to handle M3 launch ops without losing progress.
 
-### Phase 1 — Compliance scaffold + Tier 1 tests (THIS COMMIT)
+### Phase 1 — Compliance scaffold + Tier 1 tests (✅ shipped)
 
 **Code**:
 - New workspace package `packages/protocol-compliance/`
@@ -58,11 +58,11 @@ Three phases, roughly two weeks of work each. Each phase ships independently —
 
 **Scope discipline**: Tier 1 is intentionally small — scaffolds the runner shape and proves the pattern. Real coverage is Phase 2.
 
-### Phase 2 — Tier 2 + Tier 3 tests
+### Phase 2 — Tier 2 + Tier 3 tests (✅ shipped)
 
-Split into two sub-phases so they ship independently:
+Split into two sub-phases that shipped independently:
 
-**Phase 2a — Tier 2 (authenticated read paths)**
+**Phase 2a — Tier 2 (authenticated read paths)** ✅
 
 Bearer-required reads, no destructive ops. The suite skips these tests when `AAP_TEST_BEARER` is unset (same opt-in pattern Tier 1 has for `AAP_BASE_URL`). Routes covered:
 
@@ -73,7 +73,7 @@ Bearer-required reads, no destructive ops. The suite skips these tests when `AAP
 
 For each: 401 on missing bearer, 401 on invalid bearer, 200 + correctly-scoped data on valid bearer, 403 on cross-owner queries (where applicable).
 
-**Phase 2b — Tier 3 (mutation paths)**
+**Phase 2b — Tier 3 (mutation paths)** ✅
 
 Sandbox-only writes. Per F.3 decision:
 
