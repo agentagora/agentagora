@@ -67,6 +67,9 @@ interface SetupOptions {
   nowMs?: number;
   /** Skip wiring GitHub OAuth — used to assert 503 not_configured. */
   withoutGithub?: boolean;
+  /** Force the §H4 fail-closed callback behavior. Default off so
+   *  the existing legacy-GET tests don't break; new H4 tests opt in. */
+  requireNonceBinding?: boolean;
 }
 
 async function setup(options: SetupOptions = {}) {
@@ -94,6 +97,9 @@ async function setup(options: SetupOptions = {}) {
             client: github,
             stateSigningKey,
             now: nowImpl,
+            ...(options.requireNonceBinding !== undefined
+              ? { requireNonceBinding: options.requireNonceBinding }
+              : {}),
           },
         }),
   });
@@ -461,6 +467,59 @@ describe("POST /v1/auth/github/start with nonce_hash + callback nonce binding [�
       body: JSON.stringify({ code: "abc", state: start.state }),
     });
     expect(cbRes.status).toBe(201);
+  });
+});
+
+// security-review-2026-05-07 §H4: the §H3 fix (above) made POST /start
+// the secure path but left GET /start minting no-nonce states that the
+// /callback would accept. An attacker could call GET /start
+// (unauthenticated) and replay the original §H3 login-CSRF. This block
+// asserts the H4 fail-closed mode (`requireNonceBinding: true`) blocks
+// the legacy path while keeping POST /start + nonce-binding intact.
+describe("POST /v1/auth/github/callback in requireNonceBinding mode [§H4]", () => {
+  async function sha256B64u(input: string): Promise<string> {
+    const enc = new TextEncoder();
+    const digest = await crypto.subtle.digest("SHA-256", enc.encode(input));
+    const bytes = new Uint8Array(digest);
+    let s = "";
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  it("rejects a state minted via GET /start (no nonceHash payload) with state_nonce_required", async () => {
+    const { app } = await setup({ requireNonceBinding: true });
+    const startRes = await app.request("/v1/auth/github/start");
+    const start = (await startRes.json()) as { state: string };
+
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state }),
+    });
+    expect(cbRes.status, "fail-closed callback MUST 401 on no-nonce state").toBe(401);
+    const body = (await cbRes.json()) as { error: string; reason?: string; message?: string };
+    expect(body.error).toBe("unauthorized");
+    expect(body.reason).toBe("state_nonce_required");
+  });
+
+  it("still accepts POST /start with nonce_hash + matching raw nonce in callback (H3 path)", async () => {
+    const { app } = await setup({ requireNonceBinding: true });
+    const nonce = "h4-mode-real-nonce-1234567890";
+    const nonceHash = await sha256B64u(nonce);
+
+    const startRes = await app.request("/v1/auth/github/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce_hash: nonceHash }),
+    });
+    const start = (await startRes.json()) as { state: string };
+
+    const cbRes = await app.request("/v1/auth/github/callback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "abc", state: start.state, nonce }),
+    });
+    expect(cbRes.status, "fail-closed mode MUST still accept nonce-bound flow").toBe(201);
   });
 });
 

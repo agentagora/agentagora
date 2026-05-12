@@ -34,6 +34,7 @@
  */
 
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { getRequestId, requestIdMiddleware } from "./_request-id.js";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
 import { D1Storage } from "./d1-storage.js";
@@ -123,6 +124,48 @@ export interface Env {
    * GitHub uses the OAuth app's default callback URL.
    */
   GITHUB_REDIRECT_URI?: string;
+  /**
+   * security-review-2026-05-07 §H4. Set to "false" ONLY in dev to
+   * allow the legacy `GET /v1/auth/github/start` (no-nonce) flow to
+   * complete via `/callback`. Any other value (or unset) → fail
+   * closed: callback rejects no-nonce states with
+   * `state_nonce_mismatch`. Production NEVER sets this — the default
+   * is correct.
+   */
+  OAUTH_REQUIRE_NONCE?: string;
+  /**
+   * Comma-separated list of origins allowed to make cross-origin
+   * requests with `Authorization` headers (i.e., the dashboard +
+   * marketing site origins in production).
+   *
+   *   "https://dashboard.agentagora.dev,https://agentagora.dev"
+   *
+   * Localhost origins (`http://localhost:*`, `http://127.0.0.1:*`)
+   * are always allowed so `pnpm dev` works without env config.
+   *
+   * Public GET routes (catalog, healthz, JWKS) respond with `*` to
+   * any origin regardless — they have no credentials surface. The
+   * allow-list only gates POST / authenticated routes.
+   *
+   * security-review-2026-05-07 §H5: without this, the dashboard's
+   * browser→cloud-api publish + dispute flows break under CORS
+   * preflight on any cross-origin production deploy.
+   */
+  DASHBOARD_ORIGINS?: string;
+}
+
+/**
+ * Returns true if `origin` matches any localhost / 127.0.0.1 host
+ * regardless of port. Localhost is treated as "always trusted" so
+ * `pnpm dev` works without explicit `DASHBOARD_ORIGINS` config.
+ */
+function isLocalhostOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }
 
 export interface CreateApiOptions {
@@ -151,6 +194,16 @@ export interface CreateApiOptions {
    */
   rateLimiter?: RateLimiter;
   /**
+   * CORS allow-list for cross-origin authenticated requests. Public
+   * GETs always respond `Access-Control-Allow-Origin: *`; this
+   * option only gates routes that carry an `Authorization` header.
+   * When undefined or empty, only localhost origins (`http://localhost:*`,
+   * `http://127.0.0.1:*`) are allowed — sensible default for `pnpm dev`.
+   * Production wires the dashboard + marketing origins from the
+   * DASHBOARD_ORIGINS env var.
+   */
+  corsAllowList?: string[];
+  /**
    * Stripe API client. When absent, the /v1/connect/* routes return
    * 503 not_configured. Production wires HttpStripeApiClient with
    * STRIPE_SECRET_KEY; tests pass an in-memory mock.
@@ -175,6 +228,19 @@ export interface CreateApiOptions {
     now?: () => Date;
     /** Override the bearer minter for deterministic tests. */
     newBearer?: () => string;
+    /**
+     * When true, the `/callback` route rejects any state that does
+     * NOT carry a `nonceHash` payload (i.e., state minted via
+     * `GET /start` rather than `POST /start`). Closes the
+     * security-review-2026-05-07 §H4 login-CSRF re-entry: without
+     * this flag, an attacker calls the unauthenticated `GET /start`
+     * to mint a no-nonce state and replays the original §H3 attack.
+     *
+     * Production wires this to `true` via the `OAUTH_REQUIRE_NONCE`
+     * env var (default true if unset — fail closed). Tests opt out
+     * explicitly to exercise the legacy GET-no-nonce code path.
+     */
+    requireNonceBinding?: boolean;
   };
 }
 
@@ -195,6 +261,60 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   // Mount request-id correlation FIRST so 404s, errors, and every
   // route handler share a consistent X-Request-Id surface.
   app.use("*", requestIdMiddleware());
+
+  // CORS. The dashboard's manifest-publish + file-dispute forms POST
+  // browser→cloud-api directly with Authorization headers — without
+  // a CORS allow-list, every preflight 404s and the actual POST
+  // never goes out. Two layers:
+  //
+  //   1. Public read paths (catalog, healthz, JWKS, conversation /
+  //      dispute by id) — Allow-Origin: *. They carry no credentials
+  //      and the marketing site / third-party clients are expected
+  //      to read them anonymously.
+  //
+  //   2. All other /v1/* paths — Allow-Origin: <echo>, restricted
+  //      to the configured allow-list OR any localhost origin.
+  //      Localhost is treated as always-trusted so `pnpm dev` works
+  //      without env config; production wires real origins through
+  //      DASHBOARD_ORIGINS in env -> options.corsAllowList.
+  //
+  // We don't enable `credentials: true` — the dashboard uses bearer
+  // tokens in Authorization headers, not cross-site cookies, so the
+  // looser `Allow-Origin: *` actually works for the public surface.
+  //
+  // security-review-2026-05-07 §H5.
+  const corsAllowList = options.corsAllowList ?? [];
+  app.use(
+    "/v1/agents",
+    cors({
+      origin: "*",
+      allowMethods: ["GET", "OPTIONS"],
+      allowHeaders: ["content-type"],
+      maxAge: 86400,
+    }),
+  );
+  app.use("/healthz", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"], maxAge: 86400 }));
+  app.use(
+    "/.well-known/jwks.json",
+    cors({ origin: "*", allowMethods: ["GET", "OPTIONS"], maxAge: 86400 }),
+  );
+  // Authenticated + write paths. Echo the origin if it's allow-listed
+  // OR localhost; otherwise return no ACA-O header → browser blocks.
+  app.use(
+    "/v1/*",
+    cors({
+      origin: (origin) => {
+        if (!origin) return ""; // same-origin / curl — no preflight needed
+        if (isLocalhostOrigin(origin)) return origin;
+        if (corsAllowList.includes(origin)) return origin;
+        return "";
+      },
+      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowHeaders: ["content-type", "authorization", "x-aap-pubkey", "x-aap-signature"],
+      exposeHeaders: ["x-request-id"],
+      maxAge: 86400,
+    }),
+  );
 
   app.get("/", (c) =>
     c.json({
@@ -253,6 +373,9 @@ export function createApi(options: CreateApiOptions = {}): Hono {
         stateSigningKey: githubOauth.stateSigningKey,
         ...(githubOauth.now ? { now: githubOauth.now } : {}),
         ...(githubOauth.newBearer ? { newBearer: githubOauth.newBearer } : {}),
+        ...(githubOauth.requireNonceBinding !== undefined
+          ? { requireNonceBinding: githubOauth.requireNonceBinding }
+          : {}),
       }),
     );
   } else {
@@ -363,10 +486,18 @@ async function buildApp(env: Env): Promise<Hono> {
         clientSecret: env.GITHUB_CLIENT_SECRET,
       };
       if (env.GITHUB_REDIRECT_URI) config.redirectUri = env.GITHUB_REDIRECT_URI;
+      // security-review-2026-05-07 §H4: fail closed — require nonce
+      // binding by default. The legacy GET /start path still works
+      // for minting state (CI smoke tests, manual curl), but the
+      // callback rejects any no-nonce state. Operators who need the
+      // legacy callback flow set OAUTH_REQUIRE_NONCE="false" (dev
+      // only — see apps/cloud/api/.dev.vars).
+      const requireNonceBinding = env.OAUTH_REQUIRE_NONCE !== "false";
       githubOauth = {
         config,
         client: new GithubHttpClient(),
         stateSigningKey,
+        requireNonceBinding,
       };
     } catch (err) {
       console.error(
@@ -384,12 +515,18 @@ async function buildApp(env: Env): Promise<Hono> {
     );
   }
 
+  const corsAllowList = (env.DASHBOARD_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   return createApi({
     storage,
     ownerAuth,
     oidc,
     nonceStore,
     rateLimiter,
+    corsAllowList,
     stripe,
     stripeWebhookVerifier,
     ...(githubOauth ? { githubOauth } : {}),

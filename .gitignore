@@ -70,7 +70,17 @@ target/
 # with `cp apps/cloud/api/wrangler.jsonc.example apps/cloud/api/wrangler.jsonc`
 # and paste in the real IDs from `wrangler d1 create` /
 # `wrangler kv namespace create`.
+#
+# Glob form catches macOS Finder duplicates (`wrangler 2.jsonc`,
+# `wrangler 3.real-bak`, …) that the security-review-2026-05-07 §M5
+# pass found accumulating in checkouts where `mv` shuffles ran. Don't
+# rely on the exact-path match alone.
 apps/cloud/api/wrangler.jsonc
+apps/cloud/api/wrangler*.jsonc
+apps/cloud/api/wrangler*.bak
+apps/cloud/api/wrangler*.real-bak
+# Keep the example tracked even under the glob.
+!apps/cloud/api/wrangler.jsonc.example
 
 # ===== Test coverage =====
 coverage/

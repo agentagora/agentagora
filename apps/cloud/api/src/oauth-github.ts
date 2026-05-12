@@ -160,6 +160,17 @@ interface RouterDeps {
   now?: () => Date;
   /** Override the bearer minter for deterministic tests. */
   newBearer?: () => string;
+  /**
+   * security-review-2026-05-07 §H4. When true, `/callback` rejects
+   * any state whose payload does not carry `nonceHash` (i.e., state
+   * minted via the legacy `GET /start` rather than `POST /start`).
+   * Closes the §H3 login-CSRF re-entry: without this flag set,
+   * anyone can call `GET /start` (no auth) → forward the authorize
+   * URL to a victim → callback succeeds with no browser-nonce
+   * binding. Production: true. Dev / tests: defaults false so the
+   * legacy code path remains exercised by the existing suite.
+   */
+  requireNonceBinding?: boolean;
 }
 
 /**
@@ -173,6 +184,7 @@ export function createGithubOauthRouter({
   stateSigningKey,
   now = () => new Date(),
   newBearer = mintBearer,
+  requireNonceBinding = false,
 }: RouterDeps): Hono {
   const router = new Hono();
 
@@ -233,14 +245,32 @@ export function createGithubOauthRouter({
       return c.json({ error: "invalid_body", message: "state is required" }, 400);
     }
 
-    // security-review-2026-05 §H3: verify state HMAC + freshness AND
-    // (when state carries a nonce-hash) require the caller to present
-    // the raw nonce that hashes to the embedded value. This binds the
-    // state to the browser that initiated the flow — a leaked state
-    // alone is no longer enough to complete a callback.
+    // security-review-2026-05 §H3 + 2026-05-07 §H4: verify state HMAC
+    // + freshness, then require the caller to present the raw nonce
+    // that hashes to the embedded value. This binds the state to the
+    // browser that initiated the flow — a leaked state alone is no
+    // longer enough to complete a callback.
+    //
+    // H4 closes the legacy-GET-loophole: when `requireNonceBinding`
+    // is true (production default), reject any state without a
+    // nonceHash payload — the attacker shouldn't be able to fall
+    // back to the unauthenticated `GET /start` to mint a no-nonce
+    // state. Dev / tests can keep using GET /start with
+    // requireNonceBinding=false.
     const verdict = await verifyStateDetailed(stateSigningKey, stateRaw, now().getTime());
     if (!verdict.ok) {
       return c.json({ error: "unauthorized", message: "invalid or expired state" }, 401);
+    }
+    if (requireNonceBinding && verdict.payload.nonceHash === undefined) {
+      return c.json(
+        {
+          error: "unauthorized",
+          reason: "state_nonce_required",
+          message:
+            "state was minted without a browser nonce; the legacy GET /start path is disabled in this environment (security-review-2026-05-07 §H4)",
+        },
+        401,
+      );
     }
     if (verdict.payload.nonceHash !== undefined) {
       if (typeof nonceRaw !== "string" || nonceRaw.length === 0) {
