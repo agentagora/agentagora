@@ -300,7 +300,7 @@ Threat model is mostly self-inflicted (operator error), but the footgun is sharp
 | M5 | Stray `wrangler N.jsonc` backups + gitignore | Medium | S | ✅ gitignore closed; maintainer `rm` still required | Pending local cleanup |
 | M9 | Fixture file private-key perms + production guard | Medium | S | ⬜ open | Before any third-party reads README |
 | M7 | NONCES + RATE_LIMITS production fail-closed | Medium | S | ⬜ open | Same deploy as M.15/M.16 |
-| M8 | Next 15.5.15+ / Astro 5.15.8+ upgrades (M.15 / M.16) | Medium | M each | ⬜ open | Before public flip |
+| M8 | Next 15.5.16+ / Astro 5.15.8+ upgrades (M.15 / M.16) | Medium | M each | 🟡 M.16 closed 2026-05-13 (Astro 5.18.1); M.15 in progress | Before public flip |
 | M10 | Bearer via env var instead of CLI flag | Medium | S | ⬜ open | Hygiene; not blocker |
 | M11 | Request-body size limits | Medium | S | ⬜ open | Before public traffic |
 | L2 | manifest-form private-key DOM hygiene | Low | S | ⬜ open | Cosmetic |

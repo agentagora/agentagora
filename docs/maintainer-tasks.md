@@ -238,7 +238,11 @@ The CI audit step at `.github/workflows/typescript.yml` runs at `--audit-level=h
   - Manual smoke: GitHub OAuth flow + agent CRUD round-trip, identical to today
 - **Time:** 2-4 hours (~30 min upgrade, the rest is touching every Server Component the codemod missed)
 
-### M.16  Bump `astro` 4.16 → 5.15.8+ (or 6+)
+### M.16 ✅ Bump `astro` 4.16 → 5.x (closed 2026-05-13)
+
+Landed at `astro@5.18.1`. The marketing site (only Astro consumer) builds cleanly, dev server starts, sitemap output unchanged, landing page renders + live catalog from cloud-api still populates. `pnpm audit` no longer reports any Astro advisory. Tailwind plugin bumped to `@astrojs/tailwind@6.0.2` (peer-compatible with Astro 5); sitemap to `^3.7.2`. Kept on Astro 5 (not 6) because `@astrojs/tailwind@6` doesn't yet declare Astro-6 peer compatibility — revisit at M7 when Astro 6 ecosystem catches up.
+
+
 
 > Closes 1 high-severity advisory on `apps/marketing`:
 >   - `<=5.15.6` reflected XSS via server islands — `GHSA-wrwg-2hg8-v723`
