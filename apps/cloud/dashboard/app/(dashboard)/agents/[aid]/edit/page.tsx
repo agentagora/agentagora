@@ -29,7 +29,8 @@ interface Params {
   aid: string;
 }
 
-export default async function EditAgentPage({ params }: { params: Params }) {
+export default async function EditAgentPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   const session = await requireOwner();
   const aid = decodeURIComponent(params.aid);
   const detail = await getAgent(aid);

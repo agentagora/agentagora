@@ -18,7 +18,7 @@ import { redirect } from "next/navigation";
 import { COOKIE_NAME, type SessionPayload, decryptSession } from "./cookie";
 
 export async function getOwnerSession(): Promise<SessionPayload | null> {
-  const jar = cookies();
+  const jar = await cookies();
   const raw = jar.get(COOKIE_NAME)?.value;
   if (!raw) return null;
   return decryptSession(raw);

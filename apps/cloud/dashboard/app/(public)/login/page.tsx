@@ -28,7 +28,8 @@ interface SearchParams {
   error?: string;
 }
 
-export default function LoginPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function LoginPage(props: { searchParams?: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   async function loginWithBearer(formData: FormData) {
     "use server";
     const token = String(formData.get("token") ?? "").trim();
@@ -50,7 +51,7 @@ export default function LoginPage({ searchParams }: { searchParams?: SearchParam
       provider: "static",
     });
 
-    cookies().set(COOKIE_NAME, cookieValue, {
+    (await cookies()).set(COOKIE_NAME, cookieValue, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

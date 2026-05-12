@@ -27,7 +27,7 @@
  * or fall back to the bearer-paste collapsible.
  */
 
-import { cookies } from "next/headers";
+import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BASE_URL } from "../../../../lib/cloud-api";
 import { COOKIE_NAME, encryptSession } from "../../../../lib/cookie";
@@ -48,7 +48,7 @@ const OAUTH_NONCE_COOKIE =
     : "agentagora_oauth_nonce_dev";
 
 function clearNonceCookie(): void {
-  cookies().set(OAUTH_NONCE_COOKIE, "", {
+  (cookies() as unknown as UnsafeUnwrappedCookies).set(OAUTH_NONCE_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -57,11 +57,10 @@ function clearNonceCookie(): void {
   });
 }
 
-export default async function CallbackPage({
-  searchParams,
-}: {
-  searchParams?: CallbackParams;
+export default async function CallbackPage(props: {
+  searchParams?: Promise<CallbackParams>;
 }) {
+  const searchParams = await props.searchParams;
   // GitHub itself can also redirect back with `?error=…` (e.g. user
   // declined consent). Surface it as a generic callback failure.
   if (searchParams?.error) {
@@ -80,7 +79,7 @@ export default async function CallbackPage({
   // route minted. Missing → state-binding can't be checked, fail
   // closed. cloud-api would also reject (state_nonce_mismatch), but
   // catching it here yields a clearer error code in the dashboard UI.
-  const nonce = cookies().get(OAUTH_NONCE_COOKIE)?.value;
+  const nonce = (await cookies()).get(OAUTH_NONCE_COOKIE)?.value;
   if (!nonce) {
     clearNonceCookie();
     redirect("/login?error=github_state");
@@ -143,7 +142,7 @@ export default async function CallbackPage({
     ...(body.github_login ? { githubLogin: body.github_login } : {}),
   });
 
-  cookies().set(COOKIE_NAME, cookieValue, {
+  (await cookies()).set(COOKIE_NAME, cookieValue, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

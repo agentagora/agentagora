@@ -19,10 +19,11 @@ import {
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
-  searchParams: { id?: string };
+  searchParams: Promise<{ id?: string }>;
 }
 
-export default async function ConversationsPage({ searchParams }: PageProps) {
+export default async function ConversationsPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const session = await requireOwner();
   const id = typeof searchParams.id === "string" ? searchParams.id.trim() : "";
 

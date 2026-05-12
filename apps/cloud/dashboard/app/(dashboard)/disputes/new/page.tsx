@@ -19,10 +19,11 @@ import { BASE_URL, getOwnedAgents } from "../../../../lib/cloud-api";
 import { FileDisputeForm } from "./_file-dispute-form";
 
 interface PageProps {
-  searchParams: { conversation_id?: string; respondent_aid?: string };
+  searchParams: Promise<{ conversation_id?: string; respondent_aid?: string }>;
 }
 
-export default async function NewDisputePage({ searchParams }: PageProps) {
+export default async function NewDisputePage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const session = await requireOwner();
   const ownerId = session.githubLogin ? `gh:${session.githubLogin}` : null;
   const agents = await getOwnedAgents(session.bearer, ownerId, 50);

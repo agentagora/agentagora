@@ -9,14 +9,14 @@
  * action. The redirect keeps the no-JS path working.
  */
 
-import { cookies } from "next/headers";
+import { type UnsafeUnwrappedCookies, cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { COOKIE_NAME } from "../../../../lib/cookie";
 
 export const runtime = "nodejs";
 
 function clearAndRedirect(req: Request): Response {
-  cookies().set(COOKIE_NAME, "", {
+  (cookies() as unknown as UnsafeUnwrappedCookies).set(COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

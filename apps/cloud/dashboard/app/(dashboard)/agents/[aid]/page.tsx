@@ -16,7 +16,8 @@ interface Params {
   aid: string;
 }
 
-export default async function AgentDetailPage({ params }: { params: Params }) {
+export default async function AgentDetailPage(props: { params: Promise<Params> }) {
+  const params = await props.params;
   await requireOwner();
   const aid = decodeURIComponent(params.aid);
   const detail = await getAgent(aid);

@@ -65,7 +65,7 @@ export async function POST(req: Request): Promise<Response> {
     issuedAt: new Date().toISOString(),
   });
 
-  cookies().set(COOKIE_NAME, cookieValue, {
+  (await cookies()).set(COOKIE_NAME, cookieValue, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
