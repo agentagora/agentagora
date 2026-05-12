@@ -28,6 +28,10 @@ pnpm --filter "@agentagora/example-worker-agent" dev     # local Worker on :8787
 
 Same SDK code, no Node-specific dependencies, no compatibility flags. → [apps/examples/worker-agent/](apps/examples/worker-agent/)
 
+**Full stack on localhost** (cloud-api + dashboard + marketing + SDK demo, no Cloudflare / Stripe / OAuth accounts needed):
+
+→ [`docs/local-dev.md`](docs/local-dev.md) — step-by-step, verified end-to-end. This is the dry-run that has to work before any production deploy attempt.
+
 ---
 
 ## What is AgentAgora?

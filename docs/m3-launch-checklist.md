@@ -12,7 +12,7 @@
 
 ## Status as of 2026-05-04
 
-**Marker counts**: 15 ✅ · 1 🟡 · 5 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜ — every item was open when the checklist was first drafted.
+**Marker counts**: 16 ✅ · 1 🟡 · 4 ⬜ (21 line items across A–D). Pre-update baseline was 0 ✅ · 0 🟡 · 21 ⬜. B.5 was closed 2026-05-12 as "superseded by docs" (no GitHub Projects board — see entry below).
 
 **Top blockers for M3 launch (priority order)**:
 1. **C.1 lighthouse outreach list** — without 20 named candidates we have nothing to point at the launch blog post on day one.
@@ -96,7 +96,9 @@
 - **Acceptance**: a first external user has somewhere to land.
 - **Action item**: owner `weijt606` — manual repo-settings toggle; no code change required.
 
-### B.5 ⬜ Public roadmap board
+### B.5 ✅ Public roadmap board — superseded by docs (skipped 2026-05-12)
+
+Maintainer decision: not worth the maintenance overhead for a single-maintainer pre-public-beta project. The 12-month roadmap already lives in [`docs/PRD.md` §10](PRD.md); milestone-level status in [`docs/m3-launch-checklist.md`](m3-launch-checklist.md) (this file); M4 sub-phase detail in [`docs/m4-plan.md`](m4-plan.md). Maintaining a GitHub Projects board as a third source of truth would just create drift. Revisit at M7+ when contributor count justifies it.
 - GitHub Projects board mirroring the M3 → M9 row of PRD §10.
 - Each milestone gets ~3–6 visible tasks; the rest stays in private docs until ready.
 - **Acceptance**: any visitor can see what's shipping next without reading source.

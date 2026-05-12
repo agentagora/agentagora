@@ -64,6 +64,8 @@ The order below is the recommended order — earlier tasks unblock later ones (e
 
 These are the prerequisites the launch runbook §2 assumes are already done.
 
+> **Local dry-run first.** Before any of M.3–M.7, walk [`docs/local-dev.md`](local-dev.md). The full stack (cloud-api + dashboard + marketing + SDK demo) runs on your laptop with sandbox secrets and no external accounts — that proves the engine works before you spend time on real provisioning. The local dry-run was verified end-to-end on 2026-05-13.
+
 ### M.3  Cloudflare account + zone + Workers + D1 + KV provisioned
 
 > Launch runbook §2.1, §2.2
