@@ -419,20 +419,51 @@ export async function fileDispute(
 }
 
 /**
- * Validate a bearer token by hitting cloud-api's healthz with the
- * Authorization header and confirming the API is reachable. The
- * cloud-api doesn't expose a `/v1/whoami`, so we can't actually
- * verify the *token* against an owner mapping from here — but we
- * can confirm the cloud-api itself is up before storing a session.
- *
- * Returns:
- *   "ok"           cloud-api is reachable; bearer is stored as-is
- *   "unreachable"  network error / non-2xx from /healthz
+ * Liveness probe — does the cloud-api respond to `/healthz`? No auth
+ * involved; used as a fast pre-check before doing anything more
+ * expensive (e.g., validating a bearer).
  */
 export async function pingCloudApi(): Promise<"ok" | "unreachable"> {
   try {
     const res = await fetch(`${BASE_URL}/healthz`, { cache: "no-store" });
     return res.ok ? "ok" : "unreachable";
+  } catch {
+    return "unreachable";
+  }
+}
+
+/**
+ * Validate a bearer token against the cloud-api. We don't have a
+ * `/v1/whoami` endpoint, so we instead make an authenticated request
+ * to `GET /v1/agents?owner=<deliberately-improbable>`:
+ *
+ *   - 401 → bearer is missing or unknown to the candidate
+ *   - 403 → bearer is valid but the resolved owner doesn't match the
+ *           query, which is exactly what we expect for an improbable
+ *           owner-id (the §3 cross-owner rejection path in
+ *           apps/cloud/api/src/routes/agents.ts)
+ *   - 200 → bearer is valid AND its resolved owner happens to literally
+ *           equal the improbable string (vanishingly rare; still accept)
+ *   - other → cloud-api itself is misbehaving — treat as unreachable
+ *
+ * security-review-2026-05-07 §L3: this replaces the prior login-route
+ * behavior of accepting ANY non-empty string + a /healthz ping.
+ */
+export type BearerValidation = "ok" | "invalid" | "unreachable";
+
+export async function validateBearer(bearer: string): Promise<BearerValidation> {
+  // Use a string that is grammatically a valid owner-id but is overwhelmingly
+  // unlikely to be a real one (>64 chars + reserved-looking prefix).
+  const sentinel = "__compliance_validate_invalid_owner_id__sentinel";
+  try {
+    const res = await fetch(`${BASE_URL}/v1/agents?owner=${encodeURIComponent(sentinel)}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: { authorization: `Bearer ${bearer}` },
+    });
+    if (res.status === 401) return "invalid";
+    if (res.status === 200 || res.status === 403) return "ok";
+    return "unreachable";
   } catch {
     return "unreachable";
   }

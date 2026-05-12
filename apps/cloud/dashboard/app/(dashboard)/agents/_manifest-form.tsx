@@ -441,14 +441,26 @@ export function ManifestForm({
           bytes and then cleared from memory. The dashboard server never receives it.
         </p>
         <Field label="Ed25519 private key (base64url, 32-byte seed)">
-          <textarea
+          {/* security-review-2026-05-07 §L2: use type=password so the
+              value is masked on screen + signals "secret" to screen
+              readers; explicit opt-out attrs for 1Password / LastPass /
+              Bitwarden so they don't fingerprint the field by name and
+              prompt to save the value. spellCheck stays off; autoComplete
+              and autoCapitalize forced off (textarea defaulted them
+              "off" already but inputs need it explicit). */}
+          <input
+            type="password"
             value={privateKey}
             onChange={(e) => setPrivateKey(e.target.value)}
             required
-            rows={3}
             spellCheck={false}
             autoComplete="off"
-            style={{ ...inputStyle("mono"), resize: "vertical" }}
+            autoCapitalize="off"
+            autoCorrect="off"
+            data-1p-ignore="true"
+            data-lpignore="true"
+            data-form-type="other"
+            style={inputStyle("mono")}
           />
         </Field>
       </fieldset>

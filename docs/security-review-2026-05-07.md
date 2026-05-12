@@ -1,6 +1,6 @@
 # AgentAgora security review — 2026-05-07
 
-> **Triage status as of 2026-05-13: H4 + H5 + M5 closed in the commit that ships this doc; M7 + M8 (M.15/M.16) + M9 + M10 + M11 + L2 + L3 + L4 remain open and scheduled per the table at the bottom.**
+> **Triage status as of 2026-05-13: all 11 findings ✅ closed.** Last residual operator action: `rm "apps/cloud/api/wrangler "{2,3,4}*` to clear the 6 stray macOS-Finder duplicates on disk (gitignore prevents future re-introduction).
 >
 > Read-only audit performed at commit `15a1283` (post-M4-Phase-3). Companion to [`docs/security-review-2026-05.md`](security-review-2026-05.md) — that one closed in `556e766` with H1+H2+H3+M1+M2+M4+L1 fixed and M3 documented-but-unfixed. This pass looks at:
 >
@@ -303,15 +303,16 @@ Threat model is mostly self-inflicted (operator error), but the footgun is sharp
 | M8 | Next 15.5.16+ / Astro 5.15.8+ upgrades (M.15 / M.16) | Medium | M each | ✅ closed 2026-05-13 (Astro 5.18.1 + Next 15.5.18) | Done |
 | M10 | Bearer via env var instead of CLI flag | Medium | S | ✅ closed 2026-05-13 (AAP_TEST_BEARER + SMOKE_BEARER env, --bearer flag deprecated) | Done |
 | M11 | Request-body size limits | Medium | S | ✅ closed 2026-05-13 (per-route bodyLimit; 1 MB audit-ingest / 64 KB publish / 16 KB others) | Done |
-| L2 | manifest-form private-key DOM hygiene | Low | S | ⬜ open | Cosmetic |
-| L3 | Bearer-paste login validates token | Low | S | ⬜ open | UX |
+| L2 | manifest-form private-key DOM hygiene | Low | S | ✅ closed 2026-05-13 (`<input type="password">` + 1Password/LastPass/Bitwarden opt-out attrs) | Done |
+| L3 | Bearer-paste login validates token | Low | S | ✅ closed 2026-05-13 (validateBearer against /v1/agents?owner=<sentinel>; rejects 401, accepts 200/403) | Done |
 | L4 | /v1/connect auth order before 503 | Low | S | ✅ closed 2026-05-13 (auth check precedes 503 short-circuit) | Done |
 
 **Remaining public-flip blockers**: just **the maintainer's local `rm` of the 6 wrangler backup files** (gitignore closed M5 against future drift, but the files still exist locally). As of 2026-05-13:
 
-- **Closed**: H4 + H5 + M5 (gitignore) + M.15 + M.16 + M8 + M7 + M9 + M10 + M11 + L4. 9 of 11 findings shipped fixes.
-- **Open**: L2 (manifest-form DOM hygiene), L3 (bearer-paste validation) — both cosmetic / UX, not security ship-blockers.
+- **All 11 of 11 findings shipped fixes** (H4 + H5 + M5 gitignore + M.15 + M.16 + M8 + M7 + M9 + M10 + M11 + L2 + L3 + L4).
 - `pnpm audit --prod --audit-level=high` is **0 highs / 0 criticals**.
+
+The 2026-05-07 audit pass is closed. Next scheduled review: when the public flip + first soak week is over, or sooner if new attack surface lands.
 
 ---
 

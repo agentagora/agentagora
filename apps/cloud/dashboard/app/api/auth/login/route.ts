@@ -15,7 +15,7 @@
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { pingCloudApi } from "../../../../lib/cloud-api";
+import { pingCloudApi, validateBearer } from "../../../../lib/cloud-api";
 import { COOKIE_NAME, encryptSession } from "../../../../lib/cookie";
 
 export const runtime = "nodejs";
@@ -59,8 +59,31 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // security-review-2026-05-07 §L3: actually validate the bearer
+  // against cloud-api before minting a session — pre-fix the route
+  // accepted any non-empty string and the user got 401s on every
+  // dashboard page load with no obvious "your token is invalid"
+  // signal. validateBearer returns "invalid" / "ok" / "unreachable".
+  const trimmedToken = token.trim();
+  const verdict = await validateBearer(trimmedToken);
+  if (verdict === "invalid") {
+    return NextResponse.json(
+      { error: "invalid_token", message: "cloud-api rejected this bearer (401)" },
+      { status: 401 },
+    );
+  }
+  if (verdict === "unreachable") {
+    return NextResponse.json(
+      {
+        error: "cloud_unreachable",
+        message: "cloud-api could not validate the bearer (network or 5xx)",
+      },
+      { status: 502 },
+    );
+  }
+
   const cookieValue = await encryptSession({
-    bearer: token.trim(),
+    bearer: trimmedToken,
     ownerLabel: typeof label === "string" && label.trim() ? label.trim() : "owner",
     issuedAt: new Date().toISOString(),
   });

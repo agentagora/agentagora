@@ -31,6 +31,7 @@ import {
   listOwnedConversations,
   listOwnedDisputes,
   pingCloudApi,
+  validateBearer,
 } from "../lib/cloud-api.js";
 
 type FetchArgs = [input: RequestInfo | URL, init?: RequestInit];
@@ -519,5 +520,46 @@ describe("pingCloudApi", () => {
     });
     await pingCloudApi();
     expect(urlSeen).toMatch(/\/healthz$/);
+  });
+});
+
+describe("validateBearer (security-review-2026-05-07 §L3)", () => {
+  it("returns 'invalid' on 401", async () => {
+    stubFetch(() => jsonResponse({ error: "unauthorized" }, { status: 401 }));
+    expect(await validateBearer("bad")).toBe("invalid");
+  });
+
+  it("returns 'ok' on 403 (valid bearer, cross-owner — the probe's sentinel owner)", async () => {
+    stubFetch(() => jsonResponse({ error: "forbidden" }, { status: 403 }));
+    expect(await validateBearer("good")).toBe("ok");
+  });
+
+  it("returns 'ok' on 200 (sentinel happens to match owner — vanishingly rare)", async () => {
+    stubFetch(() => jsonResponse({ total: 0, agents: [] }));
+    expect(await validateBearer("good")).toBe("ok");
+  });
+
+  it("returns 'unreachable' on 5xx", async () => {
+    stubFetch(() => jsonResponse({}, { status: 503 }));
+    expect(await validateBearer("good")).toBe("unreachable");
+  });
+
+  it("returns 'unreachable' when fetch rejects", async () => {
+    stubFetch(() => Promise.reject(new TypeError("fetch failed")));
+    expect(await validateBearer("good")).toBe("unreachable");
+  });
+
+  it("sends the bearer in an Authorization header and probes /v1/agents?owner=<sentinel>", async () => {
+    let urlSeen: string | undefined;
+    let authSeen: string | null | undefined;
+    stubFetch((input, init) => {
+      urlSeen = typeof input === "string" ? input : input.toString();
+      const headers = new Headers(init?.headers);
+      authSeen = headers.get("authorization");
+      return jsonResponse({ error: "forbidden" }, { status: 403 });
+    });
+    await validateBearer("the-actual-bearer");
+    expect(authSeen).toBe("Bearer the-actual-bearer");
+    expect(urlSeen).toMatch(/\/v1\/agents\?owner=/);
   });
 });

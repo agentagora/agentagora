@@ -209,6 +209,28 @@ pnpm --filter @agentagora/status deploy
 
 You're acting as a fresh user. Do this in an incognito window so you're not authed against any of your other tabs.
 
+### 5.0 Pre-flight: production env vars are set
+
+Before the user-side walkthrough, confirm the security-critical env vars from the 2026-05-07 audit are wired:
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret list
+```
+
+Look for **all of**:
+
+- `OWNER_TOKENS` (closed-alpha bearer-paste, optional once OAuth works)
+- `OIDC_SIGNING_KEY` + `OIDC_ISSUER` (required — without these JWTs are mocked)
+- `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`
+- `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`
+- **`AAP_ENV` = "production"** ← M7 fail-closed; without this, missing KV bindings silently degrade replay protection
+- **`DASHBOARD_ORIGINS`** ← H5 CORS allow-list; format `https://dashboard.agentagora.dev,https://agentagora.dev`
+- `OAUTH_REQUIRE_NONCE` **MUST NOT** be set (default fail-closed) ← H4
+
+`AAP_ENV` and `DASHBOARD_ORIGINS` are new in the 2026-05-13 security batch. A deploy that's missing them either fails to start (`AAP_ENV` + unbound KV) or has its dashboard publish/dispute forms 404 on CORS preflight (`DASHBOARD_ORIGINS` empty in cross-origin production).
+
+### 5.1 User-side walkthrough
+
 1. Open the marketing site at its public URL. Confirm the catalog renders **with real agents** (not the empty / unreachable fallback).
 2. Click "Get started" → arrive at the dashboard.
 3. Sign in with GitHub. After the OAuth round-trip you should land on `/home`.

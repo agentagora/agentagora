@@ -172,6 +172,49 @@ In the Stripe dashboard, point the webhook endpoint at
 today; other events are ack'd as `200 ignored` so Stripe won't
 retry).
 
+### `AAP_ENV` (required for production fail-closed guards)
+
+> security-review-2026-05-07 §M7. **Set this to `"production"` on every prod deploy.**
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put AAP_ENV
+# Type: production
+```
+
+When `AAP_ENV === "production"` and the `NONCES` or `RATE_LIMITS` KV
+namespace is unbound, `buildApp()` throws at module load — the
+Worker fails to start instead of silently degrading replay
+protection / rate counters to per-isolate. Local `wrangler dev`
+intentionally leaves this unset so the in-memory fallbacks remain
+available.
+
+### `DASHBOARD_ORIGINS` (required if the dashboard runs on a different origin)
+
+> security-review-2026-05-07 §H5.
+
+```bash
+pnpm --filter @agentagora/cloud-api exec wrangler secret put DASHBOARD_ORIGINS
+# Type a comma-separated list of allowed origins, e.g.:
+#   https://dashboard.agentagora.dev,https://agentagora.dev
+```
+
+Cross-origin requests with `Authorization` headers (manifest publish,
+file dispute) need a CORS preflight allow. Localhost origins
+(`http://localhost:*`, `http://127.0.0.1:*`) are always trusted, so
+local dev works without this; production deploys with a separate
+dashboard origin MUST set it or the dashboard's publish/dispute
+forms 404 their preflight.
+
+### `OAUTH_REQUIRE_NONCE` (intentionally NOT set in production)
+
+> security-review-2026-05-07 §H4.
+
+Leave unset. The default is fail-closed: the OAuth `/callback` route
+rejects any state minted without a browser-bound nonce (i.e., from
+the legacy `GET /v1/auth/github/start` path). Only set to `"false"`
+in `.dev.vars` if you specifically need to test the legacy curl-based
+OAuth flow locally.
+
 ---
 
 ## 4. Deploy
