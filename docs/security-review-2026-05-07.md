@@ -298,16 +298,20 @@ Threat model is mostly self-inflicted (operator error), but the footgun is sharp
 | H4 | OAuth GET /start nonce backdoor | High | S | ✅ closed 2026-05-13 | Done |
 | H5 | Cloud-api CORS allow-list missing | High | S | ✅ closed 2026-05-13 | Done |
 | M5 | Stray `wrangler N.jsonc` backups + gitignore | Medium | S | ✅ gitignore closed; maintainer `rm` still required | Pending local cleanup |
-| M9 | Fixture file private-key perms + production guard | Medium | S | ⬜ open | Before any third-party reads README |
-| M7 | NONCES + RATE_LIMITS production fail-closed | Medium | S | ⬜ open | Same deploy as M.15/M.16 |
+| M9 | Fixture file private-key perms + production guard | Medium | S | ✅ closed 2026-05-13 (0o600 + --allow-production gate) | Done |
+| M7 | NONCES + RATE_LIMITS production fail-closed | Medium | S | ✅ closed 2026-05-13 (AAP_ENV=production throws at boot) | Done |
 | M8 | Next 15.5.16+ / Astro 5.15.8+ upgrades (M.15 / M.16) | Medium | M each | ✅ closed 2026-05-13 (Astro 5.18.1 + Next 15.5.18) | Done |
-| M10 | Bearer via env var instead of CLI flag | Medium | S | ⬜ open | Hygiene; not blocker |
-| M11 | Request-body size limits | Medium | S | ⬜ open | Before public traffic |
+| M10 | Bearer via env var instead of CLI flag | Medium | S | ✅ closed 2026-05-13 (AAP_TEST_BEARER + SMOKE_BEARER env, --bearer flag deprecated) | Done |
+| M11 | Request-body size limits | Medium | S | ✅ closed 2026-05-13 (per-route bodyLimit; 1 MB audit-ingest / 64 KB publish / 16 KB others) | Done |
 | L2 | manifest-form private-key DOM hygiene | Low | S | ⬜ open | Cosmetic |
 | L3 | Bearer-paste login validates token | Low | S | ⬜ open | UX |
-| L4 | /v1/connect auth order before 503 | Low | S | ⬜ open | Cosmetic |
+| L4 | /v1/connect auth order before 503 | Low | S | ✅ closed 2026-05-13 (auth check precedes 503 short-circuit) | Done |
 
-**Remaining public-flip blockers**: just **the maintainer's local `rm` of the 6 wrangler backup files** (gitignore closed M5 against future drift, but the files still exist locally). M7 + M9 + M11 should land in the first 2 weeks of M3 if launch traffic stays small. As of 2026-05-13: H4 + H5 + M5 (gitignore) + M.15 + M.16 + M8 all ✅. `pnpm audit --prod --audit-level=high` is **0 highs / 0 criticals**.
+**Remaining public-flip blockers**: just **the maintainer's local `rm` of the 6 wrangler backup files** (gitignore closed M5 against future drift, but the files still exist locally). As of 2026-05-13:
+
+- **Closed**: H4 + H5 + M5 (gitignore) + M.15 + M.16 + M8 + M7 + M9 + M10 + M11 + L4. 9 of 11 findings shipped fixes.
+- **Open**: L2 (manifest-form DOM hygiene), L3 (bearer-paste validation) — both cosmetic / UX, not security ship-blockers.
+- `pnpm audit --prod --audit-level=high` is **0 highs / 0 criticals**.
 
 ---
 

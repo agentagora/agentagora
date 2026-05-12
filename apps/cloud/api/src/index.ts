@@ -34,6 +34,7 @@
  */
 
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { getRequestId, requestIdMiddleware } from "./_request-id.js";
 import { type OwnerAuthenticator, StaticOwnerAuth, parseOwnerTokens } from "./auth.js";
@@ -134,6 +135,15 @@ export interface Env {
    */
   OAUTH_REQUIRE_NONCE?: string;
   /**
+   * Set to "production" on prod Worker deploys. When set, the cloud
+   * fails closed at boot if security-critical bindings are missing
+   * (NONCES KV → replay protection broken; RATE_LIMITS KV → rate
+   * counters per-isolate). Unset / any other value → dev mode,
+   * in-memory fallbacks accepted with a console.warn.
+   * security-review-2026-05-07 §M7.
+   */
+  AAP_ENV?: string;
+  /**
    * Comma-separated list of origins allowed to make cross-origin
    * requests with `Authorization` headers (i.e., the dashboard +
    * marketing site origins in production).
@@ -152,6 +162,17 @@ export interface Env {
    * preflight on any cross-origin production deploy.
    */
   DASHBOARD_ORIGINS?: string;
+}
+
+/**
+ * Pull the bearer token out of an Authorization header value. Used
+ * by the §L4 connect-503-after-auth pattern in this file; per-route
+ * handlers carry their own copies under `routes/*.ts`.
+ */
+function extractBearerHeader(header: string | undefined): string | undefined {
+  if (!header) return undefined;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match?.[1]?.trim();
 }
 
 /**
@@ -337,6 +358,39 @@ export function createApi(options: CreateApiOptions = {}): Hono {
     return c.json(oidc.jwks());
   });
 
+  // security-review-2026-05-07 §M11: cap request body sizes per
+  // route so a malformed / hostile client can't burn CPU + memory
+  // parsing 99 MB JSON. Caps are generous relative to typical
+  // payloads (manifest ~2-4 KB, dispute body ~1-2 KB, nonce key
+  // < 256 bytes) but small enough to be a real ceiling.
+  //
+  // 413 envelope mirrors the cloud-api convention `{ error, message }`.
+  const tooLarge = (limitKb: number) => ({
+    maxSize: limitKb * 1024,
+    onError: (c: { json: (b: unknown, s: number) => Response }) =>
+      c.json(
+        {
+          error: "payload_too_large",
+          message: `request body exceeds the ${limitKb} KB limit for this route`,
+        },
+        413,
+      ),
+  });
+  // audit-ingest takes batches of signed events; 1 MB is ~20 small
+  // events. If a real workload needs more, pagination is the right
+  // answer, not a bigger cap.
+  app.use("/v1/audit/ingest", bodyLimit(tooLarge(1024)));
+  // Manifest publish: 4 KB typical, 64 KB ceiling leaves headroom
+  // for fat capability schemas.
+  app.use("/v1/agents", bodyLimit(tooLarge(64)));
+  // Disputes, nonces, connect, stripe-webhook, oauth: all small
+  // structured bodies. 16 KB is generous.
+  app.use("/v1/disputes", bodyLimit(tooLarge(16)));
+  app.use("/v1/nonces/check", bodyLimit(tooLarge(16)));
+  app.use("/v1/connect/*", bodyLimit(tooLarge(16)));
+  app.use("/v1/stripe/webhook", bodyLimit(tooLarge(64)));
+  app.use("/v1/auth/github/*", bodyLimit(tooLarge(16)));
+
   app.route("/v1/agents", createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }));
   app.route("/v1/audit", createAuditRouter(storage));
   app.route("/v1/conversations", createConversationsRouter({ storage, ownerAuth }));
@@ -346,6 +400,34 @@ export function createApi(options: CreateApiOptions = {}): Hono {
   if (stripe) {
     app.route("/v1/connect", createConnectRouter({ storage, ownerAuth, stripe }));
   } else {
+    // security-review-2026-05-07 §L4: check auth FIRST, then signal
+    // service-unavailable. Stripe-unconfigured dev candidates would
+    // otherwise leak that the route exists to anonymous probes.
+    // GET /v1/connect/accounts/:aid is the only intentionally public
+    // route under /connect/* (resolver-style lookup); keep that on
+    // the 503 short-circuit path.
+    app.all("/v1/connect/onboarding", async (c) => {
+      const bearer = extractBearerHeader(c.req.header("authorization"));
+      if (!bearer) {
+        return c.json({ error: "unauthorized", message: "missing bearer token" }, 401);
+      }
+      const ownerId = await ownerAuth.resolve(bearer);
+      if (!ownerId) {
+        return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+      }
+      return c.json({ error: "not_configured", message: "STRIPE_SECRET_KEY is not set" }, 503);
+    });
+    app.all("/v1/connect/account", async (c) => {
+      const bearer = extractBearerHeader(c.req.header("authorization"));
+      if (!bearer) {
+        return c.json({ error: "unauthorized", message: "missing bearer token" }, 401);
+      }
+      const ownerId = await ownerAuth.resolve(bearer);
+      if (!ownerId) {
+        return c.json({ error: "unauthorized", message: "invalid bearer token" }, 401);
+      }
+      return c.json({ error: "not_configured", message: "STRIPE_SECRET_KEY is not set" }, 503);
+    });
     app.all("/v1/connect/*", (c) =>
       c.json({ error: "not_configured", message: "STRIPE_SECRET_KEY is not set" }, 503),
     );
@@ -425,12 +507,35 @@ async function buildApp(env: Env): Promise<Hono> {
   // Static lookup runs first (constant time, no DB round-trip); the
   // session table is consulted only when the static map misses.
   const ownerAuth = new ChainOwnerAuth(staticAuth, new OauthSessionAuth(storage));
+  // security-review-2026-05-07 §M7: prod deploys MUST have NONCES +
+  // RATE_LIMITS KV bindings. Without them, replay protection and
+  // rate limits silently degrade to per-isolate (broken across
+  // Workers' rolling-isolate model). Fail closed when AAP_ENV is
+  // "production"; allow in-memory fallback in dev / tests with the
+  // legacy console.warn.
+  const isProduction = env.AAP_ENV === "production";
+  if (isProduction) {
+    if (!env.NONCES) {
+      throw new Error(
+        "NONCES KV namespace not bound in production — per-isolate replay protection is " +
+          "broken at scale. Bind a KV namespace in wrangler.jsonc and redeploy " +
+          "(security-review-2026-05-07 §M7).",
+      );
+    }
+    if (!env.RATE_LIMITS) {
+      throw new Error(
+        "RATE_LIMITS KV namespace not bound in production — per-isolate rate counters do " +
+          "not survive isolate hops. Bind a KV namespace in wrangler.jsonc and redeploy " +
+          "(security-review-2026-05-07 §M7).",
+      );
+    }
+  }
   const nonceStore: NonceStore = env.NONCES
     ? new KvNonceStore(env.NONCES)
     : new InMemoryNonceStore();
   if (!env.NONCES) {
     console.warn(
-      "[cloud-api] NONCES KV namespace not bound — /v1/nonces/check is per-isolate only",
+      "[cloud-api] NONCES KV namespace not bound — /v1/nonces/check is per-isolate only (dev mode)",
     );
   }
   const rateLimiter: RateLimiter = env.RATE_LIMITS
@@ -438,7 +543,7 @@ async function buildApp(env: Env): Promise<Hono> {
     : new InMemoryRateLimiter();
   if (!env.RATE_LIMITS) {
     console.warn(
-      "[cloud-api] RATE_LIMITS KV namespace not bound — rate-limit counters are per-isolate only",
+      "[cloud-api] RATE_LIMITS KV namespace not bound — rate-limit counters are per-isolate only (dev mode)",
     );
   }
 

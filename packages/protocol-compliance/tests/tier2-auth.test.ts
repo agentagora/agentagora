@@ -156,25 +156,18 @@ describe.skipIf(!tier2Enabled)("Tier 2 · Authenticated read paths", () => {
 
   // ── /v1/connect/account ──────────────────────────────────────────
   //
-  // Note on 503 acceptance below: the reference cloud-api short-circuits
-  // with `503 not_configured` whenever `STRIPE_SECRET_KEY` is unset
-  // (dev / mock mode), BEFORE running the auth check. That's a
-  // documented graceful-degradation path, so a candidate that returns
-  // 503 here in lieu of 401 is still spec-conformant — it just means
-  // the test environment doesn't have Stripe wired. We accept both;
-  // a maintainer running this suite against a production candidate
-  // (where Stripe IS wired) will get the strict 401 path tested.
+  // security-review-2026-05-07 §L4: the cloud-api now runs the auth
+  // check BEFORE the Stripe-unconfigured 503 short-circuit, so a
+  // missing/invalid bearer MUST get 401 regardless of whether the
+  // candidate has Stripe wired. Valid-bearer Stripe-unconfigured
+  // dev candidates still surface 503 — that's the only signal of
+  // a dev-mode setup.
   describe("GET /v1/connect/account", () => {
-    it("MUST require auth (401) OR signal service-unavailable (503) when Stripe is unconfigured", async () => {
+    it("MUST 401 on missing bearer (auth check precedes service-availability)", async () => {
       const res = await probe(`${cfg.baseUrl}/v1/connect/account`);
-      expect(
-        [401, 503].includes(res.status),
-        `expected 401 (auth required) or 503 (Stripe unconfigured); got ${res.status}`,
-      ).toBe(true);
-      if (res.status === 401) {
-        const body = res.body as ErrorEnvelope;
-        expect(body.error, "401 envelope MUST be `unauthorized`").toBe("unauthorized");
-      }
+      expect(res.status, "missing bearer MUST 401 (not 503)").toBe(401);
+      const body = res.body as ErrorEnvelope;
+      expect(body.error).toBe("unauthorized");
     });
 
     it("on valid bearer MAY return 200 (account exists) / 404 (no account yet) / 503 (unconfigured)", async () => {

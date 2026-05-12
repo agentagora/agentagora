@@ -202,8 +202,39 @@ const FIXTURE_PATH = "node_modules/.cache/protocol-compliance/fixtures.json";
 
 export async function saveFixtures(fixtures: Fixtures): Promise<string> {
   await mkdir(dirname(FIXTURE_PATH), { recursive: true });
-  await writeFile(FIXTURE_PATH, JSON.stringify(fixtures, null, 2), "utf-8");
+  // security-review-2026-05-07 §M9: file contains an Ed25519 private
+  // key. Force mode 0600 so other users on the machine can't read it
+  // (default umask is typically 0644 on macOS).
+  await writeFile(FIXTURE_PATH, JSON.stringify(fixtures, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
   return FIXTURE_PATH;
+}
+
+/**
+ * Returns true if `baseUrl` looks like a production cloud-api host,
+ * i.e., anything that isn't localhost / 127.0.0.1 / a Cloudflare
+ * `*.workers.dev` preview / an explicit test host. Used by the CLI
+ * to refuse `--setup` without an `--allow-production` opt-in.
+ *
+ * security-review-2026-05-07 §M9: a naive `--setup --base-url=
+ * https://api.agentagora.dev` publishes a real production agent
+ * whose signing key is then persisted on the operator's laptop.
+ */
+export function looksLikeProductionUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    // Cloudflare Workers preview / staging hosts.
+    if (host.endsWith(".workers.dev")) return false;
+    // Common test / loopback aliases.
+    if (host.endsWith(".local") || host.endsWith(".test")) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function loadFixtures(): Promise<Fixtures | null> {

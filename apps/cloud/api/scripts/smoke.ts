@@ -77,6 +77,20 @@ function parseArgs(argv: string[]): Args {
   if (!args.url) {
     fail("missing --url=https://<your-cloud-url>");
   }
+  // security-review-2026-05-07 §M10: bearer-in-argv leaks via shell
+  // history + `ps`. Prefer SMOKE_BEARER env; --bearer= still works
+  // but emits a deprecation warning.
+  const bearerFromEnv = process.env.SMOKE_BEARER ?? "";
+  if (args.bearer && bearerFromEnv && args.bearer !== bearerFromEnv) {
+    fail("conflicting bearer: --bearer flag does not match SMOKE_BEARER env");
+  }
+  if (args.bearer && !bearerFromEnv) {
+    process.stderr.write(
+      "⚠ smoke: --bearer flag is visible in shell history + `ps` output. " +
+        "Prefer SMOKE_BEARER env (security-review-2026-05-07 §M10).\n",
+    );
+  }
+  args.bearer = args.bearer || bearerFromEnv || undefined;
   return args as Args;
 }
 

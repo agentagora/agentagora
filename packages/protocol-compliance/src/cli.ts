@@ -26,7 +26,7 @@
  */
 
 import { copyFile } from "node:fs/promises";
-import { provisionFixtures, saveFixtures } from "./setup.js";
+import { looksLikeProductionUrl, provisionFixtures, saveFixtures } from "./setup.js";
 
 interface ParsedArgs {
   setup: boolean;
@@ -35,14 +35,16 @@ interface ParsedArgs {
   ownerNamespace?: string;
   agentName?: string;
   seedFile?: string;
+  allowProduction: boolean;
   help: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
-  const out: ParsedArgs = { setup: false, help: false };
+  const out: ParsedArgs = { setup: false, help: false, allowProduction: false };
   for (const arg of argv) {
     if (arg === "--setup") out.setup = true;
     else if (arg === "--help" || arg === "-h") out.help = true;
+    else if (arg === "--allow-production") out.allowProduction = true;
     else if (arg.startsWith("--base-url=")) out.baseUrl = arg.slice("--base-url=".length);
     else if (arg.startsWith("--bearer=")) out.bearer = arg.slice("--bearer=".length);
     else if (arg.startsWith("--owner-namespace=")) {
@@ -91,9 +93,52 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  if (!args.baseUrl || !args.bearer) {
-    process.stderr.write("--base-url and --bearer are required for --setup\n\n");
+  // security-review-2026-05-07 §M10: prefer bearer via env var so it
+  // doesn't appear in shell history / ps. `--bearer=` flag still
+  // works but emits a deprecation warning.
+  const bearerFromEnv = process.env.AAP_TEST_BEARER ?? "";
+  if (args.bearer && bearerFromEnv && args.bearer !== bearerFromEnv) {
+    process.stderr.write(
+      "✗ Conflicting bearer: --bearer flag does not match AAP_TEST_BEARER env\n",
+    );
+    return 1;
+  }
+  const effectiveBearer = args.bearer || bearerFromEnv;
+  if (args.bearer && !bearerFromEnv) {
+    process.stderr.write(
+      "⚠ --bearer flag is visible in shell history + `ps` output. " +
+        "Prefer AAP_TEST_BEARER env (security-review-2026-05-07 §M10).\n",
+    );
+  }
+
+  if (!args.baseUrl || !effectiveBearer) {
+    process.stderr.write(
+      "--base-url and a bearer (via --bearer= or AAP_TEST_BEARER env) are required for --setup\n\n",
+    );
     printUsage();
+    return 1;
+  }
+
+  // security-review-2026-05-07 §M9: refuse production-shaped URLs
+  // without --allow-production. `--setup` publishes a real manifest
+  // and persists a private key locally; the safest default is to
+  // assume the operator pointed at production by accident.
+  if (!args.allowProduction && looksLikeProductionUrl(args.baseUrl)) {
+    process.stderr.write(
+      [
+        `✗ --base-url ${args.baseUrl} looks like a production cloud-api host.`,
+        "",
+        "  This will publish a real manifest and persist its Ed25519 private",
+        "  key to node_modules/.cache/protocol-compliance/fixtures.json on this",
+        "  machine. If that's actually what you want, re-run with",
+        "  --allow-production. Otherwise point at a sandbox / staging host",
+        "  (localhost / 127.0.0.1 / *.workers.dev / *.local / *.test all",
+        "  bypass this guard without the flag).",
+        "",
+        "  security-review-2026-05-07 §M9.",
+        "",
+      ].join("\n"),
+    );
     return 1;
   }
 
@@ -101,7 +146,7 @@ async function main(): Promise<number> {
   try {
     const fixtures = await provisionFixtures({
       baseUrl: args.baseUrl,
-      bearer: args.bearer,
+      bearer: effectiveBearer,
       ownerNamespace: args.ownerNamespace,
       agentName: args.agentName,
     });
