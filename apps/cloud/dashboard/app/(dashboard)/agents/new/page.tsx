@@ -16,13 +16,18 @@ export default async function NewAgentPage() {
   const session = await requireOwner();
 
   return (
-    <div>
-      <h1 style={{ marginBottom: 4 }}>Publish agent</h1>
-      <p style={{ color: "#555", marginTop: 0 }}>
-        Build a manifest, sign it with your Ed25519 private key, and POST to{" "}
-        <code>{BASE_URL}/v1/agents</code>. The signing happens in this browser tab — your private
-        key is not sent to the dashboard server.
-      </p>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Publish agent</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
+          Build a manifest, sign it with your Ed25519 private key, and POST to{" "}
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            {BASE_URL}/v1/agents
+          </code>
+          . The signing happens in this browser tab — your private key is not sent to the dashboard
+          server.
+        </p>
+      </header>
 
       <PublishForm cloudApiBaseUrl={BASE_URL} bearer={session.bearer} />
     </div>

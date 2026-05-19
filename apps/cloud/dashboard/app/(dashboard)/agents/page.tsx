@@ -14,48 +14,37 @@
 import Link from "next/link";
 import { requireOwner } from "../../../lib/auth";
 import { type AgentListEntry, getOwnedAgents } from "../../../lib/cloud-api";
+import { Badge } from "../../_components/badge";
+import { Button } from "../../_components/button";
+import { Card, CardBody } from "../../_components/card";
 
 export default async function AgentsPage() {
   const session = await requireOwner();
   const agents = await getOwnedAgents(session.bearer, null, 50);
 
   return (
-    <div>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 24,
-        }}
-      >
-        <h1 style={{ margin: 0 }}>Agents</h1>
-        <Link
-          href="/agents/new"
-          style={{
-            padding: "8px 14px",
-            background: "#0366d6",
-            color: "#fff",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Publish agent
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Agents</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
+            Showing the public catalog ({agents.length} entr{agents.length === 1 ? "y" : "ies"}). An
+            owner-scoped filter lands when the cloud-api exposes a{" "}
+            <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+              published_by
+            </code>{" "}
+            query — for now every entry is visible.
+          </p>
+        </div>
+        <Link href="/agents/new">
+          <Button>+ Publish agent</Button>
         </Link>
       </header>
-
-      <p style={{ color: "#555", marginTop: 0 }}>
-        Showing the public catalog ({agents.length} entr{agents.length === 1 ? "y" : "ies"}). An
-        owner-scoped filter lands when the cloud-api exposes a <code>published_by</code> query — for
-        now every entry is visible.
-      </p>
 
       {agents.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="flex flex-col gap-3">
           {agents.map((agent) => (
             <AgentRow key={agent.aid} agent={agent} />
           ))}
@@ -67,61 +56,53 @@ export default async function AgentsPage() {
 
 function AgentRow({ agent }: { agent: AgentListEntry }) {
   return (
-    <li
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
-        background: "#fff",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
-        <Link
-          href={`/agents/${encodeURIComponent(agent.aid)}`}
-          style={{ fontWeight: 600, color: "#0366d6", textDecoration: "none" }}
-        >
-          {agent.aid}
-        </Link>
-        <span style={{ fontSize: 12, color: "#888" }}>{agent.published_at}</span>
-      </div>
-      {agent.description ? (
-        <div style={{ color: "#444", marginTop: 4 }}>{agent.description}</div>
-      ) : null}
-      <ul
-        style={{
-          fontSize: 13,
-          color: "#444",
-          paddingLeft: 16,
-          marginTop: 8,
-          marginBottom: 0,
-        }}
+    <li>
+      <Link
+        href={`/agents/${encodeURIComponent(agent.aid)}`}
+        className="group block rounded-lg border border-accent-100 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
       >
-        {agent.capabilities.map((cap) => (
-          <li key={cap.name}>
-            <code>{cap.name}</code> · {pricingLabel(cap.pricing)}
-          </li>
-        ))}
-      </ul>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+            {agent.aid}
+          </code>
+          <time className="font-mono text-xs text-accent-500">{agent.published_at}</time>
+        </div>
+        {agent.description && (
+          <p className="mt-2 text-sm leading-relaxed text-accent-700">{agent.description}</p>
+        )}
+        {agent.capabilities.length > 0 && (
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {agent.capabilities.map((cap) => (
+              <li key={cap.name}>
+                <Badge tone={cap.pricing.model === "free" ? "neutral" : "info"}>
+                  <code className="font-mono">{cap.name}</code>
+                  <span className="ml-1.5 text-[10px] opacity-75">·</span>
+                  <span className="ml-1.5">{pricingLabel(cap.pricing)}</span>
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Link>
     </li>
   );
 }
 
 function EmptyState() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#666",
-      }}
-    >
-      <p style={{ margin: 0 }}>
-        No agents in the catalog yet. <Link href="/agents/new">Publish your first one →</Link>
-      </p>
-    </div>
+    <Card>
+      <CardBody className="border border-dashed border-accent-200 text-center">
+        <p className="text-sm text-accent-600">
+          No agents in the catalog yet.{" "}
+          <Link
+            href="/agents/new"
+            className="font-medium text-accent-900 underline underline-offset-2 hover:text-accent-700"
+          >
+            Publish your first one →
+          </Link>
+        </p>
+      </CardBody>
+    </Card>
   );
 }
 
