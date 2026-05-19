@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Wire types and Zod schemas for the AgentAgora Protocol (AAP). Single source of truth for protocol-level definitions.",
   "license": "Apache-2.0",
+  "author": "AgentAgora maintainers",
+  "homepage": "https://github.com/agentagora/agentagora/tree/main/packages/protocol#readme",
+  "bugs": "https://github.com/agentagora/agentagora/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/agentagora/agentagora.git",

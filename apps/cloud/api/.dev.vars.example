@@ -1,0 +1,52 @@
+# Example local-dev secrets for @agentagora/cloud-api.
+#
+# Wrangler reads this file (when present at apps/cloud/api/.dev.vars)
+# during `wrangler dev`. The real file is gitignored; copy this
+# example as the starting point:
+#
+#   cp apps/cloud/api/.dev.vars.example apps/cloud/api/.dev.vars
+#
+# Then fill in the values below. For end-to-end localhost runbook see
+# docs/local-dev.md.
+
+# ----- Required for any owner-authenticated request -----
+# Pipe-separated owner-id:bearer pairs. Multiple owners are allowed.
+# The bearer is what dashboards / scripts paste; the owner-id is the
+# identity it resolves to.
+OWNER_TOKENS="local-dev:local-dev-bearer"
+
+# ----- Required for OAuth + JWKS issuance -----
+# 32-byte Ed25519 private key, base64url-encoded.
+# Generate one:
+#   node -e 'import("@noble/ed25519").then(ed => process.stdout.write(Buffer.from(ed.utils.randomPrivateKey()).toString("base64url") + "\n"))'
+OIDC_SIGNING_KEY=""
+OIDC_ISSUER="http://localhost:8787"
+# Optional. If unset, the kid is derived from sha256(pubkey).
+# OIDC_KID="local-dev-key-1"
+
+# ----- Optional: Stripe Connect (skip if you're not testing payouts) -----
+# Test-mode secret key (starts with sk_test_). NEVER paste sk_live_ here.
+# STRIPE_SECRET_KEY="sk_test_..."
+# Webhook signing secret printed by `stripe listen --forward-to localhost:8787/v1/stripe/webhook`.
+# STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# ----- Optional: GitHub OAuth sign-in -----
+# Create a GitHub OAuth app at https://github.com/settings/developers
+# with callback URL http://localhost:3000/login/callback.
+# GITHUB_CLIENT_ID=""
+# GITHUB_CLIENT_SECRET=""
+# GITHUB_REDIRECT_URI="http://localhost:3000/login/callback"
+
+# ----- Production-only safety toggles (leave commented for local dev) -----
+# Comma-separated allow-list for browser-origin CORS. Only set in production
+# where DASHBOARD_ORIGINS gates which dashboards may call the API.
+# DASHBOARD_ORIGINS="https://dashboard.agentagora.dev"
+
+# When "true" (the default in production), the OAuth callback refuses
+# tokens minted via the legacy GET /start path (no browser-bound nonce).
+# Leave unset locally so the dashboard can use either flow.
+# OAUTH_REQUIRE_NONCE="true"
+
+# When "production", required bindings (NONCES + RATE_LIMITS KV) become
+# fail-closed: the Worker refuses to start if either is missing.
+# AAP_ENV="production"

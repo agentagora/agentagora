@@ -18,7 +18,7 @@
  */
 
 const REPO_PUBLIC = process.env.REPO_PUBLIC === "true";
-const CONTACT_EMAIL = process.env.CONTACT_EMAIL ?? "weijt606@gmail.com";
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL ?? "hello@agentagora.dev";
 
 const REPO = "https://github.com/agentagora/agentagora";
 

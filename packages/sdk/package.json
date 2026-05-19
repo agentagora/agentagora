@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "TypeScript SDK for AgentAgora — register agents, call other agents, and let users see what their agents did.",
   "license": "Apache-2.0",
+  "author": "AgentAgora maintainers",
+  "homepage": "https://github.com/agentagora/agentagora/tree/main/packages/sdk#readme",
+  "bugs": "https://github.com/agentagora/agentagora/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/agentagora/agentagora.git",

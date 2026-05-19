@@ -44,7 +44,7 @@ class MockGithubClient implements GithubLike {
   /** When non-null, exchange returns this token. */
   exchangeToken: string | null = "ghs_test_access_token";
   exchangeError: Error | null = null;
-  user: GithubUser = { id: 4242, login: "weijt606", email: "weijt606@gmail.com" };
+  user: GithubUser = { id: 4242, login: "oss-test", email: "oss-test@agentagora.dev" };
   fetchError: Error | null = null;
 
   async exchangeCode(input: { code: string }): Promise<string> {
@@ -229,8 +229,8 @@ describe("POST /v1/auth/github/callback", () => {
     };
 
     // Owner ID and login come from the GitHub profile.
-    expect(body.github_login).toBe("weijt606");
-    expect(body.owner_id).toBe("gh:weijt606");
+    expect(body.github_login).toBe("oss-test");
+    expect(body.owner_id).toBe("gh:oss-test");
     expect(body.provider).toBe("github");
 
     // Bearer is a base64url string ≥ 32 bytes of randomness, NOT
@@ -245,9 +245,9 @@ describe("POST /v1/auth/github/callback", () => {
 
     // Persisted to storage.
     const session = await storage.getOauthSession(body.bearer);
-    expect(session?.ownerId).toBe("gh:weijt606");
+    expect(session?.ownerId).toBe("gh:oss-test");
     expect(session?.providerUid).toBe("4242");
-    expect(session?.email).toBe("weijt606@gmail.com");
+    expect(session?.email).toBe("oss-test@agentagora.dev");
 
     // Code was forwarded once.
     expect(github.exchangeCalls).toHaveLength(1);
@@ -263,7 +263,7 @@ describe("OauthSessionAuth resolves OAuth-issued bearers like OWNER_TOKENS beare
 
   const validManifest = {
     manifest_version: 1 as const,
-    aid: "aid:agentagora:weijt606/code-review",
+    aid: "aid:agentagora:oss-test/code-review",
     description: "Reviews PRs",
     endpoints: { rpc: "https://example.com/aap/v1/rpc" },
     capabilities: [
@@ -277,11 +277,11 @@ describe("OauthSessionAuth resolves OAuth-issued bearers like OWNER_TOKENS beare
     ],
   };
 
-  // Note: this AID needs to be owned by `gh:weijt606` for the publish
+  // Note: this AID needs to be owned by `gh:oss-test` for the publish
   // to succeed — manifest AIDs aren't constrained to the owner ID
   // server-side (the registry stamps published_by from the bearer),
   // so this is just a "what shape does the cloud accept?" test.
-  const ghAid = "aid:agentagora:gh-weijt606/code-review";
+  const ghAid = "aid:agentagora:gh-oss-test/code-review";
   const ghManifest = { ...validManifest, aid: ghAid };
 
   async function publish(
@@ -319,7 +319,7 @@ describe("OauthSessionAuth resolves OAuth-issued bearers like OWNER_TOKENS beare
     const res = await publish(app, ghManifest, bearer);
     expect(res.status).toBe(201);
     const stored = await storage.getAgent(ghAid);
-    expect(stored?.publishedBy).toBe("gh:weijt606");
+    expect(stored?.publishedBy).toBe("gh:oss-test");
   });
 
   it("still accepts the static OWNER_TOKENS bearer alongside OAuth bearers", async () => {

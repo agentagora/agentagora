@@ -137,9 +137,15 @@ jobs:
 
       # Bundle-size budget — cloud-api Worker. Same Workers-only constraint
       # as worker-agent, but cloud-api carries D1, KV, Stripe, OIDC, audit,
-      # and disputes wiring. Budget is set above the M2-closed-alpha steady
-      # state (281 KiB raw / 61 KiB gzip) with headroom for M3 dashboard
-      # server actions and Stripe charge handling.
+      # disputes wiring, plus the security-review-2026-05-07 hardening
+      # pack (Hono cors + bodyLimit middleware, KV fail-closed checks,
+      # auth-before-503 fallback). The budget was originally set at
+      # 320 KiB raw / 75 KiB gzip above the M2 steady state of 281/61.
+      # Sustained security additions through M7+M9+M10+M11+L4 pushed
+      # the bundle to ~322 KiB raw, so the budget moves to 340/75 —
+      # still 5.5% headroom over current measured size, still tight
+      # enough to catch an accidental Node-only mega-dep (`crypto`,
+      # `stream`, `fs`) sneaking into the SDK.
       #
       # security-review-2026-05 §M1: the real wrangler.jsonc carries
       # production D1 / KV resource IDs and is gitignored. CI stages
@@ -152,9 +158,9 @@ jobs:
       - name: Bundle-size guard (cloud-api)
         run: pnpm --filter "@agentagora/cloud-api" check
 
-      - name: Enforce bundle-size budget (≤ 320 KiB raw, ≤ 75 KiB gzip)
+      - name: Enforce bundle-size budget (≤ 340 KiB raw, ≤ 75 KiB gzip)
         env:
-          CLOUD_API_RAW_LIMIT_KIB: 320
+          CLOUD_API_RAW_LIMIT_KIB: 340
           CLOUD_API_GZIP_LIMIT_KIB: 75
         run: |
           set -euo pipefail

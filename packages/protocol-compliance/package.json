@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Conformance test suite for AgentAgora Protocol (AAP) — runnable against any cloud-api candidate URL via AAP_BASE_URL env var.",
   "license": "Apache-2.0",
+  "author": "AgentAgora maintainers",
+  "homepage": "https://github.com/agentagora/agentagora/tree/main/packages/protocol-compliance#readme",
+  "bugs": "https://github.com/agentagora/agentagora/issues",
   "private": true,
   "repository": {
     "type": "git",

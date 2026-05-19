@@ -102,8 +102,8 @@ Full rationale:
 - 📄 [Product Requirements Document (PRD)](docs/PRD.md) — vision, scope, 12-month roadmap
 - 🏗 [Tech Stack & Architecture](docs/tech-stack.md) — language, runtime, framework choices
 - 📋 [AAP Protocol Spec v0.1](docs/AAP-spec.md) — internal draft; public release at M6
-- 🛠 [SDK API Design (Python — secondary)](docs/sdk-api-python.md) — original Python-first design, kept as reference
-- 🛠 TypeScript SDK API Design — *coming in M1, will become canonical*
+- 🛠 [TypeScript SDK reference](apps/docs/sdk-reference/) — TypeDoc-generated API docs for `@agentagora/sdk` (canonical); narrative intro in [`apps/docs/sdk.md`](apps/docs/sdk.md)
+- 🛠 [Python SDK design (frozen)](docs/sdk-api-python.md) — original Python-first design, kept as reference; the package itself revives at M5
 - 🏛 [Protocol stewardship](docs/protocol-stewardship.md) — why the open protocol and the hosted Cloud share this repo today, and the triggers that flip them into separate repos
 
 ---
