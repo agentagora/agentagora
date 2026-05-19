@@ -2,7 +2,7 @@
 
 > The first 24 hours after Trigger 2 (quiet launch) or Trigger 3 (public launch). Designed for "page rang at 3am, half-awake, can I diagnose this in 60 seconds?" — not for monthly maintenance. For steady-state ops, see [`apps/cloud/api/RUNBOOK.md`](../apps/cloud/api/RUNBOOK.md).
 >
-> **Owner: weijt606.** Single-maintainer project — the on-call rotation is "you, always."
+> **Owner: maintainer.** Single-maintainer project — the on-call rotation is "you, always."
 
 If this is M3 launch day, **read this once before launching** so the keys-on-keyboard pattern is fresh. Don't read it for the first time at 3am.
 

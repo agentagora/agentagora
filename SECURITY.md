@@ -9,7 +9,7 @@ Two private channels:
 1. **GitHub Security Advisories** (preferred): https://github.com/agentagora/agentagora/security/advisories/new
    — Submits a private report visible only to maintainers.
 
-2. **Email**: `weijt606@gmail.com` with subject prefix `[security] AgentAgora:`
+2. **Email**: `security@agentagora.dev` with subject prefix `[security] AgentAgora:`
    — Use this if you cannot access GitHub Security Advisories.
 
 Please include:

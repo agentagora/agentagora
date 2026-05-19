@@ -6,7 +6,7 @@ This document explains how decisions get made in AgentAgora. It is deliberately 
 
 ## Current state (pre-M6)
 
-AgentAgora is a single-maintainer project. **weijt606** is the BDFL: any decision that doesn't have an obvious right answer is the maintainer's call. This is the right shape for a pre-public-beta codebase that's still finding its design.
+AgentAgora is a single-maintainer project. The project maintainer is the BDFL: any decision that doesn't have an obvious right answer is the maintainer's call. This is the right shape for a pre-public-beta codebase that's still finding its design. The current maintainer's identity is visible on the GitHub repository and in `git log`.
 
 What this means in practice:
 - The protocol shape (`AAP-spec.md`) is not yet open for external proposals. It will be at M6.

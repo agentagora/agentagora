@@ -7,7 +7,7 @@
  *
  * const codeReview = createAgent({
  *   name: "code-review",
- *   namespace: "weijt606",
+ *   namespace: "acme",
  *   accepts: ["stripe-fiat"],
  *   capabilities: {
  *     review_pull_request: capability({
@@ -77,7 +77,7 @@ export function capability<I extends z.ZodTypeAny, O extends z.ZodTypeAny>(
 export interface AgentOptions {
   /** Local name segment of the AID (e.g. "code-review"). */
   name: string;
-  /** Owner namespace segment of the AID (e.g. "weijt606"). */
+  /** Owner namespace segment of the AID (e.g. "acme"). */
   namespace: string;
   /** Registry segment of the AID. Defaults to "agentagora". */
   registry?: string;

@@ -5,7 +5,7 @@
 | **Version** | Draft v0.1 (RFC-style hardening, M4 Phase 3) |
 | **Status** | Internal draft (not yet public) — public release at M6 per [PRD §10](PRD.md) |
 | **Updated** | 2026-05-07 |
-| **Editor** | weijt606 |
+| **Editor** | AgentAgora maintainers |
 | **Style** | IETF RFC 2119 normative language. See [`docs/aap-traceability.md`](aap-traceability.md) for the requirement → test mapping. |
 | **Conformance** | Verified by [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) (Tier 1 / 2 / 3) |
 
@@ -76,10 +76,10 @@ aid:<registry>:<namespace>/<name>[#<fragment>]
 Examples:
 
 ```
-aid:agentagora:weijt606/code-review
+aid:agentagora:acme/code-review
 aid:agentagora:acme-corp/procurement
 aid:self-hosted.example.com:ops/incident-bot
-aid:agentagora:weijt606/code-review#v2
+aid:agentagora:acme/code-review#v2
 ```
 
 - `<registry>` — the authority that issued and resolves this AID. `agentagora` is the canonical public registry; any DNS-resolvable hostname denotes a self-hosted registry.
@@ -110,7 +110,7 @@ Verification: a recipient MUST verify the JWT signature against the issuer's pub
 
 ### 3.3 Identity binding (v1+: DID)
 
-In v1, AIDs MAY also be expressed as W3C DIDs (`did:agentagora:weijt606/code-review`) and resolved to DID Documents. The OIDC-form AID issued in v0 will include a `aap.did_placeholder` claim that the owner MAY later activate to control the DID-form AID with the same keys, providing a non-breaking migration path.
+In v1, AIDs MAY also be expressed as W3C DIDs (`did:agentagora:acme/code-review`) and resolved to DID Documents. The OIDC-form AID issued in v0 will include a `aap.did_placeholder` claim that the owner MAY later activate to control the DID-form AID with the same keys, providing a non-breaking migration path.
 
 ### 3.4 Scopes
 
@@ -136,10 +136,10 @@ A manifest is a YAML or JSON document. The canonical hash for signing is compute
 
 ```yaml
 manifest_version: 1
-aid: aid:agentagora:weijt606/code-review
+aid: aid:agentagora:acme/code-review
 description: Reviews pull requests and produces structured comments.
-homepage: https://github.com/weijt606/code-review-bot
-contact: weijt606@example.com
+homepage: https://github.com/acme/code-review-bot
+contact: acme@example.com
 endpoints:
   rpc: https://review.example.com/aap/v1/rpc
   events: https://review.example.com/aap/v1/events       # optional SSE/WebSocket
@@ -273,11 +273,11 @@ All AAP messages are JSON-RPC 2.0 with the following extensions:
     "conversation_id": "conv_01HX...",
     "timestamp": "2026-04-30T12:34:56.789Z",
     "nonce": "8f3c...",
-    "from": "aid:agentagora:weijt606/orchestrator",
+    "from": "aid:agentagora:acme/orchestrator",
     "to":   "aid:agentagora:alice/code-review",
     "signature": {
       "alg": "EdDSA",
-      "key_id": "weijt606/orchestrator#k1",
+      "key_id": "acme/orchestrator#k1",
       "value": "base64url-signature"
     }
   }
@@ -709,8 +709,8 @@ These are tracked in PRD §15. Highlights affecting the protocol surface:
 
 | Version | Date | Editor | Notes |
 |---|---|---|---|
-| v0.1 | 2026-04-30 | weijt606 | Initial draft. Internal only. |
-| v0.1-rfc-draft | 2026-05-07 | weijt606 | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
+| v0.1 | 2026-04-30 | acme | Initial draft. Internal only. |
+| v0.1-rfc-draft | 2026-05-07 | acme | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
 
 ---
 

@@ -177,7 +177,7 @@ describe("getOwnedAgents", () => {
       authSeen = headers.get("authorization");
       return jsonResponse({ total: 0, agents: [] });
     });
-    await getOwnedAgents("bearer-Y", "weijt606");
+    await getOwnedAgents("bearer-Y", "acme");
     expect(authSeen).toBe("Bearer bearer-Y");
   });
 
@@ -187,26 +187,26 @@ describe("getOwnedAgents", () => {
         total: 1,
         agents: [
           {
-            aid: "aid:agentagora:weijt606/x",
+            aid: "aid:agentagora:acme/x",
             capabilities: [],
             published_at: "2026-05-01T00:00:00Z",
           },
         ],
       }),
     );
-    const out = await getOwnedAgents("bearer-Y", "weijt606");
+    const out = await getOwnedAgents("bearer-Y", "acme");
     expect(out).toHaveLength(1);
-    expect(out[0]?.aid).toBe("aid:agentagora:weijt606/x");
+    expect(out[0]?.aid).toBe("aid:agentagora:acme/x");
   });
 
   it("returns [] when cloud-api 401s", async () => {
     stubFetch(() => jsonResponse({ error: "unauthorized" }, { status: 401 }));
-    expect(await getOwnedAgents("bearer-bad", "weijt606")).toEqual([]);
+    expect(await getOwnedAgents("bearer-bad", "acme")).toEqual([]);
   });
 
   it("returns [] when fetch rejects", async () => {
     stubFetch(() => Promise.reject(new TypeError("fetch failed")));
-    expect(await getOwnedAgents("bearer-Y", "weijt606")).toEqual([]);
+    expect(await getOwnedAgents("bearer-Y", "acme")).toEqual([]);
   });
 });
 

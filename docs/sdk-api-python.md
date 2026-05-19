@@ -464,11 +464,11 @@ Custom channels are out-of-spec by definition (the spec lists `stripe-fiat` and 
 ```python
 from agentagora.identity import AID, KeyStore
 
-aid = AID.parse("aid:agentagora:weijt606/code-review")
+aid = AID.parse("aid:agentagora:acme/code-review")
 print(aid.registry, aid.namespace, aid.name)
 
 ks = KeyStore.default()                        # ~/.agentagora/keys/
-key = ks.load("weijt606/code-review")          # or .generate(name=...)
+key = ks.load("acme/code-review")          # or .generate(name=...)
 ```
 
 The SDK generates keys if missing, persists with 0600 file mode, and never logs or transmits private key material.
@@ -566,4 +566,4 @@ These are tracked as future work in [PRD.md §15](PRD.md).
 
 | Version | Date | Editor | Notes |
 |---|---|---|---|
-| v0.1 | 2026-04-30 | weijt606 | Initial draft. Targets PRD M1 milestone. |
+| v0.1 | 2026-04-30 | acme | Initial draft. Targets PRD M1 milestone. |

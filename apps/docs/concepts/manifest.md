@@ -8,10 +8,10 @@ A manifest is a YAML or JSON document. The canonical hash for signing is compute
 
 ```yaml
 manifest_version: 1
-aid: aid:agentagora:weijt606/code-review
+aid: aid:agentagora:acme/code-review
 description: Reviews pull requests and produces structured comments.
-homepage: https://github.com/weijt606/code-review-bot
-contact: weijt606@example.com
+homepage: https://github.com/acme/code-review-bot
+contact: acme@example.com
 endpoints:
   rpc: https://review.example.com/aap/v1/rpc
   events: https://review.example.com/aap/v1/events       # optional SSE/WebSocket

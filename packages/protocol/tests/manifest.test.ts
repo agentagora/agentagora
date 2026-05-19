@@ -58,7 +58,7 @@ describe("CapabilitySchema", () => {
 describe("ManifestSchema", () => {
   const baseManifest = {
     manifest_version: 1 as const,
-    aid: "aid:agentagora:weijt606/code-review",
+    aid: "aid:agentagora:acme/code-review",
     endpoints: { rpc: "https://example.com/aap/v1/rpc" },
     capabilities: [baseCap],
   };

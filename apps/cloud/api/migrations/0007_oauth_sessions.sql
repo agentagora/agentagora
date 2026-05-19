@@ -20,7 +20,7 @@
 
 CREATE TABLE IF NOT EXISTS oauth_sessions (
   bearer        TEXT PRIMARY KEY,
-  owner_id      TEXT NOT NULL,           -- e.g. "gh:weijt606"
+  owner_id      TEXT NOT NULL,           -- e.g. "gh:acme"
   provider      TEXT NOT NULL,           -- "github" today; reserved for future providers
   provider_uid  TEXT NOT NULL,           -- numeric GitHub user id (stable across login renames)
   email         TEXT,                    -- the GitHub primary email if the OAuth scope returned one

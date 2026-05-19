@@ -4,7 +4,7 @@
 |---|---|
 | **状态** | Draft v0.3 |
 | **更新** | 2026-05-01 |
-| **作者** | weijt606 |
+| **作者** | AgentAgora maintainers |
 | **代号** | AgentAgora |
 | **协议简称** | AAP (AgentAgora Protocol) |
 

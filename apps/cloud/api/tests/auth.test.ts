@@ -19,7 +19,7 @@ import { type SigningKey, generateSigningKey, signManifest } from "./_signing.js
 
 const validManifest = {
   manifest_version: 1 as const,
-  aid: "aid:agentagora:weijt606/code-review",
+  aid: "aid:agentagora:acme/code-review",
   description: "Reviews PRs",
   endpoints: { rpc: "https://example.com/aap/v1/rpc" },
   capabilities: [
@@ -151,7 +151,7 @@ describe("ChainOwnerAuth — OAuth-issued bearers and OWNER_TOKENS bearers coexi
     const expiresAt = new Date(issuedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     await storage.createOauthSession({
       bearer: "oauth-bearer-fresh",
-      ownerId: "gh:weijt606",
+      ownerId: "gh:acme",
       provider: "github",
       providerUid: "4242",
       issuedAt: issuedAt.toISOString(),
@@ -163,7 +163,7 @@ describe("ChainOwnerAuth — OAuth-issued bearers and OWNER_TOKENS bearers coexi
 
     const ghManifest = {
       ...validManifest,
-      aid: "aid:agentagora:gh-weijt606/code-review",
+      aid: "aid:agentagora:gh-acme/code-review",
     };
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -179,7 +179,7 @@ describe("ChainOwnerAuth — OAuth-issued bearers and OWNER_TOKENS bearers coexi
     });
     expect(res.status).toBe(201);
     const stored = await storage.getAgent(ghManifest.aid);
-    expect(stored?.publishedBy).toBe("gh:weijt606");
+    expect(stored?.publishedBy).toBe("gh:acme");
 
     // The static OWNER_TOKEN bearer still works for a separate AID.
     const aliceManifest = { ...validManifest, aid: "aid:agentagora:alice/code-review" };

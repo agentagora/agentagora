@@ -64,7 +64,7 @@ class TestCapability:
 class TestManifest:
     def test_minimal_manifest(self):
         m = Manifest(
-            aid="aid:agentagora:weijt606/code-review",
+            aid="aid:agentagora:acme/code-review",
             endpoints=Endpoints(rpc="https://example.com/aap/v1/rpc"),
             capabilities=[_basic_capability()],
         )
@@ -73,7 +73,7 @@ class TestManifest:
 
     def test_capability_lookup_missing(self):
         m = Manifest(
-            aid="aid:agentagora:weijt606/code-review",
+            aid="aid:agentagora:acme/code-review",
             endpoints=Endpoints(rpc="https://example.com/aap/v1/rpc"),
             capabilities=[_basic_capability()],
         )
@@ -82,7 +82,7 @@ class TestManifest:
 
     def test_canonical_bytes_stable(self):
         m = Manifest(
-            aid="aid:agentagora:weijt606/code-review",
+            aid="aid:agentagora:acme/code-review",
             endpoints=Endpoints(rpc="https://example.com/aap/v1/rpc"),
             capabilities=[_basic_capability()],
         )
@@ -93,7 +93,7 @@ class TestManifest:
     def test_must_have_at_least_one_capability(self):
         with pytest.raises(ValidationError):
             Manifest(
-                aid="aid:agentagora:weijt606/code-review",
+                aid="aid:agentagora:acme/code-review",
                 endpoints=Endpoints(rpc="https://example.com/aap/v1/rpc"),
                 capabilities=[],
             )

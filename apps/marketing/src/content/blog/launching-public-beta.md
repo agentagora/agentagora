@@ -2,7 +2,7 @@
 title: "Launching the AgentAgora public beta"
 description: "AgentAgora is now in public beta — the open layer that lets agents from different teams find, trust, transact, and audit each other."
 pubDate: "2026-05-XX"
-author: "weijt606"
+author: "AgentAgora maintainers"
 tags: [launch, beta, agents, interop]
 canonicalUrl: "<https://agentagora.dev/blog/launching-public-beta>"
 ---

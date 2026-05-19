@@ -9,15 +9,15 @@ from agentagora import AID, KeyStore
 
 class TestAIDParse:
     def test_basic(self):
-        aid = AID.parse("aid:agentagora:weijt606/code-review")
+        aid = AID.parse("aid:agentagora:acme/code-review")
         assert aid.registry == "agentagora"
-        assert aid.namespace == "weijt606"
+        assert aid.namespace == "acme"
         assert aid.name == "code-review"
         assert aid.fragment is None
         assert aid.is_public_registry
 
     def test_with_fragment(self):
-        aid = AID.parse("aid:agentagora:weijt606/code-review#v2")
+        aid = AID.parse("aid:agentagora:acme/code-review#v2")
         assert aid.fragment == "v2"
 
     def test_self_hosted_registry(self):

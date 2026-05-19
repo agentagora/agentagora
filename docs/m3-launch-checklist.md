@@ -22,8 +22,8 @@
 > **Maintainer**: every M3 item that requires human action in an external system (B.4, B.5, C.1, C.2, D.6, A.5 gate promotion, plus ops-account setup the launch runbook assumes done) is consolidated as a top-to-bottom batch in [`docs/maintainer-tasks.md`](maintainer-tasks.md). Work that file in order; come back here to flip markers.
 
 **Done by code, awaiting human action** (not blocked on engineering):
-- **B.4 GitHub Discussions** — flip the toggle in repo Settings → Features and pin the welcome thread. Owner: weijt606.
-- **B.5 Public roadmap board** — create the GitHub Projects board mirroring PRD §10. Owner: weijt606.
+- **B.4 GitHub Discussions** — flip the toggle in repo Settings → Features and pin the welcome thread. Owner: maintainer.
+- **B.5 Public roadmap board** — create the GitHub Projects board mirroring PRD §10. Owner: maintainer.
 - **C.3 Launch blog post** — drafted at `apps/marketing/src/content/blog/launching-public-beta.md`; needs publish + HN/X distribution on launch day.
 
 **Notes for reviewers**:
@@ -94,7 +94,7 @@
 - Enable Discussions on the repo. Seed categories: Q&A, Show & Tell, Ideas, RFCs (parking lot until M6).
 - Pin a "Welcome / how to ask for help" thread.
 - **Acceptance**: a first external user has somewhere to land.
-- **Action item**: owner `weijt606` — manual repo-settings toggle; no code change required.
+- **Action item**: owner `maintainer` — manual repo-settings toggle; no code change required.
 
 ### B.5 ✅ Public roadmap board — superseded by docs (skipped 2026-05-12)
 
@@ -102,7 +102,7 @@ Maintainer decision: not worth the maintenance overhead for a single-maintainer 
 - GitHub Projects board mirroring the M3 → M9 row of PRD §10.
 - Each milestone gets ~3–6 visible tasks; the rest stays in private docs until ready.
 - **Acceptance**: any visitor can see what's shipping next without reading source.
-- **Action item**: owner `weijt606` — manual GitHub Projects setup; no code change required.
+- **Action item**: owner `maintainer` — manual GitHub Projects setup; no code change required.
 
 ---
 
@@ -143,20 +143,20 @@ Maintainer decision: not worth the maintenance overhead for a single-maintainer 
 
 | Section | Owner | Target |
 |---|---|---|
-| A.1 dashboard | weijt606 | M2 close (shipped) |
-| A.2 OIDC sign-up | weijt606 | M3 week 1 (shipped) |
-| A.3 onboarding UI | weijt606 | M3 week 1 (shipped) |
-| A.4 auto-refund | weijt606 | M3 week 2 (shipped) |
-| A.5 latency budget | weijt606 | M3 week 2 (gate promotion remaining) |
-| B.1 marketing site | weijt606 | M3 launch day (shipped) |
-| B.2 documentation site | weijt606 | M3 launch day (shipped) |
-| B.3 public catalog | weijt606 | M3 launch day (landing-page rendering remaining) |
-| B.4 Discussions | weijt606 | M3 launch day (manual toggle) |
-| B.5 roadmap board | weijt606 | M3 launch day (manual setup) |
+| A.1 dashboard | maintainer | M2 close (shipped) |
+| A.2 OIDC sign-up | maintainer | M3 week 1 (shipped) |
+| A.3 onboarding UI | maintainer | M3 week 1 (shipped) |
+| A.4 auto-refund | maintainer | M3 week 2 (shipped) |
+| A.5 latency budget | maintainer | M3 week 2 (gate promotion remaining) |
+| B.1 marketing site | maintainer | M3 launch day (shipped) |
+| B.2 documentation site | maintainer | M3 launch day (shipped) |
+| B.3 public catalog | maintainer | M3 launch day (landing-page rendering remaining) |
+| B.4 Discussions | maintainer | M3 launch day (manual toggle) |
+| B.5 roadmap board | maintainer | M3 launch day (manual setup) |
 | C.1 outreach list | TBD | M3 -1 week |
 | C.2 first paid call | external | M3 month 1 |
-| C.3 launch blog | weijt606 | M3 launch day (drafted; publish pending) |
-| D.5 deployed-Worker E2E | weijt606 | M3 launch day |
-| D.6 PIT restore drill | weijt606 | M3 launch day |
+| C.3 launch blog | maintainer | M3 launch day (drafted; publish pending) |
+| D.5 deployed-Worker E2E | maintainer | M3 launch day |
+| D.6 PIT restore drill | maintainer | M3 launch day |
 
 Filling in owners + dates is itself a kickoff task — assume the maintainer bottleneck on most A.* / B.* items unless a co-maintainer joins.

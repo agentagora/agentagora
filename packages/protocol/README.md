@@ -30,7 +30,7 @@ pnpm add @agentagora/protocol
 import { ManifestSchema, parseAid, Methods } from "@agentagora/protocol";
 
 const manifest = ManifestSchema.parse(rawJson);
-const aid = parseAid("aid:agentagora:weijt606/code-review");
+const aid = parseAid("aid:agentagora:acme/code-review");
 console.log(Methods.Invoke); // "aap.invoke"
 ```
 

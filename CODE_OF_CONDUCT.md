@@ -8,7 +8,7 @@ We want a project where people of any background can contribute and feel respect
 
 ## Reporting
 
-Email **conduct@agentagora.dev** (or **weijt606@gmail.com** while the dedicated alias is being set up). Reports go to the maintainers and stay confidential. Include:
+Email **conduct@agentagora.dev**. Reports go to the maintainers and stay confidential. Include:
 
 - What happened and where (issue / PR / Discussion link)
 - Who was involved (handles are fine)

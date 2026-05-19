@@ -152,6 +152,6 @@ Each of these will land tests in subsequent milestones; this matrix tracks the u
 ## Maintenance
 
 - **Updated**: 2026-05-07 (matches AAP-spec v0.1 RFC-style draft)
-- **Owner**: weijt606
+- **Owner**: maintainer
 - **Update trigger**: any change to `docs/AAP-spec.md` (add/remove/promote/demote a normative clause) OR any new test in `packages/protocol-compliance/tests/`. Both should bump this matrix in the same PR.
 - **Review cadence**: at every spec-version bump.

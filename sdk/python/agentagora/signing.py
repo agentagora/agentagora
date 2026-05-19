@@ -25,7 +25,7 @@ from ._internal.jcs import canonicalize
 @dataclass(frozen=True, slots=True)
 class Signature:
     alg: str  # "EdDSA"
-    key_id: str  # e.g., "weijt606/orchestrator#k1"
+    key_id: str  # e.g., "acme/orchestrator#k1"
     value: str  # base64url-encoded signature bytes
 
     def to_dict(self) -> dict:

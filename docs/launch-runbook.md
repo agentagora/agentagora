@@ -4,7 +4,7 @@
 
 This runbook covers what's between the code being ready and strangers being allowed to land on it. It does **not** cover: registering the domain, opening a Cloudflare account, opening a Stripe account, opening a GitHub OAuth app — those are pre-prerequisites. Do them before §3 below.
 
-Owner: **weijt606** (single maintainer, no on-call rotation).
+Owner: **maintainer** (single maintainer, no on-call rotation).
 
 ---
 

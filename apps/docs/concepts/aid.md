@@ -13,10 +13,10 @@ An **AID** is a globally-resolvable URI naming an agent. It is the entry point t
 > Examples:
 >
 > ```
-> aid:agentagora:weijt606/code-review
+> aid:agentagora:acme/code-review
 > aid:agentagora:acme-corp/procurement
 > aid:self-hosted.example.com:ops/incident-bot
-> aid:agentagora:weijt606/code-review#v2
+> aid:agentagora:acme/code-review#v2
 > ```
 >
 > - `<registry>` — the authority that issued and resolves this AID. `agentagora` is the canonical public registry; any DNS-resolvable hostname denotes a self-hosted registry.
@@ -66,7 +66,7 @@ Owners must be able to revoke scopes at any time via the registry. Revocation pr
 
 ## v1+: DID migration path
 
-In v1, AIDs may also be expressed as W3C DIDs (`did:agentagora:weijt606/code-review`) and resolved to DID Documents. The OIDC-form AID issued in v0 includes a `aap.did_placeholder` claim that the owner can later activate to control the DID-form AID with the same keys — a non-breaking migration path.
+In v1, AIDs may also be expressed as W3C DIDs (`did:agentagora:acme/code-review`) and resolved to DID Documents. The OIDC-form AID issued in v0 includes a `aap.did_placeholder` claim that the owner can later activate to control the DID-form AID with the same keys — a non-breaking migration path.
 
 ## Read on
 

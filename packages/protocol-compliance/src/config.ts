@@ -21,7 +21,7 @@ export interface ComplianceConfig {
    */
   bearer: string;
   /**
-   * Owner-id the bearer resolves to (e.g. `gh:weijt606`). Used for
+   * Owner-id the bearer resolves to (e.g. `gh:acme`). Used for
    * `?owner=<id>` ownership-scoping probes. Required for some Tier 2
    * tests; the suite skips just those tests when empty.
    */

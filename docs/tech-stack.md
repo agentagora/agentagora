@@ -345,4 +345,4 @@ The single biggest reason for picking TypeScript: **one `@agentagora/protocol` p
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
-| v1.0 | 2026-05-01 | weijt606 | Initial decision document. Locks language and stack choices for the project. |
+| v1.0 | 2026-05-01 | acme | Initial decision document. Locks language and stack choices for the project. |

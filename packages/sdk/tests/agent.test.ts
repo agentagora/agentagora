@@ -6,7 +6,7 @@ describe("createAgent", () => {
   it("builds an agent with at least one capability", () => {
     const a = createAgent({
       name: "code-review",
-      namespace: "weijt606",
+      namespace: "acme",
       accepts: ["stripe-fiat"],
       capabilities: {
         review_pr: capability({

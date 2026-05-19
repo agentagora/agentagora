@@ -6,7 +6,7 @@
  *     aid:<registry>:<namespace>/<name>[#<fragment>]
  *
  * Examples:
- *   aid:agentagora:weijt606/code-review
+ *   aid:agentagora:acme/code-review
  *   aid:agentagora:acme-corp/procurement#v2
  *   aid:registry.example.com:ops/incident-bot
  */

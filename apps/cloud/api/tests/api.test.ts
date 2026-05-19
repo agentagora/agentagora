@@ -15,7 +15,7 @@ import { type SigningKey, generateSigningKey, signManifest } from "./_signing.js
 
 const validManifest = {
   manifest_version: 1 as const,
-  aid: "aid:agentagora:weijt606/code-review",
+  aid: "aid:agentagora:acme/code-review",
   description: "Reviews PRs",
   endpoints: { rpc: "https://example.com/aap/v1/rpc" },
   capabilities: [

@@ -54,7 +54,7 @@ describe("D1Storage", () => {
   });
 
   it("round-trips a published manifest", async () => {
-    const rec = record("aid:agentagora:weijt606/code-review");
+    const rec = record("aid:agentagora:acme/code-review");
     await storage.putAgent(rec);
 
     const got = await storage.getAgent(rec.manifest.aid);
@@ -70,7 +70,7 @@ describe("D1Storage", () => {
   });
 
   it("upserts when the same AID is published twice", async () => {
-    const aid = "aid:agentagora:weijt606/code-review";
+    const aid = "aid:agentagora:acme/code-review";
     await storage.putAgent(record(aid, { description: "first" }, "2026-05-01T00:00:00.000Z"));
     await storage.putAgent(record(aid, { description: "second" }, "2026-05-02T00:00:00.000Z"));
 
@@ -118,7 +118,7 @@ describe("D1Storage", () => {
 
   describe("searchAgents", () => {
     beforeEach(async () => {
-      await storage.putAgent(record("aid:agentagora:weijt606/code-review"));
+      await storage.putAgent(record("aid:agentagora:acme/code-review"));
       await storage.putAgent(
         record("aid:agentagora:alice/translator", {
           description: "Translates text between languages",
@@ -156,7 +156,7 @@ describe("D1Storage", () => {
 
     it("filters by accepted settlement channel", async () => {
       const hits = await storage.searchAgents({ accepts: "stripe-fiat" });
-      expect(hits.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:weijt606/code-review"]);
+      expect(hits.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:acme/code-review"]);
 
       const usdc = await storage.searchAgents({ accepts: "usdc-base" });
       expect(usdc.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:bob/usdc-shop"]);
@@ -166,8 +166,8 @@ describe("D1Storage", () => {
       const byDesc = await storage.searchAgents({ q: "translates" });
       expect(byDesc.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:alice/translator"]);
 
-      const byAid = await storage.searchAgents({ q: "weijt606" });
-      expect(byAid.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:weijt606/code-review"]);
+      const byAid = await storage.searchAgents({ q: "acme" });
+      expect(byAid.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:acme/code-review"]);
     });
 
     it("combines filters with AND", async () => {
@@ -181,7 +181,7 @@ describe("D1Storage", () => {
         capability: "review_pull_request",
         accepts: "stripe-fiat",
       });
-      expect(matched.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:weijt606/code-review"]);
+      expect(matched.map((r) => r.manifest.aid)).toEqual(["aid:agentagora:acme/code-review"]);
     });
 
     it("returns empty list when no filter matches", async () => {
@@ -197,7 +197,7 @@ describe("D1Storage", () => {
         conversation_id: "convo-x",
         type: "rpc.request.received",
         timestamp: ts,
-        actor_aid: "aid:agentagora:weijt606/code-review",
+        actor_aid: "aid:agentagora:acme/code-review",
         previous_event_hash: prevHash,
         data: {},
         signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
@@ -233,7 +233,7 @@ describe("D1Storage", () => {
         conversation_id: "convo-a",
         type: "rpc.request.received",
         timestamp: "2026-05-01T00:00:00.000Z",
-        actor_aid: "aid:agentagora:weijt606/code-review",
+        actor_aid: "aid:agentagora:acme/code-review",
         previous_event_hash: null,
         data: {},
         signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
@@ -243,7 +243,7 @@ describe("D1Storage", () => {
         conversation_id: "convo-a",
         type: "settlement.completed",
         timestamp: "2026-05-01T00:00:01.000Z",
-        actor_aid: "aid:agentagora:weijt606/code-review",
+        actor_aid: "aid:agentagora:acme/code-review",
         previous_event_hash: "sha256:aaa",
         data: {},
         signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
@@ -253,7 +253,7 @@ describe("D1Storage", () => {
         conversation_id: "convo-b",
         type: "rpc.request.received",
         timestamp: "2026-05-02T00:00:00.000Z",
-        actor_aid: "aid:agentagora:weijt606/code-review",
+        actor_aid: "aid:agentagora:acme/code-review",
         previous_event_hash: null,
         data: {},
         signature: { alg: "EdDSA", key_id: "k1", value: "AAAA" },
@@ -273,9 +273,7 @@ describe("D1Storage", () => {
       await storage.ingestAuditEvent(e2, "now");
       await storage.ingestAuditEvent(e3, "now");
       await storage.ingestAuditEvent(e4, "now");
-      const summaries = await storage.listConversationsByActor(
-        "aid:agentagora:weijt606/code-review",
-      );
+      const summaries = await storage.listConversationsByActor("aid:agentagora:acme/code-review");
       expect(summaries.map((s) => s.conversationId)).toEqual(["convo-b", "convo-a"]);
       const a = summaries.find((s) => s.conversationId === "convo-a");
       expect(a?.eventCount).toBe(2);

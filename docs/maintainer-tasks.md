@@ -4,7 +4,7 @@
 >
 > If a task can be automated by code, it is **not** in this file. See [`docs/m3-launch-checklist.md`](m3-launch-checklist.md) for the full M3 status.
 
-Owner: **weijt606** (single maintainer).
+Owner: **maintainer** (single maintainer).
 
 Last updated: 2026-05-05.
 

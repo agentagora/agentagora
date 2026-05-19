@@ -3,15 +3,15 @@ import { AidSchema, formatAid, isPublicRegistry, parseAid } from "../src/identit
 
 describe("parseAid", () => {
   it("parses a basic public-registry AID", () => {
-    const a = parseAid("aid:agentagora:weijt606/code-review");
+    const a = parseAid("aid:agentagora:acme/code-review");
     expect(a.registry).toBe("agentagora");
-    expect(a.namespace).toBe("weijt606");
+    expect(a.namespace).toBe("acme");
     expect(a.name).toBe("code-review");
     expect(a.fragment).toBeUndefined();
   });
 
   it("parses an AID with a fragment", () => {
-    const a = parseAid("aid:agentagora:weijt606/code-review#v2");
+    const a = parseAid("aid:agentagora:acme/code-review#v2");
     expect(a.fragment).toBe("v2");
   });
 
