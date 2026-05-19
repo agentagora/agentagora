@@ -16,6 +16,7 @@
 
 import { requireOwner } from "../../../../lib/auth";
 import { BASE_URL, getStripeAccount } from "../../../../lib/cloud-api";
+import { Card, CardBody, CardHeader } from "../../../_components/card";
 import { OnboardingForm } from "../_onboarding-form";
 
 export default async function OnboardingRefreshPage() {
@@ -24,28 +25,44 @@ export default async function OnboardingRefreshPage() {
   // there is one; not load-bearing for the form itself.
   const account = await getStripeAccount(session.bearer);
 
+  const resumingFor = account.kind === "ok" ? account.account_id : undefined;
+
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Refresh your onboarding link</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">
+          Refresh your onboarding link
+        </h1>
+        <p className="text-sm leading-relaxed text-accent-600">
           Stripe sent you back because your previous onboarding link had expired. Submit below to
           generate a new one — Stripe links have a short TTL by design.
         </p>
       </header>
 
-      {account.kind === "ok" ? (
-        <p style={{ color: "#555", marginTop: 0, fontSize: 13 }}>
-          Resuming for account <code>{account.account_id}</code>.
-        </p>
-      ) : null}
-
-      <OnboardingForm
-        cloudApiBaseUrl={BASE_URL}
-        bearer={session.bearer}
-        defaultEmail={looksLikeEmail(session.ownerLabel) ? session.ownerLabel : undefined}
-        submitLabel="Get a fresh onboarding link"
-      />
+      <Card>
+        <CardHeader
+          title="Get a fresh hosted-onboarding link"
+          description={
+            resumingFor ? (
+              <>
+                Resuming for account{" "}
+                <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+                  {resumingFor}
+                </code>
+                .
+              </>
+            ) : undefined
+          }
+        />
+        <CardBody>
+          <OnboardingForm
+            cloudApiBaseUrl={BASE_URL}
+            bearer={session.bearer}
+            defaultEmail={looksLikeEmail(session.ownerLabel) ? session.ownerLabel : undefined}
+            submitLabel="Get a fresh onboarding link"
+          />
+        </CardBody>
+      </Card>
     </div>
   );
 }

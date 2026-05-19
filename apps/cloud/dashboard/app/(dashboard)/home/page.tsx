@@ -38,6 +38,10 @@ import {
   listOwnedConversations,
   listOwnedDisputes,
 } from "../../../lib/cloud-api";
+import { Alert } from "../../_components/alert";
+import { Badge } from "../../_components/badge";
+import { Button } from "../../_components/button";
+import { Card, CardBody, CardHeader } from "../../_components/card";
 
 export default async function DashboardHome() {
   const session = await requireOwner();
@@ -59,12 +63,11 @@ export default async function DashboardHome() {
   // Empty state — no agents yet. Skip the per-AID fan-out entirely.
   if (agents.length === 0) {
     return (
-      <div>
-        {showStripeBanner ? <StripeNudge /> : null}
-        <h1 style={{ marginBottom: 8 }}>Welcome back, {greeting}.</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+      <div className="flex flex-col gap-8">
+        {showStripeBanner && <StripeNudge />}
+        <PageHeader greeting={greeting}>
           You haven't published any agents yet — let's fix that.
-        </p>
+        </PageHeader>
         <GetStartedPanel />
       </div>
     );
@@ -115,22 +118,23 @@ export default async function DashboardHome() {
   const disputeTotal = dispById.size;
   const disputeOpen = [...dispById.values()].filter((d) => d.state === "open").length;
 
+  const cloudUrl = process.env.AGENTAGORA_CLOUD_URL ?? "http://localhost:8787";
+
   return (
-    <div>
-      {showStripeBanner ? <StripeNudge /> : null}
-      <h1 style={{ marginBottom: 8 }}>Welcome back, {greeting}.</h1>
-      <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-8">
+      {showStripeBanner && <StripeNudge />}
+
+      <PageHeader greeting={greeting}>
         Cloud control plane is online. The dashboard reads from{" "}
-        <code>{process.env.AGENTAGORA_CLOUD_URL ?? "http://localhost:8787"}</code>.
-      </p>
+        <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+          {cloudUrl}
+        </code>
+        .
+      </PageHeader>
 
       <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
-          marginTop: 24,
-        }}
+        className="grid gap-4"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
       >
         <CountCard
           label="Owned agents"
@@ -152,6 +156,7 @@ export default async function DashboardHome() {
           label="Open disputes"
           value={disputeOpen}
           href="/disputes"
+          tone={disputeOpen > 0 ? "warn" : "neutral"}
           hint={
             disputeTotal === 0 ? "no disputes filed" : `${disputeOpen} open · ${disputeTotal} total`
           }
@@ -163,101 +168,64 @@ export default async function DashboardHome() {
   );
 }
 
+function PageHeader({ greeting, children }: { greeting: string; children: React.ReactNode }) {
+  return (
+    <header className="flex flex-col gap-2">
+      <h1 className="text-2xl font-semibold tracking-tight text-accent-900">
+        Welcome back, {greeting}.
+      </h1>
+      <p className="text-sm leading-relaxed text-accent-600">{children}</p>
+    </header>
+  );
+}
+
 function StripeNudge() {
   return (
-    <div
-      style={{
-        background: "#fff8e1",
-        border: "1px solid #f0d480",
-        color: "#5a4400",
-        borderRadius: 8,
-        padding: "10px 14px",
-        marginBottom: 20,
-        fontSize: 13,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
-      <span>
-        <strong>Stripe onboarding incomplete.</strong> You won't be paid for calls until charges are
-        enabled.
-      </span>
-      <Link
-        href="/onboarding"
-        style={{
-          color: "#5a4400",
-          fontWeight: 600,
-          textDecoration: "underline",
-          whiteSpace: "nowrap",
-        }}
-      >
-        Finish in Stripe →
-      </Link>
-    </div>
+    <Alert tone="warn" title="Stripe onboarding incomplete">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span>You won't be paid for calls until charges are enabled.</span>
+        <Link
+          href="/onboarding"
+          className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+        >
+          Finish in Stripe →
+        </Link>
+      </div>
+    </Alert>
   );
 }
 
 function GetStartedPanel() {
   return (
-    <section
-      style={{
-        marginTop: 24,
-        border: "1px solid #e3e3e3",
-        borderRadius: 12,
-        padding: 28,
-        background: "#fff",
-      }}
-    >
-      <h2 style={{ fontSize: 22, margin: 0, marginBottom: 8 }}>Publish your first agent</h2>
-      <p style={{ color: "#444", marginTop: 0, marginBottom: 16, lineHeight: 1.5 }}>
-        An <strong>agent manifest</strong> is a small JSON document describing what your agent does
-        and how to reach it — capabilities, accepted input types, and pricing. AgentAgora signs it
-        with your Ed25519 key in your browser and publishes it to the catalog so other agents can
-        discover and call yours. See{" "}
-        <a
-          href="https://github.com/agentagora/agentagora/blob/main/apps/docs/quickstart.md#step-2-publish-an-agent"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "#0366d6" }}
-        >
-          the quickstart, Step 2
-        </a>{" "}
-        for the manifest schema.
-      </p>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link
-          href="/agents/new"
-          style={{
-            background: "#0366d6",
-            color: "#fff",
-            padding: "10px 18px",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
-          Publish an agent →
-        </Link>
-        <Link
-          href="/onboarding"
-          style={{
-            background: "#fff",
-            color: "#0366d6",
-            border: "1px solid #0366d6",
-            padding: "10px 18px",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
-          Connect Stripe to get paid for calls
-        </Link>
-      </div>
-    </section>
+    <Card>
+      <CardHeader
+        title="Publish your first agent"
+        description="An agent manifest is a small JSON document declaring what your agent does and how to reach it — capabilities, accepted input types, and pricing."
+      />
+      <CardBody>
+        <p className="text-sm leading-relaxed text-accent-700">
+          AgentAgora signs the manifest with your Ed25519 key in your browser and publishes it to
+          the catalog so other agents can discover and call yours. See{" "}
+          <a
+            href="https://github.com/agentagora/agentagora/blob/main/apps/docs/quickstart.md#step-2-publish-an-agent"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-accent-900 underline underline-offset-2 hover:text-accent-700"
+          >
+            the quickstart, Step 2
+          </a>{" "}
+          for the manifest schema.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link href="/agents/new">
+            <Button>Publish an agent →</Button>
+          </Link>
+          <Link href="/onboarding">
+            <Button variant="secondary">Connect Stripe to get paid for calls</Button>
+          </Link>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -266,108 +234,73 @@ function CountCard({
   value,
   hint,
   href,
+  tone = "neutral",
 }: {
   label: string;
   value: number;
   hint?: string;
   href: string;
+  tone?: "neutral" | "warn";
 }) {
   return (
     <Link
       href={href}
-      style={{
-        display: "block",
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 16,
-        background: "#fff",
-        color: "#111",
-        textDecoration: "none",
-      }}
+      className="group block rounded-lg border border-accent-100 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
     >
-      <div style={{ fontSize: 13, color: "#666" }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, marginTop: 4 }}>{value}</div>
-      {hint ? <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{hint}</div> : null}
+      <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wider text-accent-500">
+        <span>{label}</span>
+        {tone === "warn" && value > 0 && <Badge tone="warn">attention</Badge>}
+      </div>
+      <div className="mt-3 text-3xl font-semibold tracking-tight text-accent-900 tabular-nums">
+        {value}
+      </div>
+      {hint && <div className="mt-2 text-sm text-accent-500">{hint}</div>}
     </Link>
   );
 }
 
 function RecentConversations({ rows }: { rows: OwnedConversationSummary[] }) {
   return (
-    <section style={{ marginTop: 32 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 12,
-        }}
-      >
-        <h2 style={{ fontSize: 16, margin: 0 }}>Recent conversations</h2>
-        {rows.length > 0 ? (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-base font-semibold text-accent-900">Recent conversations</h2>
+        {rows.length > 0 && (
           <Link
             href="/conversations"
-            style={{ fontSize: 13, color: "#0366d6", textDecoration: "none" }}
+            className="text-sm font-medium text-accent-700 underline-offset-2 hover:text-accent-900 hover:underline"
           >
             View all →
           </Link>
-        ) : null}
+        )}
       </div>
 
       {rows.length === 0 ? (
-        <div
-          style={{
-            border: "1px dashed #ccc",
-            borderRadius: 8,
-            padding: 20,
-            background: "#fff",
-            color: "#666",
-            fontSize: 13,
-          }}
-        >
+        <div className="rounded-lg border border-dashed border-accent-200 bg-white px-5 py-8 text-center text-sm text-accent-500">
           Your agents haven't participated in any conversations yet. Once they emit signed audit
           events, the chains will surface here.
         </div>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="flex flex-col gap-2">
           {rows.map((row) => (
-            <li
-              key={row.conversation_id}
-              style={{
-                border: "1px solid #e3e3e3",
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 8,
-                background: "#fff",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  alignItems: "baseline",
-                }}
+            <li key={row.conversation_id}>
+              <Link
+                href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
+                className="flex flex-col gap-1 rounded-lg border border-accent-100 bg-white px-4 py-3 transition-colors hover:border-accent-300"
               >
-                <Link
-                  href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
-                  style={{
-                    fontWeight: 600,
-                    color: "#0366d6",
-                    textDecoration: "none",
-                    fontSize: 13,
-                  }}
-                >
-                  <code>{row.conversation_id}</code>
-                </Link>
-                <span style={{ fontSize: 12, color: "#888" }}>{row.last_seen_at}</span>
-              </div>
-              <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                <code>{row.latest_event_type}</code>
-                <span style={{ marginLeft: 12 }}>
-                  {row.event_count} event{row.event_count === 1 ? "" : "s"}
-                </span>
-              </div>
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <code className="font-mono text-sm font-medium text-accent-900">
+                    {row.conversation_id}
+                  </code>
+                  <time className="font-mono text-xs text-accent-500">{row.last_seen_at}</time>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-accent-500">
+                  <code className="font-mono">{row.latest_event_type}</code>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {row.event_count} event{row.event_count === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </Link>
             </li>
           ))}
         </ul>

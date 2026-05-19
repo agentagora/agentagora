@@ -18,16 +18,21 @@
 import Link from "next/link";
 import { requireOwner } from "../../../../lib/auth";
 import { getStripeAccount } from "../../../../lib/cloud-api";
+import { Alert } from "../../../_components/alert";
+import { Badge } from "../../../_components/badge";
+import { Card, CardBody, CardHeader } from "../../../_components/card";
 
 export default async function OnboardingReturnPage() {
   const session = await requireOwner();
   const account = await getStripeAccount(session.bearer);
 
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Welcome back from Stripe</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">
+          Welcome back from Stripe
+        </h1>
+        <p className="text-sm leading-relaxed text-accent-600">
           Re-checking your Stripe Connect account status.
         </p>
       </header>
@@ -42,43 +47,30 @@ type AccountResult = Awaited<ReturnType<typeof getStripeAccount>>;
 function Body({ account }: { account: AccountResult }) {
   if (account.kind === "unreachable") {
     return (
-      <div
-        style={{
-          border: "1px solid #f0c0c0",
-          background: "#fff5f5",
-          color: "#7a1f1f",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Cloud-api is unreachable</h2>
-        <p style={{ margin: 0 }}>
-          We couldn't read your Stripe account status. Try again in a moment, or{" "}
-          <RefreshLink label="refresh" />.
-        </p>
-      </div>
+      <Alert tone="danger" title="Cloud-api is unreachable">
+        We couldn't read your Stripe account status. Try again in a moment, or{" "}
+        <RefreshLink label="refresh" />.
+      </Alert>
     );
   }
 
   if (account.kind === "missing") {
     return (
-      <div
-        style={{
-          border: "1px solid #e3e3e3",
-          background: "#fff",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>No Stripe account on file</h2>
-        <p style={{ color: "#555" }}>
-          We don't have a Stripe Connect account associated with your owner ID yet. Head back to{" "}
-          <Link href="/onboarding" style={linkStyle}>
-            /onboarding
-          </Link>{" "}
-          to start over.
-        </p>
-      </div>
+      <Card>
+        <CardHeader title="No Stripe account on file" />
+        <CardBody>
+          <p className="text-sm leading-relaxed text-accent-700">
+            We don't have a Stripe Connect account associated with your owner ID yet. Head back to{" "}
+            <Link
+              href="/onboarding"
+              className="font-medium text-accent-900 underline underline-offset-2 hover:text-accent-700"
+            >
+              /onboarding
+            </Link>{" "}
+            to start over.
+          </p>
+        </CardBody>
+      </Card>
     );
   }
 
@@ -86,52 +78,55 @@ function Body({ account }: { account: AccountResult }) {
 
   if (status.charges_enabled) {
     return (
-      <div
-        style={{
-          border: "1px solid #c3e6c3",
-          background: "#f3fbf3",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Done — your account is live.</h2>
-        <p style={{ color: "#1f5a1f", marginBottom: 0 }}>
-          Account <code>{account_id}</code> can now receive payouts. Updated{" "}
-          <time>{updated_at}</time>.
-        </p>
-      </div>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-3">
+              Done — your account is live
+              <Badge tone="success">live</Badge>
+            </span>
+          }
+        />
+        <CardBody>
+          <p className="text-sm leading-relaxed text-accent-700">
+            Account <Mono>{account_id}</Mono> can now receive payouts.
+          </p>
+          <p className="mt-3 font-mono text-xs text-accent-500">
+            Updated <time>{updated_at}</time>
+          </p>
+        </CardBody>
+      </Card>
     );
   }
 
   return (
-    <div
-      style={{
-        border: "1px solid #e3a23a",
-        background: "#fff8e8",
-        borderRadius: 8,
-        padding: 20,
-      }}
-    >
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>Stripe is still verifying</h2>
-      <p style={{ color: "#5a4400" }}>
-        Stripe hasn't enabled charges on account <code>{account_id}</code> yet. This is normal —
+    <Alert tone="warn" title="Stripe is still verifying">
+      <p className="leading-relaxed">
+        Stripe hasn't enabled charges on account <Mono>{account_id}</Mono> yet. This is normal —
         verification usually clears within a few minutes for most countries, longer for some.
-        Refresh in a minute.
       </p>
-      <RefreshLink label="Refresh now" />
-    </div>
+      <p className="mt-2">
+        <RefreshLink label="Refresh now →" />
+      </p>
+    </Alert>
   );
 }
 
 function RefreshLink({ label }: { label: string }) {
   return (
-    <Link href="/onboarding/return" style={linkStyle}>
+    <Link
+      href="/onboarding/return"
+      className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+    >
       {label}
     </Link>
   );
 }
 
-const linkStyle: React.CSSProperties = {
-  color: "#0366d6",
-  textDecoration: "underline",
-};
+function Mono({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+      {children}
+    </code>
+  );
+}
