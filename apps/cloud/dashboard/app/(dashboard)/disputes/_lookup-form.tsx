@@ -9,6 +9,8 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { Button } from "../../_components/button";
+import { Input } from "../../_components/input";
 
 export function LookupForm({ initialId }: { initialId?: string }) {
   const router = useRouter();
@@ -25,44 +27,22 @@ export function LookupForm({ initialId }: { initialId?: string }) {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{
-        display: "flex",
-        gap: 8,
-        marginBottom: 24,
-      }}
-    >
-      <input
-        type="text"
-        name="id"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="disp_..."
-        style={{
-          flex: 1,
-          padding: "8px 12px",
-          border: "1px solid #d0d0d0",
-          borderRadius: 6,
-          fontSize: 14,
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        }}
-      />
-      <button
-        type="submit"
-        style={{
-          padding: "8px 16px",
-          background: "#0366d6",
-          color: "#fff",
-          border: "none",
-          borderRadius: 6,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
+    <form onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <label className="flex-1" htmlFor="dispute-lookup">
+        <span className="sr-only">dispute_id</span>
+        <Input
+          id="dispute-lookup"
+          type="text"
+          name="id"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="disp_..."
+          mono
+        />
+      </label>
+      <Button type="submit" size="md">
         Look up
-      </button>
+      </Button>
     </form>
   );
 }

@@ -21,6 +21,10 @@ import {
   getOwnedAgents,
   listOwnedDisputes,
 } from "../../../lib/cloud-api";
+import { Alert } from "../../_components/alert";
+import { Badge } from "../../_components/badge";
+import { Button } from "../../_components/button";
+import { Card, CardBody, CardHeader } from "../../_components/card";
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
@@ -33,37 +37,17 @@ export default async function DisputesPage(props: PageProps) {
   const id = typeof searchParams.id === "string" ? searchParams.id.trim() : "";
 
   return (
-    <div>
-      <header
-        style={{
-          marginBottom: 24,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 16,
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, marginBottom: 4 }}>Disputes</h1>
-          <p style={{ color: "#555", marginTop: 0 }}>
-            Look up a dispute case file by <code>dispute_id</code>, or browse the disputes filed by
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Disputes</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
+            Look up a dispute case file by <Mono>dispute_id</Mono>, or browse the disputes filed by
             (or against) your agents.
           </p>
         </div>
-        <Link
-          href="/disputes/new"
-          style={{
-            padding: "8px 14px",
-            background: "#0366d6",
-            color: "#fff",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontWeight: 600,
-            fontSize: 14,
-            whiteSpace: "nowrap",
-          }}
-        >
-          File a dispute
+        <Link href="/disputes/new">
+          <Button>+ File a dispute</Button>
         </Link>
       </header>
 
@@ -111,11 +95,11 @@ async function OwnerInbox({
     return <EmptyInbox />;
   }
   return (
-    <section>
-      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 12 }}>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-accent-500">
         Your disputes ({rows.length})
       </h2>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <ul className="flex flex-col gap-2">
         {rows.map((dispute) => (
           <DisputeRow key={dispute.dispute_id} dispute={dispute} />
         ))}
@@ -126,100 +110,81 @@ async function OwnerInbox({
 
 function DisputeRow({ dispute }: { dispute: DisputeResponse }) {
   return (
-    <li
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 14,
-        marginBottom: 10,
-        background: "#fff",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "baseline",
-          marginBottom: 6,
-        }}
+    <li>
+      <Link
+        href={`/disputes?id=${encodeURIComponent(dispute.dispute_id)}`}
+        className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
       >
-        <Link
-          href={`/disputes?id=${encodeURIComponent(dispute.dispute_id)}`}
-          style={{ fontWeight: 600, color: "#0366d6", textDecoration: "none" }}
-        >
-          <code>{dispute.dispute_id}</code>
-        </Link>
-        <StateBadge state={dispute.state} />
-      </div>
-      <div style={{ fontSize: 13, color: "#444" }}>
-        <code>{dispute.reason}</code>
-        <span style={{ color: "#888", marginLeft: 12 }}>{dispute.filed_at}</span>
-      </div>
-      <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-        <code>{dispute.filer_aid}</code> → <code>{dispute.respondent_aid}</code>
-      </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+            {dispute.dispute_id}
+          </code>
+          <StateBadge state={dispute.state} />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            {dispute.reason}
+          </code>
+          <span aria-hidden="true">·</span>
+          <time className="font-mono">{dispute.filed_at}</time>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
+            {dispute.filer_aid}
+          </code>
+          <span className="text-accent-400" aria-hidden="true">
+            →
+          </span>
+          <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
+            {dispute.respondent_aid}
+          </code>
+        </div>
+      </Link>
     </li>
   );
 }
 
 function EmptyInbox() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ margin: 0 }}>
+    <Card>
+      <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
         No disputes filed by or against your agents yet. When a counterparty files one (or you file
-        one through <code>POST /v1/disputes</code>), it'll appear here.
-      </p>
-    </div>
+        one through <Mono>POST /v1/disputes</Mono>), it'll appear here.
+      </CardBody>
+    </Card>
   );
 }
 
 function NoAgentsHint() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ margin: 0 }}>
-        You haven't published any agents yet. <Link href="/agents/new">Publish one →</Link>
-      </p>
-    </div>
+    <Card>
+      <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
+        You haven't published any agents yet.{" "}
+        <Link
+          href="/agents/new"
+          className="font-medium text-accent-900 underline underline-offset-2 hover:text-accent-700"
+        >
+          Publish one →
+        </Link>
+      </CardBody>
+    </Card>
   );
 }
 
 function NeedOwnerHint() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ marginTop: 0, marginBottom: 8 }}>
-        Sign in via GitHub to see disputes filed by or against your agents. The owner-scoped index
-        needs the dashboard to know your owner ID.
-      </p>
-      <p style={{ margin: 0 }}>
-        For now, you can still look up any case file by <code>dispute_id</code> using the form
-        above.
-      </p>
-    </div>
+    <Card>
+      <CardBody className="flex flex-col gap-3 border border-dashed border-accent-200 text-sm text-accent-600">
+        <p>
+          Sign in via GitHub to see disputes filed by or against your agents. The owner-scoped index
+          needs the dashboard to know your owner ID.
+        </p>
+        <p>
+          For now, you can still look up any case file by <Mono>dispute_id</Mono> using the form
+          above.
+        </p>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -228,20 +193,10 @@ async function CaseView({ id }: { id: string }) {
 
   if (!dispute) {
     return (
-      <div
-        style={{
-          border: "1px solid #f0c0c0",
-          background: "#fff5f5",
-          color: "#7a1f1f",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <p style={{ margin: 0 }}>
-          No dispute found for <code>{id}</code>. Either the cloud-api is unreachable or that ID
-          isn't registered.
-        </p>
-      </div>
+      <Alert tone="danger" title="No case file found">
+        No dispute found for <Mono>{id}</Mono>. Either the cloud-api is unreachable or that ID isn't
+        registered.
+      </Alert>
     );
   }
 
@@ -249,12 +204,8 @@ async function CaseView({ id }: { id: string }) {
 
   return (
     <section
-      style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 320px) minmax(0, 1fr)",
-        gap: 24,
-        alignItems: "start",
-      }}
+      className="grid items-start gap-6"
+      style={{ gridTemplateColumns: "minmax(0, 320px) minmax(0, 1fr)" }}
     >
       <CaseMeta dispute={dispute} />
       <ChainColumn dispute={dispute} chain={chain} />
@@ -264,98 +215,81 @@ async function CaseView({ id }: { id: string }) {
 
 function CaseMeta({ dispute }: { dispute: DisputeResponse }) {
   return (
-    <aside
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 16,
-        background: "#fff",
-      }}
-    >
-      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 12 }}>Case file</h2>
+    <Card>
+      <CardHeader title="Case file" />
+      <CardBody>
+        <dl
+          className="grid items-baseline gap-x-3 gap-y-1.5 text-sm"
+          style={{ gridTemplateColumns: "max-content 1fr" }}
+        >
+          <dt className="text-accent-500">dispute_id</dt>
+          <dd className="m-0">
+            <Mono breakAll>{dispute.dispute_id}</Mono>
+          </dd>
 
-      <dl
-        style={{
-          display: "grid",
-          gridTemplateColumns: "max-content 1fr",
-          gap: "6px 12px",
-          fontSize: 13,
-          margin: 0,
-        }}
-      >
-        <dt style={{ color: "#666" }}>dispute_id</dt>
-        <dd style={{ margin: 0 }}>
-          <code style={{ wordBreak: "break-all" }}>{dispute.dispute_id}</code>
-        </dd>
+          <dt className="text-accent-500">state</dt>
+          <dd className="m-0">
+            <StateBadge state={dispute.state} />
+          </dd>
 
-        <dt style={{ color: "#666" }}>state</dt>
-        <dd style={{ margin: 0 }}>
-          <StateBadge state={dispute.state} />
-        </dd>
+          <dt className="text-accent-500">reason</dt>
+          <dd className="m-0">
+            <Mono>{dispute.reason}</Mono>
+          </dd>
 
-        <dt style={{ color: "#666" }}>reason</dt>
-        <dd style={{ margin: 0 }}>
-          <code>{dispute.reason}</code>
-        </dd>
+          <dt className="text-accent-500">filer</dt>
+          <dd className="m-0">
+            <Mono breakAll>{dispute.filer_aid}</Mono>
+          </dd>
 
-        <dt style={{ color: "#666" }}>filer</dt>
-        <dd style={{ margin: 0 }}>
-          <code style={{ wordBreak: "break-all" }}>{dispute.filer_aid}</code>
-        </dd>
+          <dt className="text-accent-500">respondent</dt>
+          <dd className="m-0">
+            <Mono breakAll>{dispute.respondent_aid}</Mono>
+          </dd>
 
-        <dt style={{ color: "#666" }}>respondent</dt>
-        <dd style={{ margin: 0 }}>
-          <code style={{ wordBreak: "break-all" }}>{dispute.respondent_aid}</code>
-        </dd>
+          <dt className="text-accent-500">filed_at</dt>
+          <dd className="m-0 font-mono text-xs text-accent-700">{dispute.filed_at}</dd>
 
-        <dt style={{ color: "#666" }}>filed_at</dt>
-        <dd style={{ margin: 0 }}>{dispute.filed_at}</dd>
+          {dispute.resolved_at && (
+            <>
+              <dt className="text-accent-500">resolved_at</dt>
+              <dd className="m-0 font-mono text-xs text-accent-700">{dispute.resolved_at}</dd>
+            </>
+          )}
 
-        {dispute.resolved_at ? (
-          <>
-            <dt style={{ color: "#666" }}>resolved_at</dt>
-            <dd style={{ margin: 0 }}>{dispute.resolved_at}</dd>
-          </>
-        ) : null}
+          {dispute.resolution && (
+            <>
+              <dt className="text-accent-500">resolution</dt>
+              <dd className="m-0">
+                <Mono>{dispute.resolution}</Mono>
+              </dd>
+            </>
+          )}
+        </dl>
 
-        {dispute.resolution ? (
-          <>
-            <dt style={{ color: "#666" }}>resolution</dt>
-            <dd style={{ margin: 0 }}>
-              <code>{dispute.resolution}</code>
-            </dd>
-          </>
-        ) : null}
-      </dl>
+        {dispute.narrative && (
+          <div className="mt-5 border-t border-accent-100 pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-accent-500">
+              narrative
+            </h3>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-accent-800">
+              {dispute.narrative}
+            </p>
+          </div>
+        )}
 
-      {dispute.narrative ? (
-        <div style={{ marginTop: 16 }}>
-          <h3 style={{ fontSize: 13, color: "#666", margin: 0, marginBottom: 4 }}>narrative</h3>
-          <p
-            style={{
-              fontSize: 13,
-              color: "#222",
-              margin: 0,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {dispute.narrative}
-          </p>
-        </div>
-      ) : null}
-
-      {dispute.claimed_remedy ? (
-        <div style={{ marginTop: 12 }}>
-          <h3 style={{ fontSize: 13, color: "#666", margin: 0, marginBottom: 4 }}>
-            claimed_remedy
-          </h3>
-          <p style={{ fontSize: 13, color: "#222", margin: 0, wordBreak: "break-word" }}>
-            {dispute.claimed_remedy}
-          </p>
-        </div>
-      ) : null}
-    </aside>
+        {dispute.claimed_remedy && (
+          <div className="mt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-accent-500">
+              claimed_remedy
+            </h3>
+            <p className="mt-2 break-words text-sm leading-relaxed text-accent-800">
+              {dispute.claimed_remedy}
+            </p>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -367,43 +301,30 @@ function ChainColumn({
   chain: Awaited<ReturnType<typeof getConversation>>;
 }) {
   return (
-    <section>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 12,
-        }}
-      >
-        <h2 style={{ fontSize: 15, margin: 0 }}>
-          Linked conversation: <code>{dispute.conversation_id}</code>
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-accent-900">
+          Linked conversation: <Mono breakAll>{dispute.conversation_id}</Mono>
         </h2>
-        {chain ? (
-          <span style={{ fontSize: 13, color: "#666" }}>
+        {chain && (
+          <span className="text-sm text-accent-600">
             {chain.total} event{chain.total === 1 ? "" : "s"}
           </span>
-        ) : null}
+        )}
       </div>
 
       {!chain ? (
-        <div
-          style={{
-            border: "1px solid #f0c0c0",
-            background: "#fff5f5",
-            color: "#7a1f1f",
-            borderRadius: 8,
-            padding: 16,
-          }}
-        >
-          <p style={{ margin: 0 }}>
-            Couldn't load the linked conversation. The cloud-api may be unreachable.
-          </p>
-        </div>
+        <Alert tone="danger">
+          Couldn't load the linked conversation. The cloud-api may be unreachable.
+        </Alert>
       ) : chain.events.length === 0 ? (
-        <p style={{ color: "#666" }}>The linked chain is empty.</p>
+        <Card>
+          <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
+            The linked chain is empty.
+          </CardBody>
+        </Card>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="flex flex-col gap-2">
           {chain.events.map((event) => (
             <EventCard key={event.event_id} event={event} />
           ))}
@@ -422,75 +343,50 @@ function EventCard({ event }: { event: ConversationEvent }) {
         : null;
 
   return (
-    <li
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 8,
-        background: "#fff",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "baseline",
-          marginBottom: 4,
-        }}
-      >
-        <code style={{ fontSize: 12, color: "#0366d6" }}>{event.event_id}</code>
-        {ts ? <span style={{ fontSize: 11, color: "#888" }}>{ts}</span> : null}
-      </div>
-      <div style={{ fontSize: 13 }}>
-        <code>{event.type}</code>{" "}
-        <span style={{ color: "#666" }}>
-          by <code>{event.actor_aid}</code>
-        </span>
-      </div>
-      <details style={{ marginTop: 6 }}>
-        <summary style={{ cursor: "pointer", fontSize: 12, color: "#555" }}>view raw</summary>
-        <pre
-          style={{
-            background: "#f8f8f8",
-            border: "1px solid #eee",
-            borderRadius: 6,
-            padding: 8,
-            fontSize: 11,
-            overflowX: "auto",
-            marginTop: 6,
-            marginBottom: 0,
-          }}
-        >
-          {JSON.stringify(event, null, 2)}
-        </pre>
-      </details>
+    <li>
+      <Card>
+        <CardBody className="p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <code className="font-mono text-xs font-medium text-accent-900">{event.event_id}</code>
+            {ts && <time className="font-mono text-[11px] text-accent-500">{ts}</time>}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+            <Mono>{event.type}</Mono>
+            <span className="text-accent-500">by</span>
+            <Mono breakAll>{event.actor_aid}</Mono>
+          </div>
+          <details className="mt-3">
+            <summary className="cursor-pointer select-none text-xs font-medium text-accent-600 hover:text-accent-900">
+              view raw
+            </summary>
+            <pre className="mt-2 overflow-x-auto rounded-md border border-accent-100 bg-accent-50/50 p-3 font-mono text-[11px] text-accent-800">
+              {JSON.stringify(event, null, 2)}
+            </pre>
+          </details>
+        </CardBody>
+      </Card>
     </li>
   );
 }
 
 function StateBadge({ state }: { state: string }) {
-  const palette: Record<string, { bg: string; fg: string; border: string }> = {
-    open: { bg: "#fff8e8", fg: "#5a4400", border: "#e3a23a" },
-    resolved: { bg: "#f3fbf3", fg: "#1f5a1f", border: "#c3e6c3" },
-    rejected: { bg: "#fff5f5", fg: "#7a1f1f", border: "#f0c0c0" },
-  };
-  const colors = palette[state] ?? { bg: "#f4f4f4", fg: "#333", border: "#ccc" };
+  const tone =
+    state === "resolved"
+      ? "success"
+      : state === "rejected"
+        ? "danger"
+        : state === "open"
+          ? "warn"
+          : "neutral";
+  return <Badge tone={tone}>{state}</Badge>;
+}
+
+function Mono({ children, breakAll = false }: { children: React.ReactNode; breakAll?: boolean }) {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: 999,
-        background: colors.bg,
-        color: colors.fg,
-        border: `1px solid ${colors.border}`,
-        fontSize: 12,
-        fontWeight: 600,
-      }}
+    <code
+      className={`rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800${breakAll ? " break-all" : ""}`}
     >
-      {state}
-    </span>
+      {children}
+    </code>
   );
 }

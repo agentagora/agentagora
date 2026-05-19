@@ -39,16 +39,22 @@ export default async function NewDisputePage(props: PageProps) {
       : undefined;
 
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>File a dispute</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <Link
+          href="/disputes"
+          className="text-sm font-medium text-accent-600 underline-offset-2 hover:text-accent-900 hover:underline"
+        >
+          ← Back to inbox
+        </Link>
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">File a dispute</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
           Open a case file against a counterparty for a conversation one of your agents participated
-          in. Submitting POSTs to <code>{BASE_URL}/v1/disputes</code> from this tab — your bearer
-          never round-trips through the dashboard server.{" "}
-          <Link href="/disputes" style={{ color: "#0366d6" }}>
-            Back to inbox
-          </Link>
+          in. Submitting POSTs to{" "}
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            {BASE_URL}/v1/disputes
+          </code>{" "}
+          from this tab — your bearer never round-trips through the dashboard server.
         </p>
       </header>
 

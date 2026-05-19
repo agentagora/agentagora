@@ -16,6 +16,9 @@ import {
   getOwnedAgents,
   listOwnedConversations,
 } from "../../../lib/cloud-api";
+import { Alert } from "../../_components/alert";
+import { Button } from "../../_components/button";
+import { Card, CardBody } from "../../_components/card";
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
@@ -28,11 +31,11 @@ export default async function ConversationsPage(props: PageProps) {
   const id = typeof searchParams.id === "string" ? searchParams.id.trim() : "";
 
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Conversations</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
-          Look up an audit chain by <code>conversation_id</code>, or browse the conversations your
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Conversations</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
+          Look up an audit chain by <Mono>conversation_id</Mono>, or browse the conversations your
           agents have participated in.
         </p>
       </header>
@@ -102,11 +105,11 @@ async function OwnerInbox({
     return <EmptyInbox />;
   }
   return (
-    <section>
-      <h2 style={{ fontSize: 15, marginTop: 0, marginBottom: 12 }}>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-accent-500">
         Your conversations ({rows.length})
       </h2>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <ul className="flex flex-col gap-2">
         {rows.map((row) => (
           <ConversationRow key={row.conversation_id} row={row} />
         ))}
@@ -121,104 +124,84 @@ function ConversationRow({
   row: OwnedConversationSummary & { actor_aids: string[] };
 }) {
   return (
-    <li
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 14,
-        marginBottom: 10,
-        background: "#fff",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "baseline",
-        }}
+    <li>
+      <Link
+        href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
+        className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
       >
-        <Link
-          href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
-          style={{ fontWeight: 600, color: "#0366d6", textDecoration: "none" }}
-        >
-          <code>{row.conversation_id}</code>
-        </Link>
-        <span style={{ fontSize: 12, color: "#888" }}>{row.last_seen_at}</span>
-      </div>
-      <div style={{ fontSize: 13, color: "#444", marginTop: 4 }}>
-        <code>{row.latest_event_type}</code>
-        <span style={{ color: "#888", marginLeft: 12 }}>
-          {row.event_count} event{row.event_count === 1 ? "" : "s"} as{" "}
-          {row.actor_aids.map((a, i) => (
-            <span key={a}>
-              {i > 0 ? ", " : null}
-              <code>{a}</code>
-            </span>
-          ))}
-        </span>
-      </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+            {row.conversation_id}
+          </code>
+          <time className="font-mono text-xs text-accent-500">{row.last_seen_at}</time>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            {row.latest_event_type}
+          </code>
+          <span aria-hidden="true">·</span>
+          <span>
+            {row.event_count} event{row.event_count === 1 ? "" : "s"}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            as
+            {row.actor_aids.map((a) => (
+              <code
+                key={a}
+                className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700"
+              >
+                {a}
+              </code>
+            ))}
+          </span>
+        </div>
+      </Link>
     </li>
   );
 }
 
 function EmptyInbox() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ margin: 0 }}>
+    <Card>
+      <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
         Your agents haven't participated in any conversations yet. Once they emit signed audit
         events, the chains they appear in will show up here.
-      </p>
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 
 function NoAgentsHint() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ margin: 0 }}>
-        You haven't published any agents yet. <Link href="/agents/new">Publish one →</Link>
-      </p>
-    </div>
+    <Card>
+      <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
+        You haven't published any agents yet.{" "}
+        <Link
+          href="/agents/new"
+          className="font-medium text-accent-900 underline underline-offset-2 hover:text-accent-700"
+        >
+          Publish one →
+        </Link>
+      </CardBody>
+    </Card>
   );
 }
 
 function NeedOwnerHint() {
   return (
-    <div
-      style={{
-        border: "1px dashed #ccc",
-        borderRadius: 8,
-        padding: 24,
-        background: "#fff",
-        color: "#555",
-      }}
-    >
-      <p style={{ marginTop: 0, marginBottom: 8 }}>
-        Sign in via GitHub to see the conversations your agents have participated in. The
-        owner-scoped index needs the dashboard to know your owner ID.
-      </p>
-      <p style={{ margin: 0 }}>
-        For now, you can still look up any chain by <code>conversation_id</code> using the form
-        above.
-      </p>
-    </div>
+    <Card>
+      <CardBody className="flex flex-col gap-3 border border-dashed border-accent-200 text-sm text-accent-600">
+        <p>
+          Sign in via GitHub to see the conversations your agents have participated in. The
+          owner-scoped index needs the dashboard to know your owner ID.
+        </p>
+        <p>
+          For now, you can still look up any chain by <Mono>conversation_id</Mono> using the form
+          above.
+        </p>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -235,20 +218,10 @@ async function ChainView({
 
   if (!chain) {
     return (
-      <div
-        style={{
-          border: "1px solid #f0c0c0",
-          background: "#fff5f5",
-          color: "#7a1f1f",
-          borderRadius: 8,
-          padding: 16,
-        }}
-      >
-        <p style={{ margin: 0 }}>
-          No conversation found for <code>{id}</code>. Either the cloud-api is unreachable or no
-          events have been ingested under that ID yet.
-        </p>
-      </div>
+      <Alert tone="danger" title="No chain found">
+        No conversation found for <Mono>{id}</Mono>. Either the cloud-api is unreachable or no
+        events have been ingested under that ID yet.
+      </Alert>
     );
   }
 
@@ -272,45 +245,29 @@ async function ChainView({
     : `/disputes/new?conversation_id=${encodeURIComponent(chain.conversation_id)}`;
 
   return (
-    <section>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 12,
-          gap: 12,
-        }}
-      >
-        <h2 style={{ fontSize: 16, margin: 0 }}>
-          <code>{chain.conversation_id}</code>
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="font-mono text-base font-semibold text-accent-900">
+          {chain.conversation_id}
         </h2>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "#666" }}>
+        <div className="flex flex-wrap items-baseline gap-4">
+          <span className="text-sm text-accent-600">
             {chain.total} event{chain.total === 1 ? "" : "s"}
           </span>
-          <Link
-            href={fileHref}
-            style={{
-              padding: "6px 12px",
-              background: "#0366d6",
-              color: "#fff",
-              borderRadius: 6,
-              textDecoration: "none",
-              fontWeight: 600,
-              fontSize: 13,
-              whiteSpace: "nowrap",
-            }}
-          >
-            File a dispute
+          <Link href={fileHref}>
+            <Button size="sm">File a dispute</Button>
           </Link>
         </div>
       </div>
 
       {chain.events.length === 0 ? (
-        <p style={{ color: "#666" }}>The chain is empty (no events have been ingested yet).</p>
+        <Card>
+          <CardBody className="border border-dashed border-accent-200 text-center text-sm text-accent-500">
+            The chain is empty (no events have been ingested yet).
+          </CardBody>
+        </Card>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="flex flex-col gap-3">
           {chain.events.map((event) => (
             <EventCard key={event.event_id} event={event} />
           ))}
@@ -330,82 +287,64 @@ function EventCard({ event }: { event: ConversationEvent }) {
         : null;
 
   return (
-    <li
-      style={{
-        border: "1px solid #e3e3e3",
-        borderRadius: 8,
-        padding: 16,
-        marginBottom: 12,
-        background: "#fff",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          alignItems: "baseline",
-          marginBottom: 8,
-        }}
-      >
-        <code style={{ fontSize: 13, color: "#0366d6" }}>{event.event_id}</code>
-        {ts ? <span style={{ fontSize: 12, color: "#888" }}>{ts}</span> : null}
-      </div>
+    <li>
+      <Card>
+        <CardBody>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <code className="font-mono text-sm font-medium text-accent-900">{event.event_id}</code>
+            {ts && <time className="font-mono text-xs text-accent-500">{ts}</time>}
+          </div>
 
-      <dl
-        style={{
-          display: "grid",
-          gridTemplateColumns: "max-content 1fr",
-          gap: "4px 16px",
-          fontSize: 13,
-          margin: 0,
-        }}
-      >
-        <dt style={{ color: "#666" }}>type</dt>
-        <dd style={{ margin: 0 }}>
-          <code>{event.type}</code>
-        </dd>
-
-        <dt style={{ color: "#666" }}>actor</dt>
-        <dd style={{ margin: 0 }}>
-          <code>{event.actor_aid}</code>
-        </dd>
-
-        {prevHash ? (
-          <>
-            <dt style={{ color: "#666" }}>prev_hash</dt>
-            <dd style={{ margin: 0 }}>
-              <code style={{ fontSize: 12 }} title={prevHash}>
-                {truncate(prevHash, 24)}
-              </code>
+          <dl
+            className="mt-3 grid items-baseline gap-x-6 gap-y-1.5 text-sm"
+            style={{ gridTemplateColumns: "max-content 1fr" }}
+          >
+            <dt className="text-accent-500">type</dt>
+            <dd className="m-0">
+              <Mono>{event.type}</Mono>
             </dd>
-          </>
-        ) : (
-          <>
-            <dt style={{ color: "#666" }}>prev_hash</dt>
-            <dd style={{ margin: 0, color: "#999" }}>(genesis)</dd>
-          </>
-        )}
-      </dl>
 
-      <details style={{ marginTop: 10 }}>
-        <summary style={{ cursor: "pointer", fontSize: 13, color: "#555" }}>view raw</summary>
-        <pre
-          style={{
-            background: "#f8f8f8",
-            border: "1px solid #eee",
-            borderRadius: 6,
-            padding: 10,
-            fontSize: 12,
-            overflowX: "auto",
-            marginTop: 8,
-            marginBottom: 0,
-          }}
-        >
-          {JSON.stringify(event, null, 2)}
-        </pre>
-      </details>
+            <dt className="text-accent-500">actor</dt>
+            <dd className="m-0">
+              <Mono breakAll>{event.actor_aid}</Mono>
+            </dd>
+
+            <dt className="text-accent-500">prev_hash</dt>
+            <dd className="m-0">
+              {prevHash ? (
+                <code
+                  className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800"
+                  title={prevHash}
+                >
+                  {truncate(prevHash, 24)}
+                </code>
+              ) : (
+                <span className="font-mono text-xs text-accent-400">(genesis)</span>
+              )}
+            </dd>
+          </dl>
+
+          <details className="mt-4">
+            <summary className="cursor-pointer select-none text-xs font-medium text-accent-600 hover:text-accent-900">
+              view raw
+            </summary>
+            <pre className="mt-2 overflow-x-auto rounded-md border border-accent-100 bg-accent-50/50 p-3 font-mono text-[11px] text-accent-800">
+              {JSON.stringify(event, null, 2)}
+            </pre>
+          </details>
+        </CardBody>
+      </Card>
     </li>
+  );
+}
+
+function Mono({ children, breakAll = false }: { children: React.ReactNode; breakAll?: boolean }) {
+  return (
+    <code
+      className={`rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800${breakAll ? " break-all" : ""}`}
+    >
+      {children}
+    </code>
   );
 }
 
