@@ -272,6 +272,20 @@ Landed at `astro@5.18.1`. The marketing site (only Astro consumer) builds cleanl
 - **Acceptance:** CI run on a fresh push is green with the moderate floor.
 - **Time:** 5 min — when ready.
 
+### M.18  Backfill cloud-api coverage: fail-closed + body-limit + L4
+
+- **Why:** the M3 §D gate locked cloud-api at 67% lines/statements. After Hono 4.6 → 4.12.18 + the M7/M9/M10/M11/L4 hardening pack, measured coverage dropped to 66.84%. The drop is real (new code paths fire only under conditions the unit suite doesn't simulate) but doesn't reflect missing test value — it reflects missing tests on already-shipped guards. The threshold was lowered to 65 in `apps/cloud/api/vitest.config.ts` as a stop-gap so green CI doesn't block UI PRs.
+- **What:** add unit tests for these specific branches, then bump the floor back to ≥72 (the post-hardening target should be higher than the original 67 since the security pack added MORE testable surface, not less):
+  - **M7 fail-closed checks** — set `AAP_ENV=production` + leave `NONCES` / `RATE_LIMITS` KV bindings unset, assert `createApi` throws the production-must-bind error. Mirror tests for the success path (production with bindings).
+  - **M11 body-limit middleware** — POST `> tooLarge(N)` bytes to `/v1/audit/ingest` (1024 KiB cap), `/v1/agents` (64 KiB), `/v1/disputes` (16 KiB); assert 413 + `{ error: "payload_too_large" }` envelope. Confirm under-limit happy path still returns the existing 200/201.
+  - **L4 auth-before-503** — call `POST /v1/connect/account` and `POST /v1/connect/onboarding` with no bearer / invalid bearer when Stripe is unconfigured; assert 401 (not 503). Confirm 503 still fires when bearer is valid + Stripe is unconfigured.
+- **Acceptance:**
+  - `pnpm --filter @agentagora/cloud-api test --coverage` reports lines ≥ 72, statements ≥ 72
+  - `apps/cloud/api/vitest.config.ts` thresholds bumped back to ≥ 72 (no longer 65)
+  - Comment in vitest.config.ts updated to record the new post-backfill baseline
+  - One-line CHANGELOG entry under "Testing"
+- **Time:** 2-3 hours (most of the time is wiring the production-env test harness — `vi.stubEnv` + a fresh `createApi` per case).
+
 ---
 
 ## Group F — M4 spec-hardening decisions
