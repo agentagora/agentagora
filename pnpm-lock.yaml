@@ -70,6 +70,9 @@ importers:
       '@agentagora/protocol':
         specifier: workspace:*
         version: link:../../../packages/protocol
+      '@fontsource-variable/inter':
+        specifier: ^5.2.5
+        version: 5.2.8
       '@noble/ed25519':
         specifier: ^2.3.0
         version: 2.3.0
@@ -79,6 +82,9 @@ importers:
       canonicalize:
         specifier: ^2.1.0
         version: 2.1.0
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       next:
         specifier: ^15.5.18
         version: 15.5.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -98,6 +104,15 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.0(postcss@8.5.13)
+      postcss:
+        specifier: ^8.5.10
+        version: 8.5.13
+      tailwindcss:
+        specifier: ^3.4.17
+        version: 3.4.19(tsx@4.21.0)(yaml@2.8.4)
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -1088,6 +1103,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/inter@5.2.8':
+    resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
 
   '@gerrit0/mini-shiki@3.23.0':
     resolution: {integrity: sha512-bEMORlG0cqdjVyCEuU0cDQbORWX+kYCeo0kV1lbxF5bt4r7SID2l9bqsxJEM0zndaxpOUT7riCyIVEuqq/Ynxg==}
@@ -4486,6 +4504,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.7':
     optional: true
+
+  '@fontsource-variable/inter@5.2.8': {}
 
   '@gerrit0/mini-shiki@3.23.0':
     dependencies:

@@ -1,0 +1,38 @@
+/* Self-hosted Inter Variable — no network round-trip, no FOUC, no
+   Google Fonts privacy footprint. Browsers fall back through the
+   Tailwind `font-sans` stack if the variable face is unavailable. */
+@import "@fontsource-variable/inter";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-white font-sans text-accent-800 antialiased;
+  }
+
+  ::selection {
+    @apply bg-accent-800 text-white;
+  }
+
+  /* Hide spin buttons on number inputs across browsers — they leak
+     visual noise into financial pages (earnings, dispute amounts). */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
