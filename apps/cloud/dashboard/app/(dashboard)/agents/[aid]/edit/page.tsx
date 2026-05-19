@@ -23,6 +23,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOwner } from "../../../../../lib/auth";
 import { BASE_URL, getAgent } from "../../../../../lib/cloud-api";
+import { Alert } from "../../../../_components/alert";
 import { EditManifestForm } from "./_edit-form";
 
 interface Params {
@@ -44,56 +45,64 @@ export default async function EditAgentPage(props: { params: Promise<Params> }) 
 
   if (!ownsRecord) {
     return (
-      <div>
-        <header style={{ marginBottom: 16 }}>
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-col gap-3">
           <Link
             href={`/agents/${encodeURIComponent(aid)}`}
-            style={{ fontSize: 13, color: "#0366d6" }}
+            className="text-sm font-medium text-accent-600 underline-offset-2 hover:text-accent-900 hover:underline"
           >
             ← Back to {aid}
           </Link>
-          <h1 style={{ marginTop: 8, marginBottom: 4 }}>Not your agent</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Not your agent</h1>
         </header>
-        <div
-          role="alert"
-          style={{
-            border: "1px solid #d93025",
-            background: "#fce8e6",
-            color: "#7c0c00",
-            borderRadius: 8,
-            padding: 16,
-            fontSize: 14,
-            maxWidth: 640,
-          }}
-        >
-          <p style={{ margin: "0 0 8px" }}>
+        <Alert tone="danger" title="Owner mismatch">
+          <p className="leading-relaxed">
             This AID is registered to a different owner — the cloud-api would refuse a re-publish
             from your account anyway.
           </p>
-          <p style={{ margin: 0 }}>
-            Pinned to: <code>{detail.published_by}</code>
-            <br />
-            Your session: <code>{ownerId ?? "(unknown — non-OAuth bearer)"}</code>
-          </p>
-        </div>
+          <dl
+            className="mt-3 grid gap-x-6 gap-y-1 text-sm"
+            style={{ gridTemplateColumns: "max-content 1fr" }}
+          >
+            <dt className="text-red-800/80">Pinned to</dt>
+            <dd className="m-0">
+              <code className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-[12px] text-red-900">
+                {detail.published_by}
+              </code>
+            </dd>
+            <dt className="text-red-800/80">Your session</dt>
+            <dd className="m-0">
+              <code className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-[12px] text-red-900">
+                {ownerId ?? "(unknown — non-OAuth bearer)"}
+              </code>
+            </dd>
+          </dl>
+        </Alert>
       </div>
     );
   }
 
   return (
-    <div>
-      <header style={{ marginBottom: 16 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
         <Link
           href={`/agents/${encodeURIComponent(aid)}`}
-          style={{ fontSize: 13, color: "#0366d6" }}
+          className="text-sm font-medium text-accent-600 underline-offset-2 hover:text-accent-900 hover:underline"
         >
           ← Back to {aid}
         </Link>
-        <h1 style={{ marginTop: 8, marginBottom: 4 }}>Edit manifest</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
-          Update the manifest for <code>{aid}</code>. Cloud-api's <code>POST /v1/agents</code> is an
-          upsert keyed on AID — this re-signs a fresh manifest with the same key you originally
-          published with and replaces the registry entry.
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Edit manifest</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
+          Update the manifest for{" "}
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            {aid}
+          </code>
+          . Cloud-api's{" "}
+          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+            POST /v1/agents
+          </code>{" "}
+          is an upsert keyed on AID — this re-signs a fresh manifest with the same key you
+          originally published with and replaces the registry entry.
         </p>
       </header>
 
