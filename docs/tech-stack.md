@@ -96,7 +96,7 @@ Exceptions are quarantined to platform-specific entry points (e.g., `agentagora/
 
 ### 4.2 Validation: Zod
 
-**Why**: de facto standard, excellent inference, runtime + compile-time types from one source. Hono has first-class Zod integration via `@hono/zod-validator`.
+**Why**: de facto standard, excellent inference, runtime + compile-time types from one source. We use Zod schemas (from `@agentagora/protocol`) for parse-at-the-route-handler validation directly inside Hono route handlers — no integration middleware needed.
 
 **Used for**:
 - Capability input/output schemas in manifests (Zod schemas serialized to JSON Schema for the wire)

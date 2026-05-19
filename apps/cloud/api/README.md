@@ -65,7 +65,7 @@ pnpm --filter @agentagora/cloud-api check # bundle dry-run
 ## Architecture
 
 - **Hono** for routing (Workers-native)
-- **`@hono/zod-validator`** for body/param validation
+- **Zod schemas from `@agentagora/protocol`** for body/param validation (parse-at-the-route-handler pattern)
 - **`Storage` interface** — `D1Storage` (production) or `InMemoryStorage` (no binding / unit tests)
 - Same SDK-side bundle-budget rules apply: web standards only, no Node-specific imports
 

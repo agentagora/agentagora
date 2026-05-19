@@ -66,7 +66,7 @@ Audit ingest is intentionally not rate-limited — every event already carries a
 ## Architecture
 
 - **Hono** for routing (Workers-native)
-- **`@hono/zod-validator`** for body/param validation
+- **Zod schemas from `@agentagora/protocol`** for body/param validation (parse-at-the-route-handler pattern)
 - **`Storage` interface** — `D1Storage` (production) or `InMemoryStorage` (tests)
 - Bundle-budget rules: web standards only, no Node-specific imports
 

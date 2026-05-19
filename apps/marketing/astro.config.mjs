@@ -1,5 +1,4 @@
 import sitemap from "@astrojs/sitemap";
-import tailwind from "@astrojs/tailwind";
 import { defineConfig } from "astro/config";
 
 // https://astro.build/config
@@ -23,10 +22,5 @@ const SITE_URL = process.env.SITE_URL ?? "https://agentagora.dev";
 
 export default defineConfig({
   site: SITE_URL,
-  integrations: [
-    tailwind({
-      applyBaseStyles: false,
-    }),
-    sitemap(),
-  ],
+  integrations: [sitemap()],
 });
