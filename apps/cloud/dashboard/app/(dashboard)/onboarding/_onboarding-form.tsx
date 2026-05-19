@@ -20,6 +20,10 @@
  */
 
 import { useState } from "react";
+import { Alert } from "../../_components/alert";
+import { Button } from "../../_components/button";
+import { Input } from "../../_components/input";
+import { Field, FormError, FormHint, Label } from "../../_components/label";
 
 interface Props {
   cloudApiBaseUrl: string;
@@ -95,94 +99,51 @@ export function OnboardingForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16, maxWidth: 480 }}
-    >
-      <fieldset
-        disabled={busy}
-        style={{ border: "1px solid #e3e3e3", borderRadius: 8, padding: 16, background: "#fff" }}
-      >
-        <legend style={{ padding: "0 6px", fontSize: 13, color: "#666" }}>Stripe account</legend>
-
-        <Field label="Email (optional — prefills your Stripe account)">
-          <input
+    <form onSubmit={onSubmit} className="flex max-w-[480px] flex-col gap-4">
+      <fieldset disabled={busy} className="flex flex-col gap-4 disabled:opacity-60">
+        <Field>
+          <Label htmlFor="onboarding-email" hint="(optional — prefills your Stripe account)">
+            Email
+          </Label>
+          <Input
+            id="onboarding-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             autoComplete="email"
-            style={inputStyle()}
           />
         </Field>
 
-        <Field label="Country (2-letter ISO code)">
-          <input
+        <Field>
+          <Label htmlFor="onboarding-country" hint="(2-letter ISO code)">
+            Country
+          </Label>
+          <Input
+            id="onboarding-country"
             type="text"
             value={country}
             onChange={(e) => setCountry(e.target.value.toUpperCase())}
             required
             pattern="[A-Z]{2}"
             maxLength={2}
-            style={inputStyle("mono")}
+            mono
           />
+          <FormHint>
+            Determines which Stripe entity (Stripe US, Stripe Ireland, …) hosts you.
+          </FormHint>
         </Field>
       </fieldset>
 
-      {err ? (
-        <div
-          role="alert"
-          style={{
-            border: "1px solid #d93025",
-            background: "#fce8e6",
-            color: "#7c0c00",
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 14,
-          }}
-        >
-          {err}
-        </div>
-      ) : null}
+      {err && (
+        <Alert tone="danger">
+          <FormError>{err}</FormError>
+        </Alert>
+      )}
 
-      <button
-        type="submit"
-        disabled={busy}
-        style={{
-          padding: "10px 16px",
-          background: busy ? "#9ec5fe" : "#0366d6",
-          color: "#fff",
-          border: 0,
-          borderRadius: 6,
-          fontWeight: 600,
-          cursor: busy ? "wait" : "pointer",
-          alignSelf: "flex-start",
-        }}
-      >
+      <Button type="submit" disabled={busy} size="md" className="self-start">
         {busy ? "Contacting Stripe…" : submitLabel}
-      </button>
+      </Button>
     </form>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: <label> wraps `children` which is always an input; biome can't see through React.ReactNode.
-    <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-      <span style={{ fontSize: 13, color: "#333" }}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function inputStyle(variant?: "mono"): React.CSSProperties {
-  return {
-    padding: "8px 10px",
-    border: "1px solid #ccc",
-    borderRadius: 6,
-    fontSize: 14,
-    fontFamily: variant === "mono" ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "inherit",
-    width: "100%",
-    boxSizing: "border-box",
-  };
 }

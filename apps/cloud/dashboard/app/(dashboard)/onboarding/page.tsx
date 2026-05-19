@@ -16,6 +16,9 @@
 
 import { requireOwner } from "../../../lib/auth";
 import { BASE_URL, getStripeAccount } from "../../../lib/cloud-api";
+import { Alert } from "../../_components/alert";
+import { Badge } from "../../_components/badge";
+import { Card, CardBody, CardHeader } from "../../_components/card";
 import { OnboardingForm } from "./_onboarding-form";
 
 export default async function OnboardingPage() {
@@ -23,10 +26,12 @@ export default async function OnboardingPage() {
   const account = await getStripeAccount(session.bearer);
 
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Stripe Connect onboarding</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">
+          Stripe Connect onboarding
+        </h1>
+        <p className="text-sm leading-relaxed text-accent-600">
           Connect a Stripe Express account so capabilities priced in real money can route payouts to
           you. The dashboard hands you off to Stripe's hosted onboarding flow; you'll land back here
           when it's done.
@@ -51,38 +56,28 @@ function Body({
 }) {
   if (account.kind === "unreachable") {
     return (
-      <div
-        style={{
-          border: "1px solid #f0c0c0",
-          background: "#fff5f5",
-          color: "#7a1f1f",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Cloud-api is unreachable</h2>
-        <p style={{ margin: 0 }}>
-          We couldn't read your Stripe account status. Try again in a moment.
-        </p>
-      </div>
+      <Alert tone="danger" title="Cloud-api is unreachable">
+        We couldn't read your Stripe account status. Try again in a moment.
+      </Alert>
     );
   }
 
   if (account.kind === "missing") {
     return (
-      <section>
-        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Create your Stripe Connect account</h2>
-        <p style={{ color: "#555", marginTop: 0 }}>
-          Submitting this form creates an Express account on Stripe and forwards you to their hosted
-          onboarding form. Country and email are passed straight through to Stripe.
-        </p>
-        <OnboardingForm
-          cloudApiBaseUrl={BASE_URL}
-          bearer={bearer}
-          defaultEmail={looksLikeEmail(email) ? email : undefined}
-          submitLabel="Start Stripe onboarding"
+      <Card>
+        <CardHeader
+          title="Create your Stripe Connect account"
+          description="Submitting this form creates an Express account on Stripe and forwards you to their hosted onboarding form. Country and email are passed straight through to Stripe."
         />
-      </section>
+        <CardBody>
+          <OnboardingForm
+            cloudApiBaseUrl={BASE_URL}
+            bearer={bearer}
+            defaultEmail={looksLikeEmail(email) ? email : undefined}
+            submitLabel="Start Stripe onboarding"
+          />
+        </CardBody>
+      </Card>
     );
   }
 
@@ -91,50 +86,50 @@ function Body({
 
   if (status.charges_enabled) {
     return (
-      <div
-        style={{
-          border: "1px solid #c3e6c3",
-          background: "#f3fbf3",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Onboarding complete</h2>
-        <p style={{ color: "#1f5a1f" }}>
-          Account <code>{account_id}</code> is ready to receive payouts.
-        </p>
-        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-      </div>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-3">
+              Onboarding complete
+              <Badge tone="success">live</Badge>
+            </span>
+          }
+          description={
+            <>
+              Account <Mono>{account_id}</Mono> is ready to receive payouts.
+            </>
+          }
+        />
+        <CardBody>
+          <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+        </CardBody>
+      </Card>
     );
   }
 
   if (!status.details_submitted) {
     return (
-      <section>
-        <div
-          style={{
-            border: "1px solid #e3a23a",
-            background: "#fff8e8",
-            borderRadius: 8,
-            padding: 20,
-            marginBottom: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: 16 }}>Resume onboarding</h2>
-          <p style={{ color: "#5a4400", marginBottom: 0 }}>
-            Your Stripe account <code>{account_id}</code> exists but Stripe still needs the rest of
-            your business details. Re-submit to fetch a fresh hosted-onboarding link (Stripe links
-            expire after a short window).
-          </p>
-        </div>
-        <OnboardingForm
-          cloudApiBaseUrl={BASE_URL}
-          bearer={bearer}
-          defaultEmail={looksLikeEmail(email) ? email : undefined}
-          submitLabel="Resume onboarding"
-        />
-        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-      </section>
+      <div className="flex flex-col gap-4">
+        <Alert tone="warn" title="Resume onboarding">
+          Your Stripe account <Mono>{account_id}</Mono> exists but Stripe still needs the rest of
+          your business details. Re-submit to fetch a fresh hosted-onboarding link (Stripe links
+          expire after a short window).
+        </Alert>
+        <Card>
+          <CardHeader title="Resume Stripe onboarding" />
+          <CardBody>
+            <OnboardingForm
+              cloudApiBaseUrl={BASE_URL}
+              bearer={bearer}
+              defaultEmail={looksLikeEmail(email) ? email : undefined}
+              submitLabel="Resume onboarding"
+            />
+            <div className="mt-6">
+              <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+            </div>
+          </CardBody>
+        </Card>
+      </div>
     );
   }
 
@@ -142,21 +137,20 @@ function Body({
   // is reviewing. We don't generate a new link in that state; the
   // user just waits.
   return (
-    <div
-      style={{
-        border: "1px solid #e3e3e3",
-        background: "#fff",
-        borderRadius: 8,
-        padding: 20,
-      }}
-    >
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>Stripe is reviewing your account</h2>
-      <p style={{ color: "#555" }}>
-        You've submitted your details; Stripe hasn't enabled charges yet. This is normal and usually
-        clears within a business day.
-      </p>
-      <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-    </div>
+    <Card>
+      <CardHeader
+        title={
+          <span className="flex items-center gap-3">
+            Stripe is reviewing your account
+            <Badge tone="info">in review</Badge>
+          </span>
+        }
+        description="You've submitted your details; Stripe hasn't enabled charges yet. This is normal and usually clears within a business day."
+      />
+      <CardBody>
+        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+      </CardBody>
+    </Card>
   );
 }
 
@@ -170,25 +164,24 @@ function AccountMeta({
   updatedAt: string;
 }) {
   return (
-    <dl
-      style={{
-        display: "grid",
-        gridTemplateColumns: "max-content 1fr",
-        gap: "4px 16px",
-        fontSize: 13,
-        marginTop: 16,
-        marginBottom: 0,
-      }}
-    >
-      <dt style={{ color: "#666" }}>account_id</dt>
-      <dd style={{ margin: 0 }}>
-        <code>{accountId}</code>
+    <dl className="grid gap-x-6 gap-y-1 text-sm" style={{ gridTemplateColumns: "max-content 1fr" }}>
+      <dt className="text-accent-500">account_id</dt>
+      <dd className="m-0">
+        <Mono>{accountId}</Mono>
       </dd>
-      <dt style={{ color: "#666" }}>created</dt>
-      <dd style={{ margin: 0 }}>{createdAt}</dd>
-      <dt style={{ color: "#666" }}>updated</dt>
-      <dd style={{ margin: 0 }}>{updatedAt}</dd>
+      <dt className="text-accent-500">created</dt>
+      <dd className="m-0 font-mono text-xs text-accent-700">{createdAt}</dd>
+      <dt className="text-accent-500">updated</dt>
+      <dd className="m-0 font-mono text-xs text-accent-700">{updatedAt}</dd>
     </dl>
+  );
+}
+
+function Mono({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+      {children}
+    </code>
   );
 }
 

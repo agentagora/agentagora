@@ -1,27 +1,23 @@
 /**
- * Logout button. Server Component that renders a form posting to
- * the `/api/auth/logout` Route Handler — no client JS required, so
- * we can keep the dashboard layout fully server-rendered.
+ * Logout button — Server Component that renders a form posting to the
+ * `/api/auth/logout` Route Handler. Form-based logout keeps the
+ * dashboard layout fully server-rendered (no `"use client"`,
+ * no `useState`) and works without JS.
+ *
+ * The button uses the design-system `<Button variant="secondary" />`
+ * primitive so the styling lives in one place — change the secondary
+ * variant once and every "secondary" surface in the dashboard
+ * updates with it.
  */
+
+import { Button } from "../_components/button";
 
 export function LogoutButton() {
   return (
-    <form action="/api/auth/logout" method="post" style={{ margin: 0 }}>
-      <button
-        type="submit"
-        style={{
-          background: "transparent",
-          border: "1px solid #ccc",
-          borderRadius: 6,
-          color: "#333",
-          padding: "6px 12px",
-          fontSize: 13,
-          cursor: "pointer",
-          width: "100%",
-        }}
-      >
+    <form action="/api/auth/logout" method="post" className="m-0">
+      <Button type="submit" variant="secondary" size="sm">
         Sign out
-      </button>
+      </Button>
     </form>
   );
 }
