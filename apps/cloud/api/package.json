@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bench": "tsx bench/bench.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "seed:catalog": "tsx scripts/seed-demo-agents.ts"
   },
   "dependencies": {
     "@agentagora/protocol": "workspace:*",
