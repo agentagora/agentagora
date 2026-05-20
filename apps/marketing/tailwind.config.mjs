@@ -22,6 +22,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          "'Inter Variable'",
           "Inter",
           "ui-sans-serif",
           "system-ui",

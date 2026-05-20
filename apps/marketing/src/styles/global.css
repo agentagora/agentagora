@@ -1,3 +1,8 @@
+/* Self-hosted Inter Variable — no Google Fonts round-trip, no FOUC,
+   no privacy footprint for visitors. ~30 KB woff2; falls through the
+   Tailwind `font-sans` stack if the variable face is unavailable. */
+@import "@fontsource-variable/inter";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

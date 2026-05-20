@@ -1,0 +1,32 @@
+---
+/**
+ * The geometric AgentAgora mark — graphite square with an inset ring.
+ * Same recipe used by the dashboard's `BrandMark` primitive, kept
+ * inline as an Astro component because Astro doesn't share the React
+ * component tree. Header / footer / future error pages reuse this so
+ * the wordmark styling lives in one place.
+ *
+ * `withWordmark={false}` drops the "AgentAgora" label (mark-only).
+ */
+
+interface Props {
+  /** Render the wordmark next to the mark. Defaults to true. */
+  withWordmark?: boolean;
+  /** Extra utility classes to merge with the default flex chrome. */
+  class?: string;
+}
+
+const { withWordmark = true, class: className = "" } = Astro.props;
+---
+
+<span class={`inline-flex items-center gap-2.5 ${className}`}>
+  <span
+    class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
+    aria-hidden="true"
+  >
+    <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
+  </span>
+  {withWordmark && (
+    <span class="text-sm font-semibold tracking-tight text-accent-900">AgentAgora</span>
+  )}
+</span>
