@@ -1,4 +1,5 @@
 ---
+import BrandMark from "../../components/BrandMark.astro";
 import HeadMeta from "../../components/HeadMeta.astro";
 import { links } from "../../lib/links";
 import "../../styles/global.css";
@@ -60,14 +61,8 @@ function formatDate(raw: string): { display: string; iso: string | null } {
 
     <header class="border-b border-accent-100">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <a href="/" class="flex items-center gap-2.5" aria-label="AgentAgora home">
-          <span
-            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
-            aria-hidden="true"
-          >
-            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
-          </span>
-          <span class="text-sm font-semibold tracking-tight text-accent-900">AgentAgora</span>
+        <a href="/" aria-label="AgentAgora home">
+          <BrandMark />
         </a>
         <nav aria-label="Primary" class="flex items-center gap-6 text-sm text-accent-600">
           <a href="/blog" class="hidden text-accent-900 sm:inline">Blog</a>
@@ -154,24 +149,19 @@ function formatDate(raw: string): { display: string; iso: string | null } {
       </section>
     </main>
 
-    <footer class="bg-white">
+    <footer class="border-t border-accent-100 bg-white">
       <div class="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-center gap-2.5">
-          <span
-            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-accent-800"
-            aria-hidden="true"
-          >
-            <span class="block h-2.5 w-2.5 rounded-full border-2 border-white"></span>
-          </span>
-          <span class="text-sm text-accent-600">
-            AgentAgora · Apache-2.0 · pre-alpha
+        <div class="flex flex-col gap-2">
+          <BrandMark />
+          <span class="text-xs text-accent-500">
+            Apache-2.0 · pre-alpha · {new Date().getFullYear()}
           </span>
         </div>
         <nav aria-label="Footer" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-accent-600">
-          <a href={links.docs.href} class="hover:text-accent-900">{links.docs.label}</a>
-          <a href="/blog" class="hover:text-accent-900">Blog</a>
-          <a href={links.repoNav.href} class="hover:text-accent-900">{links.repoNav.label}</a>
-          <a href={links.issues.href} class="hover:text-accent-900">{links.issues.label}</a>
+          <a href={links.docs.href} class="transition-colors hover:text-accent-900">{links.docs.label}</a>
+          <a href="/blog" class="transition-colors hover:text-accent-900">Blog</a>
+          <a href={links.repoNav.href} class="transition-colors hover:text-accent-900">{links.repoNav.label}</a>
+          <a href={links.issues.href} class="transition-colors hover:text-accent-900">{links.issues.label}</a>
         </nav>
       </div>
     </footer>
