@@ -20,6 +20,11 @@
  */
 
 import { useMemo, useState } from "react";
+import { Alert } from "../../../_components/alert";
+import { Button } from "../../../_components/button";
+import { Card, CardBody } from "../../../_components/card";
+import { Input } from "../../../_components/input";
+import { Field, FormHint, Label } from "../../../_components/label";
 
 type Reason = "non_delivery" | "wrong_output" | "fraud" | "other";
 
@@ -132,52 +137,41 @@ export function FileDisputeForm({
 
   if (ownedAids.length === 0) {
     return (
-      <div
-        style={{
-          border: "1px dashed #ccc",
-          borderRadius: 8,
-          padding: 24,
-          background: "#fff",
-          color: "#555",
-          marginTop: 24,
-        }}
-      >
-        <p style={{ margin: 0 }}>
+      <Card>
+        <CardBody className="border border-dashed border-accent-200 text-sm text-accent-600">
           You haven't published any agents yet, so there's no <code>filer_aid</code> you can file on
           behalf of. Publish an agent first, then come back.
-        </p>
-      </div>
+        </CardBody>
+      </Card>
     );
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}
-    >
-      <fieldset
-        disabled={busy}
-        style={{ border: "1px solid #e3e3e3", borderRadius: 8, padding: 16, background: "#fff" }}
-      >
-        <legend style={{ padding: "0 6px", fontSize: 13, color: "#666" }}>Case</legend>
-
-        <Field label="conversation_id">
-          <input
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
+      <FormFieldset legend="Case" busy={busy}>
+        <Field>
+          <Label htmlFor="dispute-convo">conversation_id</Label>
+          <Input
+            id="dispute-convo"
             type="text"
             value={conversationId}
             onChange={(e) => setConversationId(e.target.value)}
             required
             placeholder="conv_..."
-            style={inputStyle("mono")}
+            mono
           />
         </Field>
 
-        <Field label="filer_aid (one of your agents)">
+        <Field>
+          <Label htmlFor="dispute-filer" hint="one of your agents">
+            filer_aid
+          </Label>
           <select
+            id="dispute-filer"
             value={filerAid}
             onChange={(e) => setFilerAid(e.target.value)}
             required
-            style={inputStyle("mono")}
+            className="block w-full rounded-md border border-accent-200 bg-white px-3 py-2 font-mono text-sm text-accent-900 shadow-sm transition-colors focus-visible:border-accent-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-800 focus-visible:ring-offset-1"
           >
             {ownedAids.map((a) => (
               <option key={a} value={a}>
@@ -187,37 +181,28 @@ export function FileDisputeForm({
           </select>
         </Field>
 
-        <Field label="respondent_aid">
-          <input
+        <Field>
+          <Label htmlFor="dispute-respondent">respondent_aid</Label>
+          <Input
+            id="dispute-respondent"
             type="text"
             value={respondentAid}
             onChange={(e) => setRespondentAid(e.target.value)}
             required
             placeholder="aid:agentagora:namespace/name"
-            style={inputStyle("mono")}
+            mono
           />
         </Field>
-      </fieldset>
+      </FormFieldset>
 
-      <fieldset
-        disabled={busy}
-        style={{ border: "1px solid #e3e3e3", borderRadius: 8, padding: 16, background: "#fff" }}
-      >
-        <legend style={{ padding: "0 6px", fontSize: 13, color: "#666" }}>Claim</legend>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: "#333" }}>reason</span>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <FormFieldset legend="Claim" busy={busy}>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium text-accent-800">reason</legend>
+          <div className="flex flex-col gap-1.5">
             {REASONS.map((r) => (
               <label
                 key={r}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 14,
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                }}
+                className="flex cursor-pointer items-center gap-2.5 font-mono text-sm text-accent-800"
               >
                 <input
                   type="radio"
@@ -225,90 +210,72 @@ export function FileDisputeForm({
                   value={r}
                   checked={reason === r}
                   onChange={() => setReason(r)}
+                  className="h-4 w-4 cursor-pointer accent-accent-800"
                 />
                 {r}
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
 
-        <Field label={`narrative (optional, ${narrativeRemaining} of ${NARRATIVE_MAX} chars left)`}>
+        <Field>
+          <Label htmlFor="dispute-narrative" hint="optional">
+            narrative
+          </Label>
           <textarea
+            id="dispute-narrative"
             value={narrative}
             onChange={(e) => setNarrative(e.target.value)}
             rows={6}
             maxLength={NARRATIVE_MAX}
             placeholder="What happened? Describe the failure, with timestamps and links to events if you can."
-            style={{ ...inputStyle(), resize: "vertical" }}
+            className="block w-full resize-y rounded-md border border-accent-200 bg-white px-3 py-2 text-sm leading-relaxed text-accent-900 shadow-sm transition-colors placeholder:text-accent-400 focus-visible:border-accent-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-800 focus-visible:ring-offset-1"
           />
+          <FormHint>
+            {narrativeRemaining} of {NARRATIVE_MAX} chars left
+          </FormHint>
         </Field>
 
-        <Field label={`claimed_remedy (optional, max ${REMEDY_MAX} chars)`}>
-          <input
+        <Field>
+          <Label htmlFor="dispute-remedy" hint={`optional, ≤ ${REMEDY_MAX} chars`}>
+            claimed_remedy
+          </Label>
+          <Input
+            id="dispute-remedy"
             type="text"
             value={claimedRemedy}
             onChange={(e) => setClaimedRemedy(e.target.value)}
             maxLength={REMEDY_MAX}
             placeholder="e.g. full refund of the call charge"
-            style={inputStyle()}
           />
         </Field>
-      </fieldset>
+      </FormFieldset>
 
-      {err ? (
-        <div
-          role="alert"
-          style={{
-            border: "1px solid #d93025",
-            background: "#fce8e6",
-            color: "#7c0c00",
-            borderRadius: 8,
-            padding: 12,
-            fontSize: 14,
-          }}
-        >
-          {err}
-        </div>
-      ) : null}
+      {err && <Alert tone="danger">{err}</Alert>}
 
-      <button
-        type="submit"
-        disabled={busy}
-        style={{
-          padding: "10px 16px",
-          background: busy ? "#9ec5fe" : "#0366d6",
-          color: "#fff",
-          border: 0,
-          borderRadius: 6,
-          fontWeight: 600,
-          cursor: busy ? "wait" : "pointer",
-          alignSelf: "flex-start",
-        }}
-      >
+      <Button type="submit" disabled={busy} size="md" className="self-start">
         {busy ? "Filing…" : "File dispute"}
-      </button>
+      </Button>
     </form>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: <label> wraps `children` which is always an input/select/textarea; biome can't see through React.ReactNode but native HTML associates them correctly.
-    <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-      <span style={{ fontSize: 13, color: "#333" }}>{label}</span>
-      {children}
-    </label>
-  );
+interface FormFieldsetProps {
+  legend: string;
+  busy: boolean;
+  children: React.ReactNode;
 }
 
-function inputStyle(variant?: "mono"): React.CSSProperties {
-  return {
-    padding: "8px 10px",
-    border: "1px solid #ccc",
-    borderRadius: 6,
-    fontSize: 14,
-    fontFamily: variant === "mono" ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "inherit",
-    width: "100%",
-    boxSizing: "border-box",
-  };
+function FormFieldset({ legend, busy, children }: FormFieldsetProps) {
+  return (
+    <fieldset
+      disabled={busy}
+      className="rounded-lg border border-accent-100 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] disabled:opacity-60"
+    >
+      <legend className="px-1.5 text-xs font-medium uppercase tracking-wider text-accent-500">
+        {legend}
+      </legend>
+      <div className="mt-2 flex flex-col gap-4">{children}</div>
+    </fieldset>
+  );
 }

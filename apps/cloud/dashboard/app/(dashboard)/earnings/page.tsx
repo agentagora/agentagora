@@ -20,16 +20,20 @@
 import Link from "next/link";
 import { requireOwner } from "../../../lib/auth";
 import { type StripeAccountResult, getStripeAccount } from "../../../lib/cloud-api";
+import { Alert } from "../../_components/alert";
+import { Badge } from "../../_components/badge";
+import { Button } from "../../_components/button";
+import { Card, CardBody, CardHeader } from "../../_components/card";
 
 export default async function EarningsPage() {
   const session = await requireOwner();
   const account = await getStripeAccount(session.bearer);
 
   return (
-    <div>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, marginBottom: 4 }}>Earnings</h1>
-        <p style={{ color: "#555", marginTop: 0 }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent-900">Earnings</h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-accent-600">
           Stripe Connect onboarding status. Per-AID payout tracking ships with destination charges
           (M3 §A.4) — until then the dashboard intentionally does not display a number.
         </p>
@@ -37,13 +41,15 @@ export default async function EarningsPage() {
 
       <StatusCard account={account} />
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 16, marginBottom: 8 }}>Earnings</h2>
-        <p style={{ color: "#555", margin: 0 }}>
-          The cloud doesn't index per-AID payouts yet. Once destination charges are live, this page
-          will surface a per-agent earnings total joined from the Stripe ledger.
-        </p>
-      </section>
+      <Card>
+        <CardHeader title="Earnings totals" description="Per-AID payouts (waiting on M3 §A.4)" />
+        <CardBody>
+          <p className="text-sm leading-relaxed text-accent-600">
+            The cloud doesn't index per-AID payouts yet. Once destination charges are live, this
+            page will surface a per-agent earnings total joined from the Stripe ledger.
+          </p>
+        </CardBody>
+      </Card>
     </div>
   );
 }
@@ -51,55 +57,26 @@ export default async function EarningsPage() {
 function StatusCard({ account }: { account: StripeAccountResult }) {
   if (account.kind === "unreachable") {
     return (
-      <div
-        style={{
-          border: "1px solid #f0c0c0",
-          background: "#fff5f5",
-          color: "#7a1f1f",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Cloud-api is unreachable</h2>
-        <p style={{ margin: 0 }}>
-          We couldn't read your Stripe account status. The cloud-api may be down — try again in a
-          moment.
-        </p>
-      </div>
+      <Alert tone="danger" title="Cloud-api is unreachable">
+        We couldn't read your Stripe account status. The cloud-api may be down — try again in a
+        moment.
+      </Alert>
     );
   }
 
   if (account.kind === "missing") {
     return (
-      <div
-        style={{
-          border: "1px solid #e3e3e3",
-          background: "#fff",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>You haven't connected a Stripe account yet</h2>
-        <p style={{ color: "#555" }}>
-          Agents can publish without payouts, but capabilities priced in real money need a Stripe
-          Connect account to receive funds.
-        </p>
-        <Link
-          href="/onboarding"
-          style={{
-            display: "inline-block",
-            padding: "8px 14px",
-            background: "#0366d6",
-            color: "#fff",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Connect Stripe →
-        </Link>
-      </div>
+      <Card>
+        <CardHeader
+          title="You haven't connected a Stripe account yet"
+          description="Agents can publish without payouts, but capabilities priced in real money need a Stripe Connect account to receive funds."
+        />
+        <CardBody>
+          <Link href="/onboarding">
+            <Button>Connect Stripe →</Button>
+          </Link>
+        </CardBody>
+      </Card>
     );
   }
 
@@ -108,77 +85,64 @@ function StatusCard({ account }: { account: StripeAccountResult }) {
 
   if (!status.details_submitted) {
     return (
-      <div
-        style={{
-          border: "1px solid #e3a23a",
-          background: "#fff8e8",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Onboarding incomplete</h2>
-        <p style={{ color: "#5a4400" }}>
-          Your Stripe account exists but hasn't finished onboarding. Stripe needs the rest of your
-          business details before you can accept payouts.
-        </p>
-        <Link
-          href="/onboarding"
-          style={{
-            display: "inline-block",
-            padding: "8px 14px",
-            background: "#b87900",
-            color: "#fff",
-            borderRadius: 6,
-            textDecoration: "none",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Finish onboarding in Stripe →
-        </Link>
-        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-      </div>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-3">
+              Onboarding incomplete
+              <Badge tone="warn">action required</Badge>
+            </span>
+          }
+          description="Your Stripe account exists but hasn't finished onboarding. Stripe needs the rest of your business details before you can accept payouts."
+        />
+        <CardBody>
+          <Link href="/onboarding">
+            <Button>Finish onboarding in Stripe →</Button>
+          </Link>
+          <div className="mt-5">
+            <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+          </div>
+        </CardBody>
+      </Card>
     );
   }
 
   if (status.charges_enabled) {
     return (
-      <div
-        style={{
-          border: "1px solid #c3e6c3",
-          background: "#f3fbf3",
-          borderRadius: 8,
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Account connected</h2>
-        <p style={{ color: "#1f5a1f", margin: 0 }}>
-          Earnings tracking lands when destination charges go live (M3 §A.4). Until then, payments
-          run through the platform account and per-AID payouts aren't routed yet.
-        </p>
-        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-      </div>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-3">
+              Account connected
+              <Badge tone="success">live</Badge>
+            </span>
+          }
+          description="Earnings tracking lands when destination charges go live (M3 §A.4). Until then, payments run through the platform account and per-AID payouts aren't routed yet."
+        />
+        <CardBody>
+          <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+        </CardBody>
+      </Card>
     );
   }
 
   // details_submitted: true but charges_enabled: false — Stripe is
   // still reviewing. Show a neutral status.
   return (
-    <div
-      style={{
-        border: "1px solid #e3e3e3",
-        background: "#fff",
-        borderRadius: 8,
-        padding: 20,
-      }}
-    >
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>Stripe is reviewing your account</h2>
-      <p style={{ color: "#555", margin: 0 }}>
-        You've submitted your details; Stripe hasn't enabled charges yet. This is normal and usually
-        clears within a business day.
-      </p>
-      <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
-    </div>
+    <Card>
+      <CardHeader
+        title={
+          <span className="flex items-center gap-3">
+            Stripe is reviewing your account
+            <Badge tone="info">in review</Badge>
+          </span>
+        }
+        description="You've submitted your details; Stripe hasn't enabled charges yet. This is normal and usually clears within a business day."
+      />
+      <CardBody>
+        <AccountMeta accountId={account_id} createdAt={created_at} updatedAt={updated_at} />
+      </CardBody>
+    </Card>
   );
 }
 
@@ -193,23 +157,19 @@ function AccountMeta({
 }) {
   return (
     <dl
-      style={{
-        display: "grid",
-        gridTemplateColumns: "max-content 1fr",
-        gap: "4px 16px",
-        fontSize: 13,
-        marginTop: 16,
-        marginBottom: 0,
-      }}
+      className="grid items-baseline gap-x-6 gap-y-1.5 text-sm"
+      style={{ gridTemplateColumns: "max-content 1fr" }}
     >
-      <dt style={{ color: "#666" }}>account_id</dt>
-      <dd style={{ margin: 0 }}>
-        <code>{accountId}</code>
+      <dt className="text-accent-500">account_id</dt>
+      <dd className="m-0">
+        <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+          {accountId}
+        </code>
       </dd>
-      <dt style={{ color: "#666" }}>created</dt>
-      <dd style={{ margin: 0 }}>{createdAt}</dd>
-      <dt style={{ color: "#666" }}>updated</dt>
-      <dd style={{ margin: 0 }}>{updatedAt}</dd>
+      <dt className="text-accent-500">created</dt>
+      <dd className="m-0 font-mono text-xs text-accent-700">{createdAt}</dd>
+      <dt className="text-accent-500">updated</dt>
+      <dd className="m-0 font-mono text-xs text-accent-700">{updatedAt}</dd>
     </dl>
   );
 }
