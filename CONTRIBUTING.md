@@ -56,7 +56,20 @@ pnpm --filter "@agentagora/example-worker-agent" dev     # local on :8787
 - **pre-commit** (~1 s): Biome lint + auto-format on staged files only.
 - **pre-push** (~10–15 s): full `pnpm lint`, `pnpm typecheck`, `pnpm test`.
 
-Skip a single commit's hooks with `git commit --no-verify` — but every skip is one less guarantee that `main` is green; treat it as exceptional.
+The pre-push hook mirrors CI's `fast` job: if your push would land on a clean main, it will here too. Skip a single commit's hooks with `git commit --no-verify` — but every skip is one less guarantee that `main` is green; treat it as exceptional.
+
+### CI gating
+
+CI is split into `fast` + heavy jobs and event-gated to keep the project inside the GitHub Actions free-tier budget:
+
+| Event | What runs |
+|---|---|
+| `push` to `main` | `fast` only (lint + typecheck + test) — the same things `pre-push` already enforced locally. ~3 min. |
+| `pull_request` | `fast` + audit + coverage gate + bundle-size guards + TruffleHog secrets scan. ~13 min. |
+| Weekly cron (Mon 06:00 UTC) | Everything — catches vulnerability + secret drift on quiet weeks. |
+| `workflow_dispatch` | Everything — manual re-run from the Actions tab. |
+
+Practical consequence: do your design + security signals catching on PR. Direct pushes to `main` (only available to maintainers with branch-protection bypass) will not run the heavy gates. The weekly cron is the safety net.
 
 ## Commit conventions
 
