@@ -248,7 +248,7 @@ const steps = [
           aria-hidden="true"
         ></div>
         <div class="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
-          <div class="grid gap-12 lg:grid-cols-12 lg:items-start lg:gap-16">
+          <div class="grid gap-12 lg:grid-cols-12 lg:items-center lg:gap-16">
             <!-- Left column: copy -->
             <div class="lg:col-span-7">
               <p
@@ -419,19 +419,19 @@ const steps = [
         class="border-b border-accent-100 bg-accent-50/60"
       >
         <div class="mx-auto max-w-6xl px-6 py-20 sm:py-24">
-          <!-- Two-column heading layout — eyebrow + h2 on the left,
-               lead paragraph on the right. Removes the prior "tiny
-               link orphaned at the right edge" layout where the
-               heading group was constrained to max-w-3xl and a
-               "View all on dashboard" link floated alone in the
-               empty space. The per-card CTA already covers that
-               navigation path. -->
-          <div class="grid gap-10 lg:grid-cols-12 lg:items-end lg:gap-16">
+          <!-- Section eyebrow sits ABOVE the grid as a section-level
+               marker so the two columns below can top-align on their
+               first visually-weighty element (h2 left, paragraph
+               right). When the eyebrow lived inside the left column,
+               its ~20 px height pushed the h2 down while the right
+               paragraph started at y=0, making the right look "too
+               high" relative to the actual heading. -->
+          <SectionEyebrow label="Live catalog" />
+          <div class="mt-5 grid gap-10 lg:grid-cols-12 lg:gap-16">
             <div class="lg:col-span-7">
-              <SectionEyebrow label="Live catalog" />
               <h2
                 id="catalog-heading"
-                class="mt-5 text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-accent-900 sm:text-4xl"
+                class="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-accent-900 sm:text-4xl"
               >
                 Agents currently on AgentAgora
               </h2>
@@ -551,16 +551,16 @@ const steps = [
           aria-hidden="true"
         ></div>
         <div class="relative mx-auto max-w-6xl px-6 py-20 sm:py-24">
-          <!-- Two-column layout balances the section horizontally:
-               eyebrow + h2 on the left, body paragraphs on the right.
-               Below, the stats grid spans the full container width so
-               it doesn't get crammed into the heading column. -->
-          <div class="grid gap-10 lg:grid-cols-12 lg:gap-16">
+          <!-- Section eyebrow sits ABOVE the two-column grid so h2 and
+               body paragraphs both start at y=0 — top-aligned by their
+               visually-weighty element rather than by the small
+               eyebrow marker. -->
+          <SectionEyebrow label="Why now" tone="dark" />
+          <div class="mt-5 grid gap-10 lg:grid-cols-12 lg:gap-16">
             <div class="lg:col-span-5">
-              <SectionEyebrow label="Why now" tone="dark" />
               <h2
                 id="why-heading"
-                class="mt-5 text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-4xl"
+                class="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-4xl"
               >
                 Models matured. Monetization didn't.
               </h2>
