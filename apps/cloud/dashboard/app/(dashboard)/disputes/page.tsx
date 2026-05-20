@@ -25,6 +25,7 @@ import { Alert } from "../../_components/alert";
 import { Badge } from "../../_components/badge";
 import { Button } from "../../_components/button";
 import { Card, CardBody, CardHeader } from "../../_components/card";
+import { FilteredList } from "../../_components/filtered-list";
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
@@ -94,53 +95,58 @@ async function OwnerInbox({
   if (rows.length === 0) {
     return <EmptyInbox />;
   }
+
+  const items = rows.map((dispute) => ({
+    key: dispute.dispute_id,
+    matchText: `${dispute.dispute_id} ${dispute.reason} ${dispute.state} ${dispute.filer_aid} ${dispute.respondent_aid}`,
+    node: <DisputeRow dispute={dispute} />,
+  }));
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-accent-500">
         Your disputes ({rows.length})
       </h2>
-      <ul className="flex flex-col gap-2">
-        {rows.map((dispute) => (
-          <DisputeRow key={dispute.dispute_id} dispute={dispute} />
-        ))}
-      </ul>
+      <FilteredList
+        placeholder="Filter by dispute_id, reason, state, or AID…"
+        items={items}
+        emptyMessage="No disputes match your filter."
+      />
     </section>
   );
 }
 
 function DisputeRow({ dispute }: { dispute: DisputeResponse }) {
   return (
-    <li>
-      <Link
-        href={`/disputes?id=${encodeURIComponent(dispute.dispute_id)}`}
-        className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
-            {dispute.dispute_id}
-          </code>
-          <StateBadge state={dispute.state} />
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
-          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
-            {dispute.reason}
-          </code>
-          <span aria-hidden="true">·</span>
-          <time className="font-mono">{dispute.filed_at}</time>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
-            {dispute.filer_aid}
-          </code>
-          <span className="text-accent-400" aria-hidden="true">
-            →
-          </span>
-          <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
-            {dispute.respondent_aid}
-          </code>
-        </div>
-      </Link>
-    </li>
+    <Link
+      href={`/disputes?id=${encodeURIComponent(dispute.dispute_id)}`}
+      className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+          {dispute.dispute_id}
+        </code>
+        <StateBadge state={dispute.state} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
+        <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+          {dispute.reason}
+        </code>
+        <span aria-hidden="true">·</span>
+        <time className="font-mono">{dispute.filed_at}</time>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
+          {dispute.filer_aid}
+        </code>
+        <span className="text-accent-400" aria-hidden="true">
+          →
+        </span>
+        <code className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700">
+          {dispute.respondent_aid}
+        </code>
+      </div>
+    </Link>
   );
 }
 

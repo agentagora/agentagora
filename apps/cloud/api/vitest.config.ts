@@ -32,6 +32,21 @@ export default defineConfig({
   test: {
     coverage: {
       provider: "v8",
+      // Coverage measures production source under src/. Dev-time
+      // tooling (scripts/, bench/) and config files are explicitly
+      // excluded so adding a new helper script doesn't dilute the
+      // statement / line ratios without contributing testable
+      // production code. v8's own defaults already drop node_modules,
+      // tests, dist, and config files.
+      exclude: [
+        "scripts/**",
+        "bench/**",
+        "tests/**",
+        "*.config.*",
+        ".wrangler/**",
+        "dist/**",
+        "node_modules/**",
+      ],
       thresholds: {
         lines: 65,
         branches: 82,

@@ -17,17 +17,42 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { DashboardShell } from "../_layouts/dashboard-shell";
+import { DashboardShell, type NavGroup } from "../_layouts/dashboard-shell";
 import { LogoutButton } from "./_logout-button";
+import { NavIcon, type NavIconName } from "./_nav-icons";
+import { SystemStatusPill } from "./_system-status-pill";
 
-const NAV_ITEMS = [
-  { href: "/home", label: "Dashboard" },
-  { href: "/agents", label: "Agents" },
-  { href: "/conversations", label: "Conversations" },
-  { href: "/earnings", label: "Earnings" },
-  { href: "/onboarding", label: "Onboarding" },
-  { href: "/disputes", label: "Disputes" },
-] as const;
+interface RawNavItem {
+  href: string;
+  label: string;
+  iconName: NavIconName;
+}
+
+const NAV_GROUPS: ReadonlyArray<{ heading?: string; items: ReadonlyArray<RawNavItem> }> = [
+  {
+    heading: "Workspace",
+    items: [
+      { href: "/home", label: "Dashboard", iconName: "dashboard" },
+      { href: "/agents", label: "Agents", iconName: "agents" },
+      { href: "/conversations", label: "Conversations", iconName: "conversations" },
+      { href: "/disputes", label: "Disputes", iconName: "disputes" },
+    ],
+  },
+  {
+    heading: "Payments",
+    items: [
+      { href: "/earnings", label: "Earnings", iconName: "earnings" },
+      { href: "/onboarding", label: "Onboarding", iconName: "onboarding" },
+    ],
+  },
+  {
+    heading: "Account",
+    items: [
+      { href: "/help", label: "Help", iconName: "help" },
+      { href: "/settings", label: "Settings", iconName: "settings" },
+    ],
+  },
+];
 
 export interface DashboardChromeUser {
   /** What the topbar displays — `@gh-login` for OAuth, raw label otherwise. */
@@ -43,14 +68,24 @@ interface Props {
 
 export function DashboardChrome({ user, children }: Props) {
   const pathname = usePathname() ?? "";
-  const nav = NAV_ITEMS.map((item) => ({
-    href: item.href,
-    label: item.label,
-    active: pathname === item.href || pathname.startsWith(`${item.href}/`),
+
+  const nav: NavGroup[] = NAV_GROUPS.map((group) => ({
+    heading: group.heading,
+    items: group.items.map((item) => ({
+      href: item.href,
+      label: item.label,
+      icon: <NavIcon name={item.iconName} />,
+      active: pathname === item.href || pathname.startsWith(`${item.href}/`),
+    })),
   }));
 
   return (
-    <DashboardShell nav={nav} user={user} userActions={<LogoutButton />}>
+    <DashboardShell
+      nav={nav}
+      user={user}
+      statusSlot={<SystemStatusPill />}
+      userActions={<LogoutButton />}
+    >
       {children}
     </DashboardShell>
   );

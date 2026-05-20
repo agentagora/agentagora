@@ -19,6 +19,7 @@ import {
 import { Alert } from "../../_components/alert";
 import { Button } from "../../_components/button";
 import { Card, CardBody } from "../../_components/card";
+import { FilteredList } from "../../_components/filtered-list";
 import { LookupForm } from "./_lookup-form";
 
 interface PageProps {
@@ -104,16 +105,23 @@ async function OwnerInbox({
   if (rows.length === 0) {
     return <EmptyInbox />;
   }
+
+  const items = rows.map((row) => ({
+    key: row.conversation_id,
+    matchText: `${row.conversation_id} ${row.latest_event_type} ${row.actor_aids.join(" ")}`,
+    node: <ConversationRow row={row} />,
+  }));
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-accent-500">
         Your conversations ({rows.length})
       </h2>
-      <ul className="flex flex-col gap-2">
-        {rows.map((row) => (
-          <ConversationRow key={row.conversation_id} row={row} />
-        ))}
-      </ul>
+      <FilteredList
+        placeholder="Filter by conversation_id, event type, or actor AID…"
+        items={items}
+        emptyMessage="No conversations match your filter."
+      />
     </section>
   );
 }
@@ -124,40 +132,38 @@ function ConversationRow({
   row: OwnedConversationSummary & { actor_aids: string[] };
 }) {
   return (
-    <li>
-      <Link
-        href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
-        className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
-            {row.conversation_id}
-          </code>
-          <time className="font-mono text-xs text-accent-500">{row.last_seen_at}</time>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
-          <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
-            {row.latest_event_type}
-          </code>
-          <span aria-hidden="true">·</span>
-          <span>
-            {row.event_count} event{row.event_count === 1 ? "" : "s"}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            as
-            {row.actor_aids.map((a) => (
-              <code
-                key={a}
-                className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700"
-              >
-                {a}
-              </code>
-            ))}
-          </span>
-        </div>
-      </Link>
-    </li>
+    <Link
+      href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
+      className="group block rounded-lg border border-accent-100 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+          {row.conversation_id}
+        </code>
+        <time className="font-mono text-xs text-accent-500">{row.last_seen_at}</time>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-accent-500">
+        <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
+          {row.latest_event_type}
+        </code>
+        <span aria-hidden="true">·</span>
+        <span>
+          {row.event_count} event{row.event_count === 1 ? "" : "s"}
+        </span>
+        <span aria-hidden="true">·</span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          as
+          {row.actor_aids.map((a) => (
+            <code
+              key={a}
+              className="rounded bg-accent-50 px-1.5 py-0.5 font-mono text-[11px] text-accent-700"
+            >
+              {a}
+            </code>
+          ))}
+        </span>
+      </div>
+    </Link>
   );
 }
 

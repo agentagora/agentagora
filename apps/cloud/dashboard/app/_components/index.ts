@@ -12,4 +12,5 @@ export { Button } from "./button";
 export { Card, CardBody, CardFooter, CardHeader } from "./card";
 export { Container } from "./container";
 export { Field, FormError, FormHint, Label } from "./label";
+export { FilteredList, type FilteredListItem } from "./filtered-list";
 export { Input } from "./input";

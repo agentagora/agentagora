@@ -9,6 +9,11 @@
  * and probes each detail endpoint to filter, which is fine at alpha
  * scale (≤ 50 agents). Once the cloud-api exposes an owner index
  * this page becomes a single GET with a query param.
+ *
+ * Client-side filter UX: the page server-renders every row, then
+ * mounts `<FilteredList>` (Client Component) which substring-matches
+ * the visible rows against an input field. No round-trip to the
+ * cloud-api per keystroke.
  */
 
 import Link from "next/link";
@@ -17,10 +22,19 @@ import { type AgentListEntry, getOwnedAgents } from "../../../lib/cloud-api";
 import { Badge } from "../../_components/badge";
 import { Button } from "../../_components/button";
 import { Card, CardBody } from "../../_components/card";
+import { FilteredList } from "../../_components/filtered-list";
 
 export default async function AgentsPage() {
   const session = await requireOwner();
   const agents = await getOwnedAgents(session.bearer, null, 50);
+
+  const items = agents.map((agent) => ({
+    key: agent.aid,
+    matchText: `${agent.aid} ${agent.description ?? ""} ${agent.capabilities
+      .map((c) => c.name)
+      .join(" ")}`,
+    node: <AgentRow agent={agent} />,
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,11 +58,12 @@ export default async function AgentsPage() {
       {agents.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul className="flex flex-col gap-3">
-          {agents.map((agent) => (
-            <AgentRow key={agent.aid} agent={agent} />
-          ))}
-        </ul>
+        <FilteredList
+          placeholder="Filter by AID, description, or capability…"
+          items={items}
+          listClassName="flex flex-col gap-3"
+          emptyMessage="No agents match your filter."
+        />
       )}
     </div>
   );
@@ -56,35 +71,33 @@ export default async function AgentsPage() {
 
 function AgentRow({ agent }: { agent: AgentListEntry }) {
   return (
-    <li>
-      <Link
-        href={`/agents/${encodeURIComponent(agent.aid)}`}
-        className="group block rounded-lg border border-accent-100 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
-            {agent.aid}
-          </code>
-          <time className="font-mono text-xs text-accent-500">{agent.published_at}</time>
-        </div>
-        {agent.description && (
-          <p className="mt-2 text-sm leading-relaxed text-accent-700">{agent.description}</p>
-        )}
-        {agent.capabilities.length > 0 && (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {agent.capabilities.map((cap) => (
-              <li key={cap.name}>
-                <Badge tone={cap.pricing.model === "free" ? "neutral" : "info"}>
-                  <code className="font-mono">{cap.name}</code>
-                  <span className="ml-1.5 text-[10px] opacity-75">·</span>
-                  <span className="ml-1.5">{pricingLabel(cap.pricing)}</span>
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Link>
-    </li>
+    <Link
+      href={`/agents/${encodeURIComponent(agent.aid)}`}
+      className="group block rounded-lg border border-accent-100 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-300"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <code className="font-mono text-sm font-semibold text-accent-900 group-hover:text-accent-700">
+          {agent.aid}
+        </code>
+        <time className="font-mono text-xs text-accent-500">{agent.published_at}</time>
+      </div>
+      {agent.description && (
+        <p className="mt-2 text-sm leading-relaxed text-accent-700">{agent.description}</p>
+      )}
+      {agent.capabilities.length > 0 && (
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {agent.capabilities.map((cap) => (
+            <li key={cap.name}>
+              <Badge tone={cap.pricing.model === "free" ? "neutral" : "info"}>
+                <code className="font-mono">{cap.name}</code>
+                <span className="ml-1.5 text-[10px] opacity-75">·</span>
+                <span className="ml-1.5">{pricingLabel(cap.pricing)}</span>
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Link>
   );
 }
 

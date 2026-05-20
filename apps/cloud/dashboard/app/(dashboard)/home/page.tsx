@@ -1,24 +1,29 @@
 /**
- * Owner home — "Welcome back" + counts, owner-scoped.
+ * Owner home — counts + unified activity feed, owner-scoped.
  *
  * Lights up immediately after the user publishes their first agent
  * because every count comes from a per-owner index:
  *
  *   1. `getOwnedAgents(bearer, ownerId)` — owned-agents count.
  *   2. fan-out `listOwnedConversations(bearer, aid)` per AID, then
- *      sum and pick the 5 most-recent for the activity feed.
+ *      sum and pick the most-recent for the activity feed.
  *   3. fan-out `listOwnedDisputes(bearer, aid)` per AID, then count
- *      open vs. total.
+ *      open vs. total + mix into the activity feed.
  *   4. `getStripeAccount(bearer)` — gates the onboarding banner.
  *
- * Everything fans out under a single `Promise.all` so the slowest
- * call dominates total latency, not the sum.
+ * Everything fans out under `Promise.all` so the slowest call
+ * dominates total latency, not the sum.
+ *
+ * Activity feed: merges three event sources (recent publishes,
+ * conversation last-seen-at, dispute filed-at) into a single
+ * newest-first stream of up to 10 entries. Replaces the prior
+ * "recent conversations" list which only surfaced one of the three.
  *
  * Empty-state branching:
  *   - 0 owned agents       → "Publish your first agent" panel
- *                            (no count cards, no recent list).
- *   - ≥1 owned agents      → count cards + recent-conversations list
- *                            (with their own empty states).
+ *                            (no count cards, no activity feed).
+ *   - ≥1 owned agents      → count cards + activity feed
+ *                            (each with their own empty states).
  *
  * Stripe banner suppression:
  *   - `kind: "ok"` && `charges_enabled === true`   → hidden.
@@ -43,14 +48,26 @@ import { Badge } from "../../_components/badge";
 import { Button } from "../../_components/button";
 import { Card, CardBody, CardHeader } from "../../_components/card";
 
+type ActivityKind = "publish" | "conversation" | "dispute_open" | "dispute_resolved";
+
+interface ActivityItem {
+  kind: ActivityKind;
+  timestamp: string;
+  /** Primary id surfaced in the row (aid / conversation_id / dispute_id). */
+  id: string;
+  /** Secondary text — for conversations this is the latest event type, for disputes the reason. */
+  detail?: string;
+  href: string;
+}
+
+const ACTIVITY_LIMIT = 10;
+
 export default async function DashboardHome() {
   const session = await requireOwner();
   const ownerId = session.githubLogin ? `gh:${session.githubLogin}` : null;
   const greeting = session.githubLogin ? `@${session.githubLogin}` : session.ownerLabel;
 
-  // Stage 1: parallel — owned agents + Stripe status. We need the
-  // agents list before we can fan out per-AID, so this is one round
-  // trip on its own.
+  // Stage 1: parallel — owned agents + Stripe status.
   const [agents, stripe] = await Promise.all([
     getOwnedAgents(session.bearer, ownerId, 50),
     getStripeAccount(session.bearer),
@@ -60,7 +77,6 @@ export default async function DashboardHome() {
     stripe.kind === "missing" ||
     (stripe.kind === "ok" && (!stripe.status.details_submitted || !stripe.status.charges_enabled));
 
-  // Empty state — no agents yet. Skip the per-AID fan-out entirely.
   if (agents.length === 0) {
     return (
       <div className="flex flex-col gap-8">
@@ -74,15 +90,13 @@ export default async function DashboardHome() {
   }
 
   // Stage 2: parallel fan-out — one conversation list + one dispute
-  // list per owned AID. Each helper is itself bearer-authed and the
-  // cloud-api 403s on cross-owner requests, so this is safe.
+  // list per owned AID.
   const [convResponses, dispResponses] = await Promise.all([
     Promise.all(agents.map((a) => listOwnedConversations(session.bearer, a.aid))),
     Promise.all(agents.map((a) => listOwnedDisputes(session.bearer, a.aid))),
   ]);
 
-  // Conversations: dedup by conversation_id (a chain may surface
-  // under multiple of the caller's AIDs), keep newest last_seen_at.
+  // Conversations dedup.
   const convById = new Map<string, OwnedConversationSummary>();
   for (const resp of convResponses) {
     for (const c of resp.conversations) {
@@ -102,34 +116,75 @@ export default async function DashboardHome() {
     }
   }
   const conversationCount = convById.size;
-  const recentConversations = [...convById.values()]
-    .sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at))
-    .slice(0, 5);
 
-  // Disputes: dedup by dispute_id (listOwnedDisputes already merges
-  // filer+respondent within a single AID, but the same case can also
-  // span two of the caller's AIDs).
-  const dispById = new Map<string, { state: string }>();
+  // Disputes dedup.
+  const dispById = new Map<
+    string,
+    { state: string; reason: string; filed_at: string; resolved_at?: string }
+  >();
   for (const resp of dispResponses) {
     for (const d of resp.disputes) {
-      dispById.set(d.dispute_id, { state: d.state });
+      dispById.set(d.dispute_id, {
+        state: d.state,
+        reason: d.reason,
+        filed_at: d.filed_at,
+        resolved_at: d.resolved_at,
+      });
     }
   }
   const disputeTotal = dispById.size;
   const disputeOpen = [...dispById.values()].filter((d) => d.state === "open").length;
 
-  const cloudUrl = process.env.AGENTAGORA_CLOUD_URL ?? "http://localhost:8787";
+  // Unified activity feed — merge three streams, sort newest-first.
+  const activity: ActivityItem[] = [];
+  for (const a of agents) {
+    if (a.published_at) {
+      activity.push({
+        kind: "publish",
+        timestamp: a.published_at,
+        id: a.aid,
+        detail: a.description,
+        href: `/agents/${encodeURIComponent(a.aid)}`,
+      });
+    }
+  }
+  for (const c of convById.values()) {
+    activity.push({
+      kind: "conversation",
+      timestamp: c.last_seen_at,
+      id: c.conversation_id,
+      detail: c.latest_event_type,
+      href: `/conversations?id=${encodeURIComponent(c.conversation_id)}`,
+    });
+  }
+  for (const [did, d] of dispById.entries()) {
+    if (d.resolved_at) {
+      activity.push({
+        kind: "dispute_resolved",
+        timestamp: d.resolved_at,
+        id: did,
+        detail: d.state,
+        href: `/disputes?id=${encodeURIComponent(did)}`,
+      });
+    }
+    activity.push({
+      kind: "dispute_open",
+      timestamp: d.filed_at,
+      id: did,
+      detail: d.reason,
+      href: `/disputes?id=${encodeURIComponent(did)}`,
+    });
+  }
+  activity.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const recentActivity = activity.slice(0, ACTIVITY_LIMIT);
 
   return (
     <div className="flex flex-col gap-8">
       {showStripeBanner && <StripeNudge />}
 
       <PageHeader greeting={greeting}>
-        Cloud control plane is online. The dashboard reads from{" "}
-        <code className="rounded bg-accent-100 px-1.5 py-0.5 font-mono text-[12px] text-accent-800">
-          {cloudUrl}
-        </code>
-        .
+        Owner-scoped view of your agents, the conversations they've appeared in, and any disputes on
+        either side.
       </PageHeader>
 
       <section
@@ -163,7 +218,7 @@ export default async function DashboardHome() {
         />
       </section>
 
-      <RecentConversations rows={recentConversations} />
+      <ActivityFeed items={recentActivity} />
     </div>
   );
 }
@@ -259,52 +314,125 @@ function CountCard({
   );
 }
 
-function RecentConversations({ rows }: { rows: OwnedConversationSummary[] }) {
+function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-accent-900">Recent conversations</h2>
-        {rows.length > 0 && (
-          <Link
-            href="/conversations"
-            className="text-sm font-medium text-accent-700 underline-offset-2 hover:text-accent-900 hover:underline"
-          >
-            View all →
-          </Link>
-        )}
+        <h2 className="text-base font-semibold text-accent-900">Recent activity</h2>
+        <span className="text-xs uppercase tracking-wider text-accent-400">newest first</span>
       </div>
 
-      {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-accent-200 bg-white px-5 py-8 text-center text-sm text-accent-500">
-          Your agents haven't participated in any conversations yet. Once they emit signed audit
-          events, the chains will surface here.
+      {items.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-accent-200 bg-white px-5 py-10 text-center text-sm text-accent-500">
+          No activity yet. Once your agents publish, get called, or have disputes filed, items will
+          surface here.
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {rows.map((row) => (
-            <li key={row.conversation_id}>
-              <Link
-                href={`/conversations?id=${encodeURIComponent(row.conversation_id)}`}
-                className="flex flex-col gap-1 rounded-lg border border-accent-100 bg-white px-4 py-3 transition-colors hover:border-accent-300"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <code className="font-mono text-sm font-medium text-accent-900">
-                    {row.conversation_id}
-                  </code>
-                  <time className="font-mono text-xs text-accent-500">{row.last_seen_at}</time>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-accent-500">
-                  <code className="font-mono">{row.latest_event_type}</code>
-                  <span aria-hidden="true">·</span>
-                  <span>
-                    {row.event_count} event{row.event_count === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </Link>
+          {items.map((item, i) => (
+            <li key={`${item.kind}-${item.id}-${i}`}>
+              <ActivityRow item={item} />
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+interface ActivityVisual {
+  iconBg: string;
+  iconFg: string;
+  label: string;
+  iconPath: React.ReactNode;
+}
+
+const ACTIVITY_VISUALS: Record<ActivityKind, ActivityVisual> = {
+  publish: {
+    iconBg: "bg-emerald-50",
+    iconFg: "text-emerald-700",
+    label: "Published agent",
+    iconPath: (
+      <>
+        <path d="M10 3v9m0 0l-3-3m3 3l3-3" />
+        <path d="M4 13v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3" />
+      </>
+    ),
+  },
+  conversation: {
+    iconBg: "bg-sky-50",
+    iconFg: "text-sky-700",
+    label: "Conversation activity",
+    iconPath: (
+      <path d="M3.5 9.5C3.5 6.46 6.13 4 9.5 4h1C13.87 4 16.5 6.46 16.5 9.5S13.87 15 10.5 15H7l-3.5 2 .8-3.13A5.4 5.4 0 0 1 3.5 9.5z" />
+    ),
+  },
+  dispute_open: {
+    iconBg: "bg-amber-50",
+    iconFg: "text-amber-700",
+    label: "Dispute filed",
+    iconPath: (
+      <>
+        <circle cx="10" cy="10" r="7" />
+        <path d="M10 6v5m0 2.5v0.5" />
+      </>
+    ),
+  },
+  dispute_resolved: {
+    iconBg: "bg-accent-100",
+    iconFg: "text-accent-700",
+    label: "Dispute resolved",
+    iconPath: (
+      <>
+        <circle cx="10" cy="10" r="7" />
+        <path d="M6.5 10.5l2.5 2.5 4.5-5" />
+      </>
+    ),
+  },
+};
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const visual = ACTIVITY_VISUALS[item.kind];
+  return (
+    <Link
+      href={item.href}
+      className="group flex items-start gap-3 rounded-lg border border-accent-100 bg-white px-4 py-3 transition-colors hover:border-accent-300"
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${visual.iconBg} ${visual.iconFg}`}
+        aria-hidden="true"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          role="img"
+          aria-label={visual.label}
+        >
+          {visual.iconPath}
+        </svg>
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-accent-500">
+            {visual.label}
+          </span>
+          <time className="font-mono text-[11px] text-accent-500">{item.timestamp}</time>
+        </div>
+        <code className="mt-1 block truncate font-mono text-sm font-medium text-accent-900 group-hover:text-accent-700">
+          {item.id}
+        </code>
+        {item.detail && (
+          <div className="mt-1 truncate text-xs text-accent-500">
+            <code className="font-mono">{item.detail}</code>
+          </div>
+        )}
+      </div>
+    </Link>
   );
 }
