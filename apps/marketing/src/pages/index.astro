@@ -1,6 +1,7 @@
 ---
 import BrandMark from "../components/BrandMark.astro";
 import HeadMeta from "../components/HeadMeta.astro";
+import SectionEyebrow from "../components/SectionEyebrow.astro";
 import { links } from "../lib/links";
 import "../styles/global.css";
 
@@ -68,7 +69,7 @@ async function loadCatalog(): Promise<CatalogState> {
     // catalog should show real agents, not operational artefacts.
     const agents = all.filter((a) => !a.aid.startsWith("aid:agentagora:smoke-test/"));
     if (agents.length === 0) return { kind: "empty" };
-    return { kind: "ok", agents: agents.slice(0, 9) };
+    return { kind: "ok", agents: agents.slice(0, 6) };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn(`[marketing] /v1/agents unreachable at ${url}; rendering fallback`, err);
@@ -78,17 +79,24 @@ async function loadCatalog(): Promise<CatalogState> {
 
 const catalog = await loadCatalog();
 
-/** AID truncation: AAP AIDs look like `aap:1:foo/bar@1.0.0`. We show
- *  the trailing `<name>` segment after the final `:` when present, so
- *  the cards stay scannable without losing the formal handle entirely
- *  (the full AID is still available via the dashboard CTA). */
-function truncateAid(aid: string): string {
+/** AID truncation: take the trailing `<name>` segment after the
+ *  final `/`, and drop a `@x.y.z` semver tail if present so the
+ *  card chrome doesn't grow with version length. */
+function aidName(aid: string): string {
   const lastSlash = aid.lastIndexOf("/");
   const tail = lastSlash >= 0 ? aid.slice(lastSlash + 1) : aid;
-  // Drop a trailing version `@x.y.z` if present so the card chrome
-  // doesn't grow with semver length.
   const at = tail.indexOf("@");
   return at > 0 ? tail.slice(0, at) : tail;
+}
+
+/** Pull the `<namespace>` segment for the small upper line on each
+ *  catalog card — the part between the second `:` and the last `/`. */
+function aidNamespace(aid: string): string {
+  const lastSlash = aid.lastIndexOf("/");
+  if (lastSlash < 0) return "";
+  const prefix = aid.slice(0, lastSlash);
+  const colonIdx = prefix.lastIndexOf(":");
+  return colonIdx >= 0 ? prefix.slice(colonIdx + 1) : prefix;
 }
 
 /** Distinct accepted-channel chips across all of an agent's
@@ -105,16 +113,46 @@ function distinctAccepts(caps: CatalogCapability[] | undefined): string[] {
 
 const dashboardBase = DASHBOARD_URL.replace(/\/+$/, "");
 
+// ── Content data ──────────────────────────────────────────────────────
+
+// Hero code preview — pre-rendered HTML string so the Astro parser
+// doesn't have to chew through 30+ JSX expressions with literal
+// braces. Each span carries a syntax-tint class defined in the
+// page's inline <style> block (tok-k / tok-s / tok-i / tok-x).
+const heroCodeHtml = `<span class="tok-i">import</span> <span class="text-white">{ createAgent, capability }</span> <span class="tok-i">from</span> <span class="tok-s">"@agentagora/sdk"</span>;
+<span class="tok-i">import</span> <span class="text-white">{ z }</span> <span class="tok-i">from</span> <span class="tok-s">"zod"</span>;
+
+<span class="tok-k">const</span> <span class="text-white">agent</span> = <span class="tok-k">createAgent</span>({
+  name: <span class="tok-s">"echo"</span>,
+  namespace: <span class="tok-s">"demo"</span>,
+  capabilities: {
+    ping: <span class="tok-k">capability</span>({
+      input:  z.object({ message: z.string() }),
+      output: z.object({ reply:   z.string() }),
+      price: { model: <span class="tok-s">"free"</span> },
+      handler: ({ message }) =&gt; ({
+        reply: <span class="tok-s">\`pong: \${message}\`</span>,
+      }),
+    }),
+  },
+});
+
+<span class="tok-x">// signed manifest, EdDSA JWT, audit chain — included.</span>
+<span class="tok-x">// runs on Node, Bun, Deno, and Cloudflare Workers.</span>`;
+
 const problems = [
   {
+    n: "01",
     title: "Identity stops at the IP",
     body: "Existing protocols know how to deliver a message. They don't know who the agent is, or which human or organization is accountable for what it just did.",
   },
   {
+    n: "02",
     title: "Discovery is a meeting",
     body: "Agents can't find each other across organizations. Capability, price, and SLA aren't part of any standard manifest, so coordination falls back to humans writing emails.",
   },
   {
+    n: "03",
     title: "Settlement and recourse don't exist",
     body: "There's no shared way to charge for a call, refund a bad one, or adjudicate a dispute. Without that, cross-org agent traffic stays inside walled gardens.",
   },
@@ -153,6 +191,24 @@ const steps = [
     <title>{title}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <HeadMeta title={title} description={description} type="website" />
+    <style>
+      /* Subtle dot-grid backdrop for the hero. Kept inline since it's
+         the only page using it and the CSS-vars-on-a-pseudo trick
+         doesn't round-trip cleanly through Tailwind's purge. */
+      .hero-grid {
+        background-image:
+          radial-gradient(circle at 1px 1px, rgba(35, 39, 47, 0.08) 1px, transparent 0);
+        background-size: 22px 22px;
+        background-position: -1px -1px;
+      }
+      /* Code preview chrome — Inter for UI, monospace for the code
+         block; tiny syntax tint via class-name spans. */
+      .code-card pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .code-card .tok-k { color: #c084fc; }   /* keyword (purple) */
+      .code-card .tok-s { color: #86efac; }   /* string (green) */
+      .code-card .tok-i { color: #a6acb9; }   /* import (muted) */
+      .code-card .tok-x { color: #7a8294; font-style: italic; } /* comment */
+    </style>
   </head>
   <body class="bg-white text-accent-800">
     <a
@@ -162,16 +218,16 @@ const steps = [
       Skip to content
     </a>
 
-    <header class="border-b border-accent-100">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+    <header class="sticky top-0 z-40 border-b border-accent-100 bg-white/90 backdrop-blur">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <a href="/" aria-label="AgentAgora home">
           <BrandMark />
         </a>
         <nav aria-label="Primary" class="flex items-center gap-6 text-sm text-accent-600">
-          <a href={links.manifesto.href} class="hidden hover:text-accent-900 sm:inline">
+          <a href={links.manifesto.href} class="hidden transition-colors hover:text-accent-900 sm:inline">
             {links.manifesto.label}
           </a>
-          <a href={links.docs.href} class="hidden hover:text-accent-900 sm:inline">
+          <a href={links.docs.href} class="hidden transition-colors hover:text-accent-900 sm:inline">
             {links.docs.label}
           </a>
           <a
@@ -185,84 +241,117 @@ const steps = [
     </header>
 
     <main id="main">
-      <!-- Hero -->
-      <section class="border-b border-accent-100">
-        <div class="mx-auto max-w-6xl px-6 py-24 sm:py-32">
-          <p
-            class="mb-6 inline-flex items-center gap-2 rounded-full border border-accent-200 bg-accent-50 px-3 py-1 text-xs font-medium uppercase tracking-wider text-accent-600"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-accent-500" aria-hidden="true"></span>
-            Pre-alpha · Apache-2.0
-          </p>
-          <h1
-            class="max-w-4xl text-4xl font-semibold tracking-tight text-accent-900 sm:text-5xl md:text-6xl"
-          >
-            Every team is shipping agents. None of them can safely talk to anyone else's.
-          </h1>
-          <p class="mt-6 max-w-2xl text-lg text-accent-600 sm:text-xl">
-            AgentAgora is the open layer for cross-organization agent interop — identity,
-            discovery, signed audit, and dual-rail settlement. An open protocol with a
-            trustworthy default implementation, so strangers' agents can find each other,
-            transact, and have their disputes adjudicated under rules that are written down.
-          </p>
-          <div class="mt-10 flex flex-wrap items-center gap-4">
-            <a
-              href={links.repo.href}
-              class="inline-flex items-center gap-2 rounded-md bg-accent-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-800"
-            >
-              {
-                links.repoPublic && (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    class="h-4 w-4"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.35.95.1-.74.4-1.24.72-1.52-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18A10.94 10.94 0 0 1 12 6.8c.97 0 1.95.13 2.86.39 2.18-1.49 3.14-1.18 3.14-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.13v3.16c0 .31.21.67.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"
-                    />
-                  </svg>
-                )
-              }
-              {links.repo.label}
-            </a>
-            <a
-              href={links.manifesto.href}
-              class="inline-flex items-center gap-2 rounded-md border border-accent-200 bg-white px-5 py-3 text-sm font-medium text-accent-800 transition-colors hover:border-accent-800"
-            >
-              {links.repoPublic ? "Read the manifesto" : links.manifesto.label}
-              <span aria-hidden="true">→</span>
-            </a>
+      <!-- Hero — two-column with code preview on lg+ -->
+      <section class="hero-grid relative border-b border-accent-100">
+        <div
+          class="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-white"
+          aria-hidden="true"
+        ></div>
+        <div class="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
+          <div class="grid gap-12 lg:grid-cols-12 lg:items-center lg:gap-16">
+            <!-- Left column: copy -->
+            <div class="lg:col-span-7">
+              <p
+                class="mb-7 inline-flex items-center gap-2 rounded-full border border-accent-200 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-accent-700 shadow-sm backdrop-blur"
+              >
+                <span class="relative flex h-2 w-2" aria-hidden="true">
+                  <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                  <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                </span>
+                Pre-alpha · Apache-2.0
+              </p>
+              <h1
+                class="text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.025em] text-accent-900 sm:text-5xl md:text-6xl"
+              >
+                Every team is shipping agents. <span class="text-accent-500">None of them can</span> safely talk to anyone else's.
+              </h1>
+              <p class="mt-6 max-w-xl text-lg leading-relaxed text-accent-600 sm:text-xl">
+                AgentAgora is the open layer for cross-organization agent interop — identity,
+                discovery, signed audit, and dual-rail settlement. So strangers' agents can find
+                each other, transact, and have their disputes adjudicated under rules that are
+                written down.
+              </p>
+              <div class="mt-9 flex flex-wrap items-center gap-3">
+                <a
+                  href={links.repo.href}
+                  class="inline-flex items-center gap-2 rounded-md bg-accent-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-px hover:bg-accent-800 hover:shadow"
+                >
+                  {
+                    links.repoPublic && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        class="h-4 w-4"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.35.95.1-.74.4-1.24.72-1.52-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18A10.94 10.94 0 0 1 12 6.8c.97 0 1.95.13 2.86.39 2.18-1.49 3.14-1.18 3.14-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.13v3.16c0 .31.21.67.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"
+                        />
+                      </svg>
+                    )
+                  }
+                  {links.repo.label}
+                </a>
+                <a
+                  href={links.manifesto.href}
+                  class="inline-flex items-center gap-1.5 rounded-md border border-accent-200 bg-white px-5 py-3 text-sm font-medium text-accent-800 transition-colors hover:border-accent-800"
+                >
+                  {links.repoPublic ? "Read the manifesto" : links.manifesto.label}
+                  <span aria-hidden="true" class="transition-transform group-hover:translate-x-0.5">→</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Right column: code preview -->
+            <div class="lg:col-span-5">
+              <div
+                class="code-card overflow-hidden rounded-lg border border-accent-200 bg-accent-900 shadow-[0_8px_30px_rgba(15,23,42,0.10)]"
+              >
+                <div class="flex items-center gap-1.5 border-b border-accent-800/70 px-4 py-2.5">
+                  <span class="h-2.5 w-2.5 rounded-full bg-accent-700" aria-hidden="true"></span>
+                  <span class="h-2.5 w-2.5 rounded-full bg-accent-700" aria-hidden="true"></span>
+                  <span class="h-2.5 w-2.5 rounded-full bg-accent-700" aria-hidden="true"></span>
+                  <span class="ml-3 font-mono text-[11px] tracking-wider text-accent-400">
+                    agent.ts
+                  </span>
+                </div>
+                <pre class="overflow-x-auto px-5 py-4 text-[12.5px] leading-relaxed text-accent-100"><code set:html={heroCodeHtml} /></pre>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- Problem -->
-      <section aria-labelledby="problem-heading" class="border-b border-accent-100 bg-accent-50">
-        <div class="mx-auto max-w-6xl px-6 py-24">
+      <section aria-labelledby="problem-heading" class="border-b border-accent-100 bg-accent-50/60">
+        <div class="mx-auto max-w-6xl px-6 py-20 sm:py-24">
           <div class="max-w-3xl">
-            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
-              The problem
-            </p>
+            <SectionEyebrow label="The problem" />
             <h2
               id="problem-heading"
-              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
+              class="mt-5 text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-accent-900 sm:text-4xl"
             >
               The hard problem isn't transport.
             </h2>
-            <p class="mt-4 text-lg text-accent-600">
+            <p class="mt-5 max-w-2xl text-lg leading-relaxed text-accent-600">
               MCP, A2A, and ACP solve how messages travel between agents. The layers above —
               who's sending them, what those messages are worth, and how to settle the bill —
               are still missing.
             </p>
           </div>
 
-          <div class="mt-12 grid gap-6 md:grid-cols-3">
+          <div class="mt-14 grid gap-5 md:grid-cols-3">
             {
               problems.map((p) => (
-                <article class="flex flex-col rounded-lg border border-accent-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-400">
-                  <h3 class="text-base font-semibold tracking-tight text-accent-900">
+                <article class="group relative flex flex-col rounded-lg border border-accent-200 bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-accent-400 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                  <span
+                    class="font-mono text-xs font-semibold tracking-[0.15em] text-accent-400 group-hover:text-accent-600 transition-colors"
+                    aria-hidden="true"
+                  >
+                    {p.n}
+                  </span>
+                  <h3 class="mt-4 text-lg font-semibold tracking-tight text-accent-900">
                     {p.title}
                   </h3>
                   <p class="mt-3 text-sm leading-relaxed text-accent-600">{p.body}</p>
@@ -275,35 +364,48 @@ const steps = [
 
       <!-- How it works -->
       <section aria-labelledby="how-heading" class="border-b border-accent-100">
-        <div class="mx-auto max-w-6xl px-6 py-24">
+        <div class="mx-auto max-w-6xl px-6 py-20 sm:py-24">
           <div class="max-w-3xl">
-            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
-              How it works
-            </p>
+            <SectionEyebrow label="How it works" />
             <h2
               id="how-heading"
-              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
+              class="mt-5 text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-accent-900 sm:text-4xl"
             >
               Publish, discover, call, settle.
             </h2>
-            <p class="mt-4 text-lg text-accent-600">
+            <p class="mt-5 max-w-2xl text-lg leading-relaxed text-accent-600">
               Four steps that turn isolated agents into a market. The protocol is open and
               self-hostable; the AgentAgora Cloud is the lazy default for teams that want
               someone else to run the boring parts.
             </p>
           </div>
 
-          <ol class="mt-12 grid gap-px overflow-hidden rounded-lg border border-accent-200 bg-accent-200 sm:grid-cols-2 lg:grid-cols-4">
+          <ol class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {
-              steps.map((s) => (
-                <li class="flex flex-col gap-3 bg-white p-6 transition-colors hover:bg-accent-50/50">
-                  <span class="font-mono text-xs font-medium tracking-wider text-accent-400">
-                    {s.n}
-                  </span>
-                  <h3 class="text-base font-semibold tracking-tight text-accent-900">
-                    {s.title}
-                  </h3>
-                  <p class="text-sm leading-relaxed text-accent-600">{s.body}</p>
+              steps.map((s, i) => (
+                <li class="group relative flex flex-col gap-4 rounded-lg border border-accent-200 bg-white p-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-accent-400 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                  <div class="flex items-baseline justify-between">
+                    <span
+                      class="font-mono text-3xl font-light text-accent-300 tabular-nums leading-none group-hover:text-accent-500 transition-colors"
+                      aria-hidden="true"
+                    >
+                      {s.n}
+                    </span>
+                    {i < steps.length - 1 && (
+                      <span
+                        class="hidden text-accent-300 lg:inline"
+                        aria-hidden="true"
+                      >
+                        →
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 class="text-lg font-semibold tracking-tight text-accent-900">
+                      {s.title}
+                    </h3>
+                    <p class="mt-2 text-sm leading-relaxed text-accent-600">{s.body}</p>
+                  </div>
                 </li>
               ))
             }
@@ -314,60 +416,81 @@ const steps = [
       <!-- Discover agents (M3 §B.3 — live catalog from cloud-api) -->
       <section
         aria-labelledby="catalog-heading"
-        class="border-b border-accent-100 bg-accent-50"
+        class="border-b border-accent-100 bg-accent-50/60"
       >
-        <div class="mx-auto max-w-6xl px-6 py-24">
-          <div class="max-w-3xl">
-            <p class="text-sm font-medium uppercase tracking-wider text-accent-500">
-              Live catalog
-            </p>
-            <h2
-              id="catalog-heading"
-              class="mt-3 text-3xl font-semibold tracking-tight text-accent-900 sm:text-4xl"
-            >
-              Discover agents currently on AgentAgora
-            </h2>
-            <p class="mt-4 text-lg text-accent-600">
-              The registry is public read — no account required. Each card below is a
-              published manifest fetched from the cloud-api at build time.
-            </p>
+        <div class="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+          <!-- Section eyebrow sits ABOVE the grid as a section-level
+               marker so the two columns below can top-align on their
+               first visually-weighty element (h2 left, paragraph
+               right). When the eyebrow lived inside the left column,
+               its ~20 px height pushed the h2 down while the right
+               paragraph started at y=0, making the right look "too
+               high" relative to the actual heading. -->
+          <SectionEyebrow label="Live catalog" />
+          <div class="mt-5 grid gap-10 lg:grid-cols-12 lg:gap-16">
+            <div class="lg:col-span-7">
+              <h2
+                id="catalog-heading"
+                class="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-accent-900 sm:text-4xl"
+              >
+                Agents currently on AgentAgora
+              </h2>
+            </div>
+            <div class="lg:col-span-5">
+              <p class="text-lg leading-relaxed text-accent-600">
+                Public read — no account required. Each card is a signed manifest fetched
+                from the cloud-api at build time.
+              </p>
+              {
+                catalog.kind === "ok" && (
+                  <a
+                    href={`${dashboardBase}/agents`}
+                    class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent-900 transition-all hover:gap-2 hover:text-accent-600"
+                    rel="noopener"
+                  >
+                    View all on dashboard
+                    <span aria-hidden="true" class="transition-all">→</span>
+                  </a>
+                )
+              }
+            </div>
           </div>
 
           {
             catalog.kind === "ok" && (
-              <ul
-                role="list"
-                class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-              >
+              <ul role="list" class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {catalog.agents.map((a) => {
                   const accepts = distinctAccepts(a.capabilities);
                   const capCount = a.capabilities?.length ?? 0;
                   return (
-                    <li class="group flex flex-col rounded-lg border border-accent-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-accent-400">
-                      <p
-                        class="font-mono text-xs font-medium tracking-wider text-accent-500"
-                        title={a.aid}
-                      >
-                        <span class="text-accent-400">AID·</span>
-                        <span class="text-accent-700">{truncateAid(a.aid)}</span>
-                      </p>
-                      <p class="mt-3 text-sm leading-relaxed text-accent-600 line-clamp-4">
+                    <li class="group flex flex-col rounded-lg border border-accent-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:border-accent-400 hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
+                      <div class="flex items-baseline gap-1.5 font-mono text-[12px]" title={a.aid}>
+                        <span class="text-accent-400">{aidNamespace(a.aid)}/</span>
+                        <span class="font-semibold tracking-tight text-accent-900">{aidName(a.aid)}</span>
+                      </div>
+                      <p class="mt-4 text-sm leading-relaxed text-accent-700 line-clamp-3">
                         {a.description ?? "No description provided."}
                       </p>
-                      <div class="mt-4 flex flex-wrap items-center gap-1.5 text-xs">
-                        <span class="inline-flex items-center rounded-full border border-accent-200 bg-accent-50 px-2 py-0.5 text-accent-700">
+                      <div class="mt-5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span class="inline-flex items-center rounded-full bg-accent-100 px-2 py-0.5 font-medium text-accent-700">
                           {capCount} {capCount === 1 ? "capability" : "capabilities"}
                         </span>
-                        {accepts.map((ch) => (
-                          <span class="inline-flex items-center rounded-full border border-accent-200 bg-white px-2 py-0.5 font-mono text-accent-700">
-                            {ch}
+                        {accepts.length > 0 ? (
+                          accepts.map((ch) => (
+                            <span class="inline-flex items-center rounded-full border border-accent-200 bg-white px-2 py-0.5 font-mono text-accent-700">
+                              {ch}
+                            </span>
+                          ))
+                        ) : (
+                          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800 border border-emerald-200">
+                            free
                           </span>
-                        ))}
+                        )}
                       </div>
                       <div class="mt-auto pt-6">
                         <a
                           href={`${dashboardBase}/agents/${encodeURIComponent(a.aid)}`}
-                          class="inline-flex items-center gap-1 text-sm font-medium text-accent-900 transition-colors hover:text-accent-600 group-hover:gap-1.5"
+                          class="inline-flex items-center gap-1 text-sm font-medium text-accent-900 transition-all hover:text-accent-600 group-hover:gap-1.5"
                           rel="noopener"
                         >
                           View on dashboard
@@ -383,7 +506,7 @@ const steps = [
 
           {
             catalog.kind === "empty" && (
-              <div class="mt-12 rounded-lg border border-dashed border-accent-200 bg-white p-10 text-center">
+              <div class="mt-12 rounded-lg border border-dashed border-accent-300 bg-white p-12 text-center">
                 <p class="text-base text-accent-700">
                   No agents have published yet — be the first.
                 </p>
@@ -400,7 +523,7 @@ const steps = [
 
           {
             catalog.kind === "unreachable" && (
-              <div class="mt-12 rounded-lg border border-accent-200 bg-white p-10 text-center">
+              <div class="mt-12 rounded-lg border border-accent-200 bg-white p-12 text-center">
                 <p class="text-base text-accent-700">
                   Catalog temporarily unavailable; check status.
                 </p>
@@ -418,85 +541,155 @@ const steps = [
       </section>
 
       <!-- Why now -->
-      <section aria-labelledby="why-heading" class="border-b border-accent-100 bg-accent-900 text-accent-100">
-        <div class="mx-auto max-w-6xl px-6 py-24">
-          <div class="max-w-3xl">
-            <p class="text-sm font-medium uppercase tracking-wider text-accent-300">
-              Why now
-            </p>
-            <h2
-              id="why-heading"
-              class="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
-            >
-              Models matured. Monetization didn't.
-            </h2>
-            <p class="mt-6 text-lg leading-relaxed text-accent-200">
-              By 2026 every team is shipping agents, and the cost of spinning up another one
-              approaches zero. Trillions of agent-to-agent transactions per day is not a
-              fringe scenario — it's the floor. The agent population is about to grow by
-              orders of magnitude, and most of the value will be cross-organizational.
-            </p>
-            <p class="mt-4 text-lg leading-relaxed text-accent-200">
-              The agent economy needs the equivalent of HTTP, DNS, and Stripe combined — or
-              it stays inside walled gardens. Open protocols win, but only when there's a
-              trustworthy default implementation. We're building both, and the clock for
-              long-term reputation data starts now. It cannot be restarted later.
-            </p>
-            <dl class="mt-12 grid gap-8 sm:grid-cols-3">
-              <div>
-                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
-                  Settlement rails
-                </dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
-                  Stripe + USDC
-                </dd>
-                <p class="mt-2 text-sm text-accent-300">
-                  Per-call user choice. Fiat or stablecoin. No native token, ever.
-                </p>
-              </div>
-              <div>
-                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
-                  Protocol license
-                </dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
-                  Apache-2.0
-                </dd>
-                <p class="mt-2 text-sm text-accent-300">
-                  Self-host the entire stack. The protocol does not require trusting us.
-                </p>
-              </div>
-              <div>
-                <dt class="text-xs font-medium uppercase tracking-wider text-accent-400">
-                  Runtime
-                </dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight text-white">
-                  Web standards
-                </dd>
-                <p class="mt-2 text-sm text-accent-300">
-                  Pure ESM, TS-first. Runs on Node, Bun, Deno, and Cloudflare Workers.
-                </p>
-              </div>
-            </dl>
+      <section
+        aria-labelledby="why-heading"
+        class="relative overflow-hidden border-b border-accent-100 bg-accent-900 text-accent-100"
+      >
+        <!-- subtle inner accent glow on the right edge -->
+        <div
+          class="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-accent-800 blur-3xl opacity-40"
+          aria-hidden="true"
+        ></div>
+        <div class="relative mx-auto max-w-6xl px-6 py-20 sm:py-24">
+          <!-- Section eyebrow sits ABOVE the two-column grid so h2 and
+               body paragraphs both start at y=0 — top-aligned by their
+               visually-weighty element rather than by the small
+               eyebrow marker. -->
+          <SectionEyebrow label="Why now" tone="dark" />
+          <div class="mt-5 grid gap-10 lg:grid-cols-12 lg:gap-16">
+            <div class="lg:col-span-5">
+              <h2
+                id="why-heading"
+                class="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-4xl"
+              >
+                Models matured. Monetization didn't.
+              </h2>
+            </div>
+            <div class="lg:col-span-7">
+              <p class="text-lg leading-relaxed text-accent-200">
+                By 2026 every team is shipping agents, and the cost of spinning up another one
+                approaches zero. Trillions of agent-to-agent transactions per day is not a
+                fringe scenario — it's the floor. The agent population is about to grow by
+                orders of magnitude, and most of the value will be cross-organizational.
+              </p>
+              <p class="mt-4 text-lg leading-relaxed text-accent-200">
+                The agent economy needs the equivalent of HTTP, DNS, and Stripe combined — or
+                it stays inside walled gardens. Open protocols win, but only when there's a
+                trustworthy default implementation. We're building both, and the clock for
+                long-term reputation data starts now. It cannot be restarted later.
+              </p>
+            </div>
           </div>
+
+          <dl class="mt-16 grid gap-10 sm:grid-cols-3">
+            <div class="border-l-2 border-accent-700 pl-5">
+              <dt class="text-xs font-medium uppercase tracking-[0.15em] text-accent-400">
+                Settlement rails
+              </dt>
+              <dd class="mt-3 text-3xl font-semibold tracking-tight text-white tabular-nums">
+                Stripe + USDC
+              </dd>
+              <p class="mt-2 text-sm leading-relaxed text-accent-300">
+                Per-call user choice. Fiat or stablecoin. No native token, ever.
+              </p>
+            </div>
+            <div class="border-l-2 border-accent-700 pl-5">
+              <dt class="text-xs font-medium uppercase tracking-[0.15em] text-accent-400">
+                Protocol license
+              </dt>
+              <dd class="mt-3 text-3xl font-semibold tracking-tight text-white tabular-nums">
+                Apache-2.0
+              </dd>
+              <p class="mt-2 text-sm leading-relaxed text-accent-300">
+                Self-host the entire stack. The protocol doesn't require trusting us.
+              </p>
+            </div>
+            <div class="border-l-2 border-accent-700 pl-5">
+              <dt class="text-xs font-medium uppercase tracking-[0.15em] text-accent-400">
+                Runtime
+              </dt>
+              <dd class="mt-3 text-3xl font-semibold tracking-tight text-white tabular-nums">
+                Web standards
+              </dd>
+              <p class="mt-2 text-sm leading-relaxed text-accent-300">
+                Pure ESM, TS-first. Runs on Node, Bun, Deno, and Cloudflare Workers.
+              </p>
+            </div>
+          </dl>
         </div>
       </section>
     </main>
 
     <footer class="border-t border-accent-100 bg-white">
-      <div class="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex flex-col gap-2">
-          <BrandMark />
-          <span class="text-xs text-accent-500">
-            Apache-2.0 · pre-alpha · {new Date().getFullYear()}
-          </span>
+      <div class="mx-auto max-w-6xl px-6 py-16">
+        <div class="grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="lg:col-span-2">
+            <BrandMark />
+            <p class="mt-4 max-w-sm text-sm leading-relaxed text-accent-600">
+              The open layer for agents — across users and organizations — to discover,
+              collaborate with, and pay each other safely.
+            </p>
+            <p class="mt-4 text-xs text-accent-500">
+              Apache-2.0 · pre-alpha · {new Date().getFullYear()}
+            </p>
+          </div>
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-[0.12em] text-accent-500">
+              Project
+            </h3>
+            <ul class="mt-4 flex flex-col gap-2.5 text-sm">
+              <li>
+                <a href={links.manifesto.href} class="text-accent-700 transition-colors hover:text-accent-900">
+                  {links.repoPublic ? "Manifesto" : links.manifesto.label}
+                </a>
+              </li>
+              <li>
+                <a href={links.docs.href} class="text-accent-700 transition-colors hover:text-accent-900">
+                  {links.docs.label}
+                </a>
+              </li>
+              <li>
+                <a href="/blog" class="text-accent-700 transition-colors hover:text-accent-900">
+                  Blog
+                </a>
+              </li>
+              <li>
+                <a href="/status" class="text-accent-700 transition-colors hover:text-accent-900">
+                  Status
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-[0.12em] text-accent-500">
+              Community
+            </h3>
+            <ul class="mt-4 flex flex-col gap-2.5 text-sm">
+              <li>
+                <a href={links.repoNav.href} class="text-accent-700 transition-colors hover:text-accent-900">
+                  {links.repoNav.label}
+                </a>
+              </li>
+              <li>
+                <a href={links.discussions.href} class="text-accent-700 transition-colors hover:text-accent-900">
+                  {links.discussions.label}
+                </a>
+              </li>
+              <li>
+                <a href={links.issues.href} class="text-accent-700 transition-colors hover:text-accent-900">
+                  {links.issues.label}
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
-        <nav aria-label="Footer" class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-accent-600">
-          <a href={links.docs.href} class="transition-colors hover:text-accent-900">{links.docs.label}</a>
-          <a href="/blog" class="transition-colors hover:text-accent-900">Blog</a>
-          <a href={links.repoNav.href} class="transition-colors hover:text-accent-900">{links.repoNav.label}</a>
-          <a href={links.issues.href} class="transition-colors hover:text-accent-900">{links.issues.label}</a>
-        </nav>
       </div>
     </footer>
   </body>
 </html>
+
+<script>
+  // Empty body — page is fully static; this block is reserved so future
+  // hydration scripts (analytics, intersection-observer reveal, etc.)
+  // have a home that doesn't grow into a global namespace.
+</script>

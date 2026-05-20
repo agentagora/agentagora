@@ -1,0 +1,32 @@
+---
+/**
+ * Section eyebrow — small uppercase label paired with a short
+ * horizontal bar marker, used above each section's h2 to give the
+ * page a consistent rhythm. Picked over a plain `<p>` because the
+ * bar gives a tiny visual anchor that doesn't rely on font weight
+ * alone to register, and reads cleaner against both light and dark
+ * backgrounds.
+ *
+ * `tone="dark"` adjusts the colors for the Why-now section's
+ * graphite background.
+ */
+
+interface Props {
+  /** The label text, rendered uppercase. */
+  label: string;
+  /** Color tone — defaults to light (works on white / accent-50). */
+  tone?: "light" | "dark";
+}
+
+const { label, tone = "light" } = Astro.props;
+
+const barColor = tone === "dark" ? "bg-accent-500" : "bg-accent-400";
+const textColor = tone === "dark" ? "text-accent-300" : "text-accent-500";
+---
+
+<div class="flex items-center gap-3">
+  <span class={`h-px w-8 ${barColor}`} aria-hidden="true"></span>
+  <span class={`text-xs font-semibold uppercase tracking-[0.15em] ${textColor}`}>
+    {label}
+  </span>
+</div>
