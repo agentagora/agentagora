@@ -336,6 +336,57 @@ Rationale recorded by maintainer: lower mental overhead for downstream implement
 
 ---
 
+## Group G — M6 public-release decisions
+
+> **Status: pending.** Engaged 2026-05-21 alongside `docs/m6-plan.md`. Three decisions gate M6 Phase 2 + Phase 3 work. Recommendations are conservative — accept all three to unblock, or override individually.
+
+### G.1  Spec versioning policy after v0.1
+
+**Recommendation: semver-style on the spec itself.**
+
+PATCH (`v0.1.1`) — editorial fixes, clarifications, typo passes, traceability matrix updates. No protocol-surface change. Existing implementations need no work.
+
+MINOR (`v0.2`) — backward-compatible additions: new optional fields, new optional capabilities, new error codes, new settlement-channel constants. Existing implementations remain conforming; new features are opt-in.
+
+MAJOR (`v1.0`, `v2.0`) — breaking changes: removed fields, renamed methods, semantic changes to existing fields. Existing implementations must update to remain conforming.
+
+Every spec change appends a row to the Document History section with the new version, date, and one-line summary. The compliance suite gates which spec version a deploy claims — Tier 1+2 tests are versioned in lockstep with the spec.
+
+**Why this matters before Phase 3**: the moment v0.1 ships, the first editorial fix needs a version number. Without a stated rule we'll invent one in a hurry; pre-deciding it is 5 minutes of work now versus a coordination problem later.
+
+### G.2  npm publish mechanics
+
+**Recommendation: GitHub Actions with `--provenance`.**
+
+Three options, in order of consumer-trust:
+
+1. **Trusted publishing via GitHub Actions** (recommended). Adds an `npm provenance` attestation to each published tarball: consumers can run `npm audit signatures` and verify the tarball was built by this repo's CI from a specific commit. Setup: one-time npm trusted-publisher config (web UI at npm.com), one workflow file (`.github/workflows/publish.yml`). Per-release work: tag a commit, the workflow does the rest.
+
+2. **Maintainer laptop publish** with `npm publish --otp=…`. Fast (no workflow setup), but no provenance — consumers must trust that the laptop wasn't compromised. Acceptable for v0.0.x pre-alpha but inappropriate for a "v0.1 public release" framing.
+
+3. **No publish — keep workspace-only.** Forces every consumer to clone the monorepo. Defeats the point of M6.
+
+**Why this matters before Phase 3**: the publish workflow file is part of Phase 3's commit. Pre-deciding the path means we don't burn a PR pivoting from one option to another mid-implementation.
+
+### G.3  Self-host runbook scope ceiling
+
+**Recommendation: Cloudflare-only for M6.**
+
+The reference impl is built on Cloudflare Workers + D1 + KV. Supporting non-Cloudflare deploys (e.g., Fly.io for compute, Postgres or Turso for storage) is genuinely useful work but it's a separate, much larger piece — it's almost an SDK-style "storage adapter" project. Trying to land it inside M6 would either:
+
+- Bloat M6 from "4–6 hours of runbook writing" to "weeks of adapter abstraction", or
+- Produce a half-finished generic runbook that doesn't actually work end-to-end on any specific non-CF stack.
+
+`docs/self-host-guide.md` explicitly states the Cloudflare-only scope and points at "want to run this on something else? open a discussion" as the future-work hook. That's the leanest defensible scope.
+
+Override paths if Cloudflare-only is unacceptable:
+- (a) Promote storage to a `StorageAdapter` abstraction first, ship that as Phase 2.5, then write a multi-target runbook. ~2 weeks of work; pushes M6 by a month.
+- (b) Document Cloudflare-only but include a `docs/self-host-non-cf.md` "guidance, not a runbook" addendum that points at the relevant code paths a porter would need to touch. Halfway house; acceptable but lower polish.
+
+**Why this matters before Phase 2**: scope discipline. Without a stated ceiling the runbook expands every time the maintainer remembers a thing.
+
+---
+
 ## After all of the above
 
 - Edit `docs/m3-launch-checklist.md` and flip every applicable `⬜ → ✅` / `🟡 → ✅`.
