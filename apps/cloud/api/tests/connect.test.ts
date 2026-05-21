@@ -307,7 +307,7 @@ describe("GET /v1/connect/accounts/:aid (public)", () => {
 });
 
 describe("/v1/connect/* with no Stripe client configured", () => {
-  it("returns 503 not_configured", async () => {
+  it("returns 503 not_configured with valid bearer", async () => {
     const { app } = setup({ stripe: null });
     const res = await app.request("/v1/connect/account", {
       headers: { authorization: "Bearer tok-alice" },
@@ -315,5 +315,71 @@ describe("/v1/connect/* with no Stripe client configured", () => {
     expect(res.status).toBe(503);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("not_configured");
+  });
+
+  // security-review-2026-05-07 §L4: auth-before-503. Without this,
+  // an anonymous probe learns that /v1/connect/account exists (503
+  // vs 404). The §L4 short-circuit checks the bearer FIRST so the
+  // existence-leak is closed.
+  describe("§L4 auth-before-503", () => {
+    it("GET /v1/connect/account → 401 with no bearer", async () => {
+      const { app } = setup({ stripe: null });
+      const res = await app.request("/v1/connect/account");
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("unauthorized");
+    });
+
+    it("GET /v1/connect/account → 401 with invalid bearer", async () => {
+      const { app } = setup({ stripe: null });
+      const res = await app.request("/v1/connect/account", {
+        headers: { authorization: "Bearer tok-not-a-real-token" },
+      });
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("unauthorized");
+    });
+
+    it("POST /v1/connect/onboarding → 401 with no bearer", async () => {
+      const { app } = setup({ stripe: null });
+      const res = await app.request("/v1/connect/onboarding", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validBody),
+      });
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("unauthorized");
+    });
+
+    it("POST /v1/connect/onboarding → 401 with invalid bearer", async () => {
+      const { app } = setup({ stripe: null });
+      const res = await app.request("/v1/connect/onboarding", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer tok-not-a-real-token",
+        },
+        body: JSON.stringify(validBody),
+      });
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("unauthorized");
+    });
+
+    it("POST /v1/connect/onboarding → 503 with valid bearer (Stripe still missing)", async () => {
+      const { app } = setup({ stripe: null });
+      const res = await app.request("/v1/connect/onboarding", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer tok-alice",
+        },
+        body: JSON.stringify(validBody),
+      });
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("not_configured");
+    });
   });
 });

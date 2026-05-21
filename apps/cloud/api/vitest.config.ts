@@ -7,23 +7,22 @@ import { defineConfig } from "vitest/config";
 // Baseline at lock-in (M3 close):
 //   statements 72.68% / branches 87.32% / functions 80.12% / lines 72.68%
 //
-// Subsequent state after Hono 4.6 → 4.12.18 + M7/M9/M10/M11/L4 hardening:
+// State after Hono 4.6 → 4.12.18 + M7/M9/M10/M11/L4 hardening pack:
 //   statements 66.84% / branches 87.46% / functions 80.89% / lines 66.84%
 //
 // Hono's patch bump grew the transitively-included framework surface,
 // and the M7+M9+M10+M11+L4 security pack added fail-closed checks +
 // body-limit middleware + auth-before-503 fallbacks whose branches
-// only fire under environment / payload conditions the unit suite
-// doesn't simulate (AAP_ENV=production, body > limit, etc.). The
-// missing coverage is real — it's a TODO on the test suite, not on
-// production safety — so we lower the lines/statements floor from 67
-// to 65 while we backfill. Branches + functions still meet the
-// original gate.
+// only fired under environment / payload conditions the unit suite
+// didn't simulate. The lines/statements floor was dropped from 67
+// to 65 as a stop-gap while the backfill was tracked under M.18.
 //
-// Tracked as M.17 in docs/maintainer-tasks.md: add unit tests for the
-// fail-closed branches + body-limit middleware + L4 auth-before-503
-// fallback path, then bump the lines/statements floor back to 67 (or
-// higher, since the post-hardening baseline target should be 72%+).
+// Post-M.18 backfill (build-app.test.ts + body-limit.test.ts + L4
+// connect tests added 2026-05-20):
+//   statements 86.21% / branches 87.73% / functions 83.70% / lines 86.21%
+//
+// Floors bumped back above the original M3 gate (with ~6pp buffer
+// against the new baseline, matching the existing convention).
 //
 // Provider is v8 (built into vitest, no extra dep). Coverage only runs
 // when --coverage is passed (CI workflow + local opt-in); plain
@@ -48,10 +47,10 @@ export default defineConfig({
         "node_modules/**",
       ],
       thresholds: {
-        lines: 65,
+        lines: 80,
         branches: 82,
-        functions: 75,
-        statements: 65,
+        functions: 78,
+        statements: 80,
       },
     },
   },

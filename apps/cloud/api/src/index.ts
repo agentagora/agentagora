@@ -494,7 +494,7 @@ export function createApi(options: CreateApiOptions = {}): Hono {
 // runs once per cold start.
 let cached: Promise<Hono> | undefined;
 
-async function buildApp(env: Env): Promise<Hono> {
+export async function buildApp(env: Env): Promise<Hono> {
   const storage: Storage = env.DB ? new D1Storage(env.DB) : new InMemoryStorage();
   const staticAuth = new StaticOwnerAuth(parseOwnerTokens(env.OWNER_TOKENS));
   if (!staticAuth.hasAnyTokens) {
