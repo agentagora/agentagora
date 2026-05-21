@@ -526,7 +526,7 @@ pnpm --filter @agentagora/cloud-api exec wrangler d1 time-travel restore DB --re
 #    the pre-restore state. Your step-2 export is the only path back.
 ```
 
-**Honest gap.** We have not rehearsed `time-travel restore` against a non-production D1 instance. Folding that drill into §1.4 is tracked but not done — the first time we run it will be the day we need it.
+**Honest gap.** We have not rehearsed `time-travel restore` against a non-production D1 instance — that path remains the day-we-need-it discovery. The plainer export → scratch-restore → query path (no time-travel) IS rehearsable via `apps/cloud/api/scripts/pit-restore-drill.sh` (maintainer-tasks.md §M.11): phase 1 plants a sentinel row, phase 2 (after ≥ 1 h) exports prod, imports into a scratch D1, queries the sentinel, and tears down. Running that quarterly covers the "can our backups even be replayed" half of the durability question; time-travel restore stays a separate, untested branch.
 
 **How to verify.** Re-run the queries from step 3 against the restored database; counts reflect the bookmark's timestamp.
 

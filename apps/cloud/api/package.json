@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "bench": "tsx bench/bench.ts",
+    "bench:server": "tsx bench/server.ts",
     "smoke": "tsx scripts/smoke.ts",
     "seed:catalog": "tsx scripts/seed-demo-agents.ts"
   },
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250101.0",
+    "@hono/node-server": "^1.13.7",
     "tsx": "^4.19.2",
     "typescript": "^5.9.0",
     "vitest": "^2.1.9",

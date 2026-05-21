@@ -164,10 +164,12 @@ These are the prerequisites the launch runbook §2 assumes are already done.
 ### M.11  PIT (point-in-time) restore drill against production D1
 
 > M3 §D.6 — `⬜` (the only D-section item still open)
+>
+> **Tooling ready (2026-05-21):** `apps/cloud/api/scripts/pit-restore-drill.sh` encodes the two phases below. Run `…/pit-restore-drill.sh write` from a terminal logged into prod wrangler; wait ≥ 1 h; run `…/pit-restore-drill.sh verify <sentinel-id>`. The script handles export → scratch create → import → sentinel query → scratch delete → prod sentinel cleanup. RUNBOOK §3.4 was updated to point at it.
 
 - **What:** export D1 → import to a scratch D1 instance → query a row that you wrote 1 hour ago → confirm it's there.
 - **Why:** RUNBOOK §3.4 explicitly flags PIT-restore as un-rehearsed. Until you've done it once on real prod data, the durability story is theoretical.
-- **Where:** local terminal + `wrangler d1`.
+- **Where:** local terminal + `wrangler d1`. Drives prod via the cloud-api package's pinned wrangler (`pnpm --filter @agentagora/cloud-api exec wrangler …`).
 - **Acceptance:**
   - Wrote a sentinel row to a known table (e.g., `INSERT INTO audit_events (... 'maintainer-pit-test-2026-05-XX' ...)`)
   - Waited ≥ 1 h
@@ -181,6 +183,8 @@ These are the prerequisites the launch runbook §2 assumes are already done.
 ### M.12  Promote the latency benchmark from informational to required gate
 
 > M3 §A.5 — `🟡`
+>
+> **Precondition unblocked (2026-05-21):** the `latency-bench` job sat disabled because `nohup wrangler dev &` never detached cleanly on GitHub runners. Resolution: a `bench:server` entry in `apps/cloud/api/bench/server.ts` hosts `createApi()` via `@hono/node-server`, sidestepping wrangler-in-CI. The job is now live in `.github/workflows/typescript.yml` with `continue-on-error: true` so the 14-run counter can actually start accumulating. Trade-off documented in `bench/server.ts`: measures Hono+Node, not the Workers runtime — right granularity for regression detection.
 
 - **What:** after 2 weeks of green latency-bench runs, edit `.github/workflows/typescript.yml` to remove `continue-on-error: true` from the `latency-bench` job and adjust thresholds based on the observed baseline.
 - **Why:** PRD §9.3 #4 — overhead < 200 ms p95. Gate prevents drift.

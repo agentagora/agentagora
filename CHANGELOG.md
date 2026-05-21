@@ -72,6 +72,11 @@ Most of M2 + the bulk of M3 landed in a single autonomous push between 2026-05-0
 
 - M.18 cloud-api coverage backfill: dedicated unit tests for §M7 production fail-closed (`buildApp` rejects boot without NONCES/RATE_LIMITS KV), §M11 body-limit middleware (413 `payload_too_large` on every capped route + under-limit happy path still reaches handler), §L4 auth-before-503 on `/v1/connect/{account,onboarding}` (401 fires before the 503 existence-leak). Cloud-api lines/statements coverage 66.84% → 86.21%; floors ratcheted from 65 back to 80, above the original M3 baseline of 72.68%.
 
+### Operations
+
+- Latency-bench CI gate unblocked (M.12 precondition): new `apps/cloud/api/bench/server.ts` hosts `createApi()` via `@hono/node-server`, replacing the `wrangler dev` background process that never detached cleanly on GitHub runners. The `latency-bench` job is back in `.github/workflows/typescript.yml`, still `continue-on-error: true` until 14 consecutive green runs accumulate.
+- M.11 PIT restore drill is now executable: `apps/cloud/api/scripts/pit-restore-drill.sh` encodes the two-phase sentinel-row roundtrip (write → wait ≥ 1 h → verify) against production D1. RUNBOOK §3.4 updated to point at it.
+
 ### Still open before M3 public-beta launch
 
 - B.4 / B.5 — flip GitHub Discussions on, create the public roadmap board (manual repo settings)
