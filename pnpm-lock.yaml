@@ -52,6 +52,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20250101.0
         version: 4.20260501.1
+      '@hono/node-server':
+        specifier: ^1.13.7
+        version: 1.19.14(hono@4.12.21)
       tsx:
         specifier: ^4.19.2
         version: 4.21.0

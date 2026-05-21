@@ -307,29 +307,87 @@ jobs:
           extra_args: --only-verified
 
   # ────────────────────────────────────────────────────────────────────
-  # latency-bench (disabled).
+  # latency-bench — informational gate (M3 §A.5).
   #
-  # M3 §A.5 — synthetic latency benchmark for the cloud-api control
-  # plane. Currently OFF because `wrangler dev` backgrounded with
-  # `nohup ... &` doesn't fully detach from the GitHub Actions
-  # runner shell — the step hangs to the job timeout on every run,
-  # costing 10-15 min of CI budget for zero useful baseline data.
+  # Background: the original job used `wrangler dev` as the server
+  # under test, backgrounded with `nohup ... &`. wrangler's child
+  # processes never fully detached from the runner shell, so every
+  # run hung to the job timeout. The job sat disabled while M.12 in
+  # docs/maintainer-tasks.md waited on a fix.
   #
-  # Re-enable via M.12 in docs/maintainer-tasks.md once one of:
-  #   (a) replace `nohup ... &` with `setsid -f` + full stdin/stdout
-  #       redirect to detach wrangler dev from the runner, or
-  #   (b) skip wrangler dev entirely and host the cloud-api Hono app
-  #       on vite-node for the bench, removing the wrangler-in-CI
-  #       fragility.
+  # Resolution: host the same Hono app via @hono/node-server (see
+  # apps/cloud/api/bench/server.ts). Trade-off documented in that
+  # file — measures Hono routing + Node stack instead of the
+  # production Workers runtime, which is the right granularity for
+  # regression detection. Cloudflare edge cost is roughly constant
+  # across deploys, so drift in our own code is what this catches.
   #
-  # The bench script itself (apps/cloud/api/bench/bench.ts) still runs
-  # locally — `pnpm --filter @agentagora/cloud-api bench` against a
-  # `wrangler dev` you've started in another terminal.
-  #
-  # The full step block (checkout / setup-node / install / stage
-  # wrangler.jsonc / start wrangler dev / wait for healthz / run bench
-  # / upload artifact / stop wrangler / append log on failure) lives
-  # in commit 9d64648 — restore it from there when re-enabling, and
-  # gate it with `if: github.event_name != 'push'` so it slots into
-  # the heavy-jobs tier.
-  # ────────────────────────────────────────────────────────────────────
+  # Status: `continue-on-error: true` keeps the gate informational
+  # until 14 consecutive green runs accumulate, per M.12's acceptance
+  # criteria. After that the flag is removed and the job blocks merges
+  # on threshold breaches.
+  latency-bench:
+    name: latency benchmark (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name != 'push'
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages the bench server depends on
+        run: pnpm --filter "@agentagora/protocol" build
+
+      - name: Start bench server (background)
+        run: |
+          pnpm --filter "@agentagora/cloud-api" bench:server > bench-server.log 2>&1 &
+          echo $! > bench-server.pid
+
+      - name: Wait for /healthz
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/healthz > /dev/null; then
+              echo "bench server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::bench server did not become ready in 30s"
+          echo "--- bench-server.log ---"
+          cat bench-server.log || true
+          exit 1
+
+      - name: Run latency bench
+        run: pnpm --filter "@agentagora/cloud-api" bench
+
+      - name: Upload bench results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-bench-results
+          path: apps/cloud/api/bench/results.json
+          if-no-files-found: warn
+
+      - name: Stop bench server
+        if: always()
+        run: |
+          if [ -f bench-server.pid ]; then
+            kill "$(cat bench-server.pid)" 2>/dev/null || true
+          fi
+          if [ -f bench-server.log ]; then
+            echo "--- bench-server.log ---"
+            cat bench-server.log
+          fi
