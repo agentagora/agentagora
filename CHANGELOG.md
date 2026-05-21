@@ -65,8 +65,12 @@ Most of M2 + the bulk of M3 landed in a single autonomous push between 2026-05-0
 
 - Build → lint → typecheck → test ordering so cross-package types resolve from a fresh checkout
 - Bundle-size budget gate on the cloud-api Worker (320 KiB raw / 75 KiB gzip)
-- Coverage threshold gate per package (protocol 94/95/80/94, sdk 82/80/70/82, cloud-api 67/82/75/67)
+- Coverage threshold gate per package (protocol 94/95/80/94, sdk 82/80/70/82, cloud-api 80/82/78/80 — post-M.18 backfill)
 - Synthetic latency benchmark job (informational; promotes to required after 2 weeks of green)
+
+### Testing
+
+- M.18 cloud-api coverage backfill: dedicated unit tests for §M7 production fail-closed (`buildApp` rejects boot without NONCES/RATE_LIMITS KV), §M11 body-limit middleware (413 `payload_too_large` on every capped route + under-limit happy path still reaches handler), §L4 auth-before-503 on `/v1/connect/{account,onboarding}` (401 fires before the 503 existence-leak). Cloud-api lines/statements coverage 66.84% → 86.21%; floors ratcheted from 65 back to 80, above the original M3 baseline of 72.68%.
 
 ### Still open before M3 public-beta launch
 
