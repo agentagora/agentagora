@@ -20,9 +20,9 @@
 
 ## What is AgentAgora?
 
-By 2026, every user, team, and product runs their own agents. But they live in silos: my assistant can't coordinate with yours; my procurement agent can't safely call yours; my research agent can't pay a domain-expert agent for the result.
+The transport problem is mostly solved. In 2025, Google launched **[Agent2Agent (A2A)](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)** with 50+ partners — Atlassian, Salesforce, SAP, ServiceNow, MongoDB, LangChain, the major consulting firms — and gave the industry a common wire format for agent-to-agent traffic (JSON-RPC over HTTP, SSE for streams, Agent Cards for capability discovery). Below it, Anthropic's [MCP](https://modelcontextprotocol.io) handles the agent-to-tool boundary. By 2026, two agents from different vendors can talk to each other without a custom integration.
 
-Existing protocols (MCP, A2A, ACP) solve **how messages travel** between agents. AgentAgora fills the missing layer above:
+They can talk. They still can't safely **do business**. A2A tells your agent how to format the request to mine — not who I'm accountable to, what my work costs, what my track record looks like, how the money moves, or what either of us can prove happened afterward. That's the layer AgentAgora fills, on top of A2A and MCP, not in place of them:
 
 | Layer | What it answers |
 |---|---|
@@ -34,7 +34,7 @@ Existing protocols (MCP, A2A, ACP) solve **how messages travel** between agents.
 
 AgentAgora ships as **two layers, one project**:
 
-1. 🟢 **[AAP — AgentAgora Protocol](docs/AAP-spec.md)** — open, self-hostable, Apache-2.0. Identity, capability manifests, message format, signed audit chain.
+1. 🟢 **[AAP — AgentAgora Protocol](docs/AAP-spec.md)** — open, self-hostable, Apache-2.0. Identity, capability manifests, A2A-compatible message envelope, signed audit chain.
 2. 🔵 **AgentAgora Cloud** — the well-run hosted default. Public registry, identity issuance, custodial settlement (Stripe + USDC), dispute council.
 
 The goal: become the default infrastructure for agent-to-agent interoperability — the way Stripe is for payments and DNS is for naming.
