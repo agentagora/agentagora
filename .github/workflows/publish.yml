@@ -1,0 +1,168 @@
+name: Publish packages to npm
+
+# Publishes @agentagora/protocol and @agentagora/sdk to npm with
+# provenance (https://docs.npmjs.com/generating-provenance-statements).
+# Uses npm OIDC trusted publishing — no NPM_TOKEN secret is required
+# or stored. Authentication is established at run time via GitHub's
+# OIDC token, scoped to this repo + this workflow file.
+#
+# ─────────────────────────────────────────────────────────────────
+# ONE-TIME npm-side setup (maintainer task — read before first run)
+# ─────────────────────────────────────────────────────────────────
+#
+#   1. For each package (@agentagora/protocol, @agentagora/sdk),
+#      configure a trusted publisher in npm settings:
+#        - For brand-new package names (first publish), use
+#          "pending publishers" at:
+#            https://docs.npmjs.com/trusted-publishers
+#        - For existing packages, add via:
+#            https://www.npmjs.com/package/<pkg>/access
+#
+#   2. Configure values:
+#        - Publisher: GitHub Actions
+#        - Organization / repository: agentagora/agentagora
+#        - Workflow filename: publish.yml
+#        - Environment name: (leave blank — no environment used)
+#
+#   3. Run this workflow with `dry_run: true` first to verify the
+#      OIDC handshake + build pipeline. Then re-run with
+#      `dry_run: false` for the real publish.
+#
+# ─────────────────────────────────────────────────────────────────
+# Trigger model
+# ─────────────────────────────────────────────────────────────────
+#
+# workflow_dispatch only for v0.1. Tag-autotrigger (push of `v*` /
+# `aap-v*`) is intentionally NOT wired here yet — partial releases
+# (e.g. bumping only @agentagora/sdk after protocol is frozen) would
+# fail on the protocol publish step because the existing version
+# can't be re-published. Add tag-autotrigger in a follow-up once the
+# per-package release cadence has settled (likely M7+).
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Which package to publish"
+        required: true
+        type: choice
+        options:
+          - "all"
+          - "@agentagora/protocol"
+          - "@agentagora/sdk"
+        default: "all"
+      dry_run:
+        description: "Dry-run (skip actual npm publish — recommended for first run)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance / OIDC trusted publishing
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false # never cancel a publish mid-flight — partial publishes are hard to clean up
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so provenance attestations carry the right SHA
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          cache: "pnpm"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Build + test before publish — the same gates lefthook
+      # pre-push enforces locally. CI re-runs them to defend
+      # against "my laptop says it's fine" failures.
+      - name: Build protocol
+        run: pnpm --filter @agentagora/protocol build
+
+      - name: Build sdk
+        run: pnpm --filter @agentagora/sdk build
+
+      - name: Test protocol
+        run: pnpm --filter @agentagora/protocol test
+
+      - name: Test sdk
+        run: pnpm --filter @agentagora/sdk test
+
+      # ───────────────────────────────────────────────────────────
+      # Publish step. Flags:
+      #   --no-git-checks  pnpm by default refuses to publish from
+      #                    a dirty tree or detached HEAD; CI's
+      #                    checkout is detached so this is required.
+      #   --provenance     emits an npm provenance attestation tying
+      #                    the tarball to this commit + workflow run.
+      #                    Consumers verify via `npm audit signatures`.
+      #   --access public  scoped packages default to private;
+      #                    we want public. Also set in package.json
+      #                    publishConfig — belt+suspenders.
+      # ───────────────────────────────────────────────────────────
+
+      - name: Publish @agentagora/protocol
+        if: inputs.package == 'all' || inputs.package == '@agentagora/protocol'
+        run: |
+          set -euo pipefail
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          pnpm --filter @agentagora/protocol publish \
+            --no-git-checks --provenance --access public $DRY_RUN_FLAG
+
+      - name: Publish @agentagora/sdk
+        if: inputs.package == 'all' || inputs.package == '@agentagora/sdk'
+        run: |
+          set -euo pipefail
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          pnpm --filter @agentagora/sdk publish \
+            --no-git-checks --provenance --access public $DRY_RUN_FLAG
+
+      # ───────────────────────────────────────────────────────────
+      # Note: @agentagora/protocol-compliance is intentionally NOT
+      # published here for v0.1. The package needs a tsup build
+      # pipeline + src/index.ts export surface before it's safely
+      # publishable as a library. Tracked for v0.2. See
+      # CHANGELOG.md [2026-05-24] for the deferral note.
+      # ───────────────────────────────────────────────────────────
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Publish summary"
+            echo ""
+            echo "- Ref: \`${{ github.ref }}\`"
+            echo "- Package: \`${{ inputs.package }}\`"
+            echo "- Dry-run: \`${{ inputs.dry_run }}\`"
+            echo ""
+            echo "Verify each published version with:"
+            echo ""
+            echo "    npm view @agentagora/protocol versions"
+            echo "    npm view @agentagora/sdk versions"
+            echo ""
+            echo "Verify provenance for the published tarballs with:"
+            echo ""
+            echo "    npm audit signatures --package=@agentagora/protocol"
+            echo "    npm audit signatures --package=@agentagora/sdk"
+          } >> "$GITHUB_STEP_SUMMARY"

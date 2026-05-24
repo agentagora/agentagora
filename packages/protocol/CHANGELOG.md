@@ -8,6 +8,40 @@ The wire-protocol version (`AAP_VERSION` in `src/constants.ts`) and the package'
 
 ---
 
+## [0.1.0] — 2026-05-24 — AAP v0.1 frozen
+
+First public npm release. AAP v0.1 spec frozen; this is the byte-for-byte surface that survived M4's RFC-style hardening pass — no protocol-surface changes since v0.1-rfc-draft (2026-05-07), just the `-rfc-draft` suffix dropped.
+
+### Added
+
+- npm publish under `@agentagora/protocol@0.1.0` (was workspace-only at 0.0.1)
+- Trusted publishing via GitHub Actions with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — consumers can run `npm audit signatures` to verify the tarball was built by this repo's CI from a specific commit
+
+### Surface
+
+No additions, removals, or changes since v0.1-rfc-draft. The contract third-party SDKs implement is:
+
+- **Identity** — `AidSchema`, `parseAid`, `IdentityCertificateClaimsSchema`
+- **Manifest** — `ManifestSchema`, `ManifestMetadataSchema`, `CapabilitySchema`, `EndpointsSchema`, `PricingSchema`, `PricingModelSchema`, `SettlementChannelIds`
+- **Envelope** — `AapEnvelopeMetaSchema` (the AAP-specific extension on JSON-RPC 2.0)
+- **Audit** — `AuditEventSchema`, `AuditEventTypes`
+- **Conversation** — `ConversationStatuses`, `LegalTransitions` (FSM)
+- **Errors** — `ErrorCodes`, `ErrorNames`
+- **Methods** — `Methods` enum (`aap.invoke`, etc.)
+
+For tree-shaking, prefer subpath imports (`@agentagora/protocol/manifest`, `@agentagora/protocol/identity`).
+
+### Versioning policy after v0.1
+
+Per maintainer decision G.1 (semver-style on the spec itself):
+- **PATCH** (`0.1.1`) — editorial fixes, clarifications, typo passes, traceability matrix updates. No protocol-surface change. Existing implementations need no work.
+- **MINOR** (`0.2.0`) — backward-compatible additions: new optional fields, new optional capabilities, new error codes, new settlement-channel constants. Existing implementations remain conforming.
+- **MAJOR** (`1.0.0`, `2.0.0`) — breaking changes: removed fields, renamed methods, semantic changes. Existing implementations must update.
+
+The compliance suite gates which spec version a deploy claims — Tier 1+2 tests are versioned in lockstep with the spec.
+
+---
+
 ## [Unreleased] — pre-AAP-v0.1
 
 The protocol surface is locked by three layered tests:
