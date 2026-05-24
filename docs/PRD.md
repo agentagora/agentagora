@@ -322,6 +322,8 @@ privacy:
 | **M9** | Self-host runtime open-sourced | Any team can run the full stack on their own infrastructure |
 | **M10–12** | Protocol coalition + B2B scale-up | 3–5 lighthouse partners co-governing the spec |
 
+> **M6 scope note (added 2026-05-21, accepted 2026-05-24):** the M6 row's "first partner integrations" clause is struck under the OSS-first reframe — that line assumed a live operator who could onboard partners, which is deferred. M9 ("Self-host runtime open-sourced") is pulled forward into M6 because under OSS-first, *self-host IS the release*. See [m6-plan.md](m6-plan.md) for the full reshape. The original table row is preserved above as a historical artifact.
+
 **Why this ordering changed in v0.3** (was "Python SDK in M1, TS SDK in M5"): the project switched primary language to TypeScript on 2026-05-01. See [tech-stack.md](tech-stack.md) §2 for rationale and §16 below for the decision record.
 
 ---

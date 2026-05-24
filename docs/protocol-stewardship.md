@@ -2,6 +2,8 @@
 
 This document explains why the AgentAgora Protocol (`packages/protocol/`) and the AgentAgora Cloud (`apps/cloud/**`) currently share a repository, and what triggers will flip us to splitting them out. It supplements [`GOVERNANCE.md`](../GOVERNANCE.md) — that file covers _decision-making_; this one covers _code organisation_.
 
+> **Operator status (2026-05-24):** the hosted Cloud is not operated as a live service today. The monorepo argument below is about *code organisation*, not operator status — the protocol and the reference impl share this repo because pre-v1 spec churn benefits from same-PR validation, not because we run a SaaS. See [`m6-plan.md`](m6-plan.md) for the OSS-first reframe.
+
 ## What "stewardship" means here
 
 [The manifesto](manifesto.md) commits to a clean separation:

@@ -342,7 +342,7 @@ Rationale recorded by maintainer: lower mental overhead for downstream implement
 
 ## Group G — M6 public-release decisions
 
-> **Status: pending.** Engaged 2026-05-21 alongside `docs/m6-plan.md`. Three decisions gate M6 Phase 2 + Phase 3 work. Recommendations are conservative — accept all three to unblock, or override individually.
+> **Status: accepted 2026-05-24.** All three recommendations adopted as stated, no overrides. Phase 1 (repositioning copy) starts immediately and was never gated by G. Phase 2 (self-host runbook) proceeds Cloudflare-only per G.3. Phase 3 (npm publish + spec freeze) uses GitHub Actions trusted publishing with `--provenance` per G.2 and semver-style spec versioning per G.1.
 
 ### G.1  Spec versioning policy after v0.1
 
