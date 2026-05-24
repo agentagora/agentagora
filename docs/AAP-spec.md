@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Version** | Draft v0.1 (RFC-style hardening, M4 Phase 3) |
-| **Status** | Internal draft (not yet public) — public release at M6 per [PRD §10](PRD.md) |
-| **Updated** | 2026-05-07 |
+| **Version** | v0.1 (frozen 2026-05-24) |
+| **Status** | Public — released at M6 per [PRD §10](PRD.md). Versioning policy: see §17 Document History. |
+| **Updated** | 2026-05-24 |
 | **Editor** | AgentAgora maintainers |
 | **Style** | IETF RFC 2119 normative language. See [`docs/aap-traceability.md`](aap-traceability.md) for the requirement → test mapping. |
 | **Conformance** | Verified by [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) (Tier 1 / 2 / 3) |
@@ -709,9 +709,10 @@ These are tracked in PRD §15. Highlights affecting the protocol surface:
 
 | Version | Date | Editor | Notes |
 |---|---|---|---|
-| v0.1 | 2026-04-30 | acme | Initial draft. Internal only. |
-| v0.1-rfc-draft | 2026-05-07 | acme | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
+| v0.1-draft | 2026-04-30 | AgentAgora maintainers | Initial draft. Internal only. |
+| v0.1-rfc-draft | 2026-05-07 | AgentAgora maintainers | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
+| **v0.1** | **2026-05-24** | **AgentAgora maintainers** | **M6 public release. The `-rfc-draft` suffix is dropped — the bytes are identical to v0.1-rfc-draft.** No protocol-surface changes since the M4 hardening pass; this version stamps the freeze. Going forward, versioning follows semver semantics on the spec itself (G.1 maintainer decision): PATCH for editorial fixes, MINOR for backward-compatible additions, MAJOR for breaking changes. Every change appends a row here. |
 
 ---
 
-*This document is internal-only until the M6 public release per [PRD §10](PRD.md). Distribution outside the project is not authorized.*
+*This spec is published under [Apache-2.0](../LICENSE). Implementers are encouraged to verify against [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) — the Tier 1 + Tier 2 + Tier 3 conformance suite — and to open a [discussion](https://github.com/agentagora/agentagora/discussions) if any spec passage is ambiguous in practice.*

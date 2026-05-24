@@ -10,6 +10,43 @@ This project follows date-based grouping during pre-alpha. Once the SDK reaches 
 
 ---
 
+## [2026-05-24] — M6 AAP v0.1 public release
+
+The protocol and the TypeScript SDK go to npm. The AAP spec sheds its `-rfc-draft` suffix and ships as a public v0.1 contract. M9 ("Self-host runtime open-sourced") is folded into M6 — under OSS-first, self-host IS the release.
+
+### Published to npm
+
+- [`@agentagora/protocol@0.1.0`](https://www.npmjs.com/package/@agentagora/protocol) — wire types and Zod schemas (single source of truth for protocol-level definitions)
+- [`@agentagora/sdk@0.1.0`](https://www.npmjs.com/package/@agentagora/sdk) — TypeScript SDK (register agents, call other agents, audit chain verification)
+
+Both are published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions trusted publishing — consumers can run `npm audit signatures` to verify the tarball was built by this repo's CI from a specific commit. See [`.github/workflows/publish.yml`](.github/workflows/publish.yml) for the workflow.
+
+`@agentagora/protocol-compliance` **stays workspace-only at 0.1.0** for this release — the package needs a `tsup` build pipeline + `src/index.ts` export surface before it's safely publishable as a library. Tracked for v0.2. Third parties run it via the documented `git clone` + `pnpm --filter @agentagora/protocol-compliance test` flow, unchanged.
+
+### Protocol freeze
+
+- [`docs/AAP-spec.md`](docs/AAP-spec.md) — header version `v0.1-rfc-draft` → `v0.1`. Document History entry stamps the freeze; the bytes are identical to the M4 hardening pass (2026-05-07), only the draft suffix is dropped. Internal-only footer removed — the spec is now public.
+- Per-package surface contract locked by `tests/api-surface.test.ts` + `tests/json-schema-lock.test.ts` (snapshot tests in `@agentagora/protocol`).
+- Versioning policy after v0.1 (G.1 maintainer decision): PATCH for editorial / MINOR for backward-compatible additions / MAJOR for breaking changes. Every spec change appends a Document History row.
+
+### Self-host
+
+- New [`docs/self-host-guide.md`](docs/self-host-guide.md) — 12-section standalone runbook from "I have nothing" to "I have a running AAP cloud" on Cloudflare. No DM-to-the-maintainer required. Scope ceiling: Cloudflare-only per G.3.
+- [`apps/cloud/api/DEPLOY.md`](apps/cloud/api/DEPLOY.md) slimmed from 319 → 108 lines and reframed as a maintainer quick-reference for code-change redeploys.
+- README's Operations section leads with the self-host guide.
+
+### Repositioning copy (M6 Phase 1)
+
+The hosted Cloud is reframed across README, manifesto (EN+ZH), protocol-stewardship, and PRD §10 as the Apache-2.0 reference implementation, not a live SaaS. No operator runs it today; the protocol works either way.
+
+### Maintainer decisions accepted (Group G)
+
+- **G.1** — Semver-style spec versioning after v0.1
+- **G.2** — GitHub Actions trusted publishing with `--provenance` (no long-lived npm tokens)
+- **G.3** — Cloudflare-only self-host runbook scope; non-CF deploys deferred to a discussion-driven future milestone
+
+---
+
 ## [Unreleased] — M3 public beta in progress
 
 Most of M2 + the bulk of M3 landed in a single autonomous push between 2026-05-02 and 2026-05-04. The full per-task tracker lives in [`docs/m3-launch-checklist.md`](docs/m3-launch-checklist.md); the highlights:
