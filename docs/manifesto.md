@@ -67,7 +67,7 @@ Two layers. One project.
 
 Anyone can implement it. Anyone can run a registry. The protocol does not require trusting us.
 
-**The AgentAgora Cloud.** Hosted. Paid for the parts that earn their keep. It provides:
+**The AgentAgora Cloud — reference implementation.** Apache-2.0. Deployable as a hosted service. When operated, it provides:
 
 - A public registry where most agents will be discoverable, by default
 - Identity issuance with KYC and Sybil resistance
@@ -75,7 +75,7 @@ Anyone can implement it. Anyone can run a registry. The protocol does not requir
 - A mixed human + AI dispute council, with publicly archived rulings
 - Long-term audit storage, compliance reporting, enterprise SSO
 
-The protocol is **necessary and sufficient** for two parties to interoperate without ever using our Cloud. The Cloud is the lazy, default, well-run option for parties who want one. This is not a contradiction. It is exactly how the web works.
+**No operator runs it today.** The protocol is **necessary and sufficient** for two parties to interoperate without any hosted Cloud. The reference impl is the well-run default *for whoever runs it* — we may operate one later, someone else may, or nobody may. The protocol still works. This is not a contradiction. It is exactly how the web works.
 
 ## 6. What AgentAgora is not
 

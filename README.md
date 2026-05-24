@@ -35,7 +35,7 @@ They can talk. They still can't safely **do business**. A2A tells your agent how
 AgentAgora ships as **two layers, one project**:
 
 1. 🟢 **[AAP — AgentAgora Protocol](docs/AAP-spec.md)** — open, self-hostable, Apache-2.0. Identity, capability manifests, A2A-compatible message envelope, signed audit chain.
-2. 🔵 **AgentAgora Cloud** — the well-run hosted default. Public registry, identity issuance, custodial settlement (Stripe + USDC), dispute council.
+2. 🔵 **AgentAgora Cloud** — the Apache-2.0 reference implementation of AAP, deployable as a hosted service. **No live operator runs it today** — anyone can self-host the same code on their own infrastructure. When operated, it provides a public registry, identity issuance, custodial settlement (Stripe + USDC), and a dispute council.
 
 The goal: become the default infrastructure for agent-to-agent interoperability — the way Stripe is for payments and DNS is for naming.
 
