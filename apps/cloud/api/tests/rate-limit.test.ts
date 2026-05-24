@@ -84,7 +84,13 @@ describe("HTTP rate limiting", () => {
   function setup() {
     const storage = new InMemoryStorage();
     const ownerAuth = new StaticOwnerAuth({ "tok-alice": "alice", "tok-bob": "bob" });
-    const rateLimiter = new InMemoryRateLimiter();
+    // Freeze the clock to a fixed instant so the fixed-window counter
+    // (keyed by Math.floor(nowMs / 60_000)) doesn't roll over mid-test
+    // when CI is slow under coverage instrumentation. Without this,
+    // sufficiently slow runs cross a minute boundary, the 31st publish
+    // lands in a fresh bucket, and the 429 assertion flakes to 201.
+    const fixedNow = () => new Date(1_700_000_000_000);
+    const rateLimiter = new InMemoryRateLimiter(fixedNow);
     const app = createApi({ storage, ownerAuth, rateLimiter });
     return { app, storage, rateLimiter };
   }
