@@ -154,8 +154,9 @@ Same SDK code, no Node-specific deps, no compatibility flags, bundle < 200 KiB. 
 - 🏗 [Tech Stack & Architecture](docs/tech-stack.md) — language, runtime, framework rationale
 
 **Operations**
+- 🌐 [Self-hosting guide](docs/self-host-guide.md) — stand up your own AAP cloud on Cloudflare, end-to-end, no DM required
 - 🛠 [Local dev runbook](docs/local-dev.md) — full stack on localhost
-- 📦 [Cloud-api deploy guide](apps/cloud/api/DEPLOY.md) — production provisioning
+- 📦 [Cloud-api deploy quick-reference](apps/cloud/api/DEPLOY.md) — maintainer cheat-sheet for code-change redeploys, migrations, secret rotations
 - 📚 [Cloud-api runbook](apps/cloud/api/RUNBOOK.md) — steady-state ops, secret rotations, restore drills
 
 **Product**
