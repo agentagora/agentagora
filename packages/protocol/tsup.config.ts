@@ -10,6 +10,7 @@ export default defineConfig({
     "src/errors.ts",
     "src/constants.ts",
     "src/conversation.ts",
+    "src/mandate.ts",
   ],
   format: ["esm"],
   dts: true,

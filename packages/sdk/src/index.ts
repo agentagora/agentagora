@@ -78,6 +78,7 @@ export {
   StripeChannel,
   stripeChannelFromEnv,
   UsdcBaseChannel,
+  X402Channel,
 } from "./settlement/index.js";
 export type {
   EscrowHandle,
@@ -88,6 +89,7 @@ export type {
   StripeChannelOptions,
   StripeLike,
   UsdcBaseChannelOptions,
+  X402ChannelOptions,
 } from "./settlement/index.js";
 
 // Re-export the protocol types so users only need one import.

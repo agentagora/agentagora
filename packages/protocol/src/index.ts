@@ -14,3 +14,4 @@ export * from "./manifest.js";
 export * from "./envelope.js";
 export * from "./audit.js";
 export * from "./conversation.js";
+export * from "./mandate.js";

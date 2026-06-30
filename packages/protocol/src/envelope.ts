@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { AAP_VERSION } from "./constants.js";
+import { SUPPORTED_AAP_VERSIONS } from "./constants.js";
 import { RpcErrorSchema } from "./errors.js";
 import { AidSchema } from "./identity.js";
 
@@ -21,7 +21,11 @@ export const SignatureSchema = z.object({
 export type Signature = z.infer<typeof SignatureSchema>;
 
 export const AapEnvelopeMetaSchema = z.object({
-  version: z.literal(AAP_VERSION),
+  /**
+   * Wire version. Accepts any supported version inbound (v0.1 stays valid);
+   * this package emits `AAP_VERSION` (the latest). See constants.ts.
+   */
+  version: z.enum(SUPPORTED_AAP_VERSIONS),
   conversation_id: z.string().min(1),
   /** ISO 8601 with millisecond precision and 'Z' suffix. */
   timestamp: z
