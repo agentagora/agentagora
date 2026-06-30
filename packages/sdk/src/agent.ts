@@ -27,6 +27,7 @@ import {
   AAP_VERSION,
   AuditEventTypes,
   ErrorCodes,
+  MandatesBlockSchema,
   Methods,
   type Privacy,
   type RpcErrorResponseEnvelope,
@@ -37,7 +38,7 @@ import {
 import type { z } from "zod";
 import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
-import { AuditLog } from "./audit.js";
+import { AuditLog, mandateHashes } from "./audit.js";
 import type { RegistryResolver } from "./registry.js";
 import { signEnvelope, verifyEnvelope } from "./signing.js";
 import type { MockTransport, Transport } from "./transport.js";
@@ -366,7 +367,9 @@ class AgentImpl implements Agent {
     }
 
     // 3. Locate capability.
-    const params = envelope.params as { capability?: string; input?: unknown } | undefined;
+    const params = envelope.params as
+      | { capability?: string; input?: unknown; mandates?: unknown }
+      | undefined;
     const capName = params?.capability;
     const cap = capName ? this.options.capabilities[capName] : undefined;
     if (!cap) {
@@ -388,14 +391,31 @@ class AgentImpl implements Agent {
       );
     }
 
-    // Audit: invocation started.
+    // 4b. Validate AP2 mandates if carried (v0.2). Malformed mandates are a
+    //     client error; their proofs (typically ES256) are verified separately
+    //     from the EdDSA envelope signature — see AAP-spec §6.5.
+    let mandateHashData: Record<string, string> = {};
+    if (params?.mandates !== undefined) {
+      const parsed = MandatesBlockSchema.safeParse(params.mandates);
+      if (!parsed.success) {
+        return await this.errorResponse(
+          envelope,
+          ErrorCodes.InputInvalid,
+          "mandates failed schema validation",
+          { issues: parsed.error.issues },
+        );
+      }
+      mandateHashData = mandateHashes(parsed.data);
+    }
+
+    // Audit: invocation started. Bind any mandate hashes into the chain.
     const log = this.logFor(envelope.aap.conversation_id);
     await writeEvent(log, {
       type: AuditEventTypes.InvocationStarted,
       actorAid: this.aid,
       privateKey: signingKey,
       keyId: signingKeyId,
-      data: { capability: capName, from: envelope.aap.from },
+      data: { capability: capName, from: envelope.aap.from, ...mandateHashData },
     });
 
     // 5. Run handler.

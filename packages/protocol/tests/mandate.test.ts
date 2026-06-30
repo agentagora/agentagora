@@ -29,11 +29,11 @@ const cart = {
       display_items: [
         {
           label: "Espresso machine",
-          amount: { currency: "USD", value: 599.99 },
+          amount: { currency: "USD", value: "599.99" },
           refund_period: 60,
         },
       ],
-      total: { label: "Total", amount: { currency: "USD", value: 603.49 }, refund_period: 30 },
+      total: { label: "Total", amount: { currency: "USD", value: "603.49" }, refund_period: 30 },
     },
     options: { request_shipping: true },
   },
@@ -46,7 +46,7 @@ const payment = {
   payment_mandate_contents: {
     payment_mandate_id: "848f97b287584cd1aa3085bed1985c22",
     payment_details_id: "order_3",
-    payment_details_total: { label: "Total", amount: { currency: "USD", value: 603.49 } },
+    payment_details_total: { label: "Total", amount: { currency: "USD", value: "603.49" } },
     payment_response: { request_id: "order_3", method_name: "CARD" },
     merchant_agent: "Generic Merchant",
     timestamp: "2026-07-11T03:50:04.532Z",

@@ -87,6 +87,11 @@ single message is legible to both stacks:
 2. **Header parity.** When AAP runs over an A2A transport, implementations SHOULD also emit the
    `X-A2A-Extensions` AP2 header and the parallel `data` part, so AP2-only middleboxes see it.
 
+**Amounts are decimal strings.** Per the W3C Payment Request spec, `amount.value` is a decimal
+**string** (e.g. `"603.49"`), not a float. This matches AAP's "decimals as strings" convention and —
+critically — keeps mandates **float-free**, so a mandate rides unchanged inside a signed AAP envelope
+(whose JCS canonicalization rejects floats by policy to avoid cross-runtime precision drift).
+
 Mandate-to-method binding:
 
 | Method | Mandate carried |

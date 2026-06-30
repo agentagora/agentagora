@@ -27,7 +27,7 @@ export {
   verifyAuditEvent,
   verifyEnvelope,
 } from "./signing.js";
-export { AuditLog, hashEvent } from "./audit.js";
+export { AuditLog, hashEvent, hashMandate } from "./audit.js";
 export {
   AAPError,
   CallRefundedError,

@@ -11,7 +11,7 @@
  * (in-memory).
  */
 
-import type { AuditEvent } from "@agentagora/protocol";
+import { Ap2, type AuditEvent, type MandatesBlock } from "@agentagora/protocol";
 import { sha256 } from "@noble/hashes/sha256";
 import { canonicalizeForSigning } from "./canonical.js";
 
@@ -22,6 +22,36 @@ export function hashEvent(event: AuditEvent): string {
   const bytes = canonicalizeForSigning(cloned);
   const digest = sha256(bytes);
   return `sha256:${toHex(digest)}`;
+}
+
+/**
+ * Hash an AP2 mandate's canonical bytes (v0.2). Recorded in audit events so
+ * the tamper-evident chain proves which mandate authorized which step. Uses
+ * the same JCS canonicalization as `hashEvent`, so a verifier can recompute
+ * the hash from the mandate carried on the wire. See AAP-spec §6.5 / §9.6.
+ */
+export function hashMandate(mandate: unknown): string {
+  const bytes = canonicalizeForSigning(mandate);
+  const digest = sha256(bytes);
+  return `sha256:${toHex(digest)}`;
+}
+
+/**
+ * Canonical hashes of whichever AP2 mandates are present, keyed for an audit
+ * event's `data` (`intent_mandate_hash`, `cart_mandate_hash`,
+ * `payment_mandate_hash`). Shared by the initiator (client) and responder
+ * (agent) so both bind the same hashes into their chains.
+ */
+export function mandateHashes(mandates: MandatesBlock | undefined): Record<string, string> {
+  if (!mandates) return {};
+  const out: Record<string, string> = {};
+  const intent = mandates[Ap2.MandateKeys.Intent];
+  const cart = mandates[Ap2.MandateKeys.Cart];
+  const payment = mandates[Ap2.MandateKeys.Payment];
+  if (intent) out.intent_mandate_hash = hashMandate(intent);
+  if (cart) out.cart_mandate_hash = hashMandate(cart);
+  if (payment) out.payment_mandate_hash = hashMandate(payment);
+  return out;
 }
 
 function toHex(bytes: Uint8Array): string {

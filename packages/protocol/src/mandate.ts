@@ -17,10 +17,15 @@
 
 import { z } from "zod";
 
-/** A monetary amount, as used in AP2's W3C Payment Request data model. */
+/**
+ * A monetary amount, as used in AP2's W3C Payment Request data model. Per the
+ * W3C Payment Request spec, `value` is a **decimal string** (e.g. "603.49"),
+ * not a float — which also matches AAP's "decimals as strings" convention and
+ * keeps mandates float-free so they ride inside a signed AAP envelope.
+ */
 export const AmountSchema = z.object({
   currency: z.string(), // ISO 4217, e.g. "USD"
-  value: z.number(),
+  value: z.string(), // decimal string, e.g. "603.49"
 });
 export type Amount = z.infer<typeof AmountSchema>;
 

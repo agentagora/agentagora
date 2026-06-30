@@ -60,6 +60,7 @@ describe("@agentagora/sdk public API surface", () => {
         "formatAid",
         "generatePrivateKey",
         "hashEvent",
+        "hashMandate",
         "parseAid",
         "publicKeyFrom",
         "signAuditEvent",
