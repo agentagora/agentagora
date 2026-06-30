@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Version** | v0.1 (frozen 2026-05-24) |
-| **Status** | Public — released at M6 per [PRD §10](PRD.md). Versioning policy: see §17 Document History. |
-| **Updated** | 2026-05-24 |
+| **Version** | v0.2 (2026-06-30) — backward-compatible MINOR over v0.1 |
+| **Status** | Public. v0.2 adds AP2 mandate carriage, the `x402` settlement channel, and the optional `aap.authorize` method — all additive; v0.1 implementations remain conforming. See [`AAP-spec-ap2-binding.md`](AAP-spec-ap2-binding.md) for the full binding. Versioning policy: see §17. |
+| **Updated** | 2026-06-30 |
 | **Editor** | AgentAgora maintainers |
 | **Style** | IETF RFC 2119 normative language. See [`docs/aap-traceability.md`](aap-traceability.md) for the requirement → test mapping. |
 | **Conformance** | Verified by [`@agentagora/protocol-compliance`](../packages/protocol-compliance/) (Tier 1 / 2 / 3) |
@@ -292,6 +292,7 @@ The `signature.value` is computed over the JCS canonicalization of the entire en
 |---|---|---|
 | `aap.handshake` | Initiator → Responder | Open conversation, exchange capabilities, agree on terms |
 | `aap.invoke` | Initiator → Responder | Submit work request |
+| `aap.authorize` | Initiator → Responder | (v0.2, OPTIONAL) Carry a `PaymentMandate` authorizing escrow capture. MAY be folded into `aap.invoke` params. |
 | `aap.progress` | Responder → Initiator | Stream progress (via SSE channel, same envelope) |
 | `aap.complete` | Responder → Initiator | Deliver final result |
 | `aap.acknowledge` | Initiator → Responder | Accept result and trigger settlement |
@@ -315,6 +316,25 @@ Errors use JSON-RPC 2.0 error objects with AAP-defined codes:
 | -32007 | `aap.sla_breach` | Responder cannot meet SLA |
 | -32008 | `aap.rate_limited` | Caller is rate-limited |
 | -32099 | `aap.internal` | Implementation error |
+
+### 6.5 AP2 mandate carriage (v0.2, OPTIONAL)
+
+AAP MAY carry [AP2](https://ap2-protocol.org) Mandates (Intent / Cart / Payment) as the
+payment-authorization payload, so an AP2-native counterparty interoperates. Mandates are W3C
+Verifiable Credentials carrying their **own** proof (typically ES256), verified **independently** of
+the EdDSA AAP envelope signature — the two sit at different layers. A verifier that accepts mandates
+MUST validate both the envelope signature and each contained mandate's proof.
+
+- Mandates ride in an optional `params.mandates` object, keyed `ap2.mandates.<Type>`.
+- When AAP runs over an A2A transport, implementations SHOULD also emit the
+  `X-A2A-Extensions: https://github.com/google-agentic-commerce/ap2/v1` header and the parallel
+  `data` part, so AP2-only middleboxes see the mandate.
+- Binding: an `IntentMandate` rides `aap.handshake` (initiator); a responder-signed `CartMandate`
+  rides the handshake response, and its `details.total.amount` MUST equal the escrowed amount; a
+  `PaymentMandate` rides `aap.authorize`.
+
+A v0.1 implementation that does not understand mandates ignores the optional field and remains
+conforming. Full data model: [`AAP-spec-ap2-binding.md`](AAP-spec-ap2-binding.md).
 
 ---
 
@@ -528,6 +548,19 @@ During handshake, the initiator proposes one or more channels from the responder
 
 Capabilities with `pricing: { model: free }` SHALL NOT trigger settlement. They MAY still emit audit events. Free-tier dispute resolution is limited to reputation impact (no monetary remedy).
 
+### 9.6 Channel: `x402` (v0.2)
+
+- AP2's onchain stablecoin rail (USDC on Base), exposed through the same
+  `escrow/capture/refund/status` abstraction.
+- x402 itself has **no native escrow** — it is a pull on an HTTP 402 challenge. AAP therefore keeps
+  **escrow as an AAP construct**: funds are held in the AgentAgora escrow contract (shared with
+  `usdc-base`) and x402 is the capture/settlement rail. The authorizing `PaymentMandate` hash is
+  recorded against the escrow.
+- Escrow-less operation (authorize-then-pull, skipping the contract) MAY be offered for low-value
+  `pricing.model: per_call` capabilities under a configured threshold, trading the escrow guarantee
+  for x402-native simplicity.
+- Latency: ~2 seconds finality. KYC: as for `usdc-base` (§9.3).
+
 ---
 
 ## 10. Dispute & Council Interaction
@@ -712,6 +745,7 @@ These are tracked in PRD §15. Highlights affecting the protocol surface:
 | v0.1-draft | 2026-04-30 | AgentAgora maintainers | Initial draft. Internal only. |
 | v0.1-rfc-draft | 2026-05-07 | AgentAgora maintainers | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
 | **v0.1** | **2026-05-24** | **AgentAgora maintainers** | **M6 public release. The `-rfc-draft` suffix is dropped — the bytes are identical to v0.1-rfc-draft.** No protocol-surface changes since the M4 hardening pass; this version stamps the freeze. Going forward, versioning follows semver semantics on the spec itself (G.1 maintainer decision): PATCH for editorial fixes, MINOR for backward-compatible additions, MAJOR for breaking changes. Every change appends a row here. |
+| **v0.2** | **2026-06-30** | **AgentAgora maintainers** | **MINOR — backward-compatible additions for AP2 interop.** Adds §6.5 AP2 mandate carriage (Intent/Cart/Payment Mandates as W3C VCs in optional `params.mandates`, proofs verified independently of the EdDSA envelope), the optional `aap.authorize` method (§6.3), and the `x402` settlement channel (§9.6). Envelopes now accept `version` ∈ {`0.1`, `0.2`} inbound and emit `0.2`. v0.1 implementations remain conforming — they ignore the optional mandate field. Full binding in [`AAP-spec-ap2-binding.md`](AAP-spec-ap2-binding.md). |
 
 ---
 

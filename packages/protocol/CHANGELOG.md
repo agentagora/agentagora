@@ -8,6 +8,23 @@ The wire-protocol version (`AAP_VERSION` in `src/constants.ts`) and the package'
 
 ---
 
+## [0.2.0] — 2026-06-30 — AAP v0.2 (AP2 interop)
+
+Backward-compatible MINOR (`AAP_VERSION` `0.1` → `0.2`). Adds [AP2](https://ap2-protocol.org) mandate carriage so AAP interoperates with the Agent Payments Protocol ecosystem. v0.1 implementations remain conforming — every addition is optional. Full binding: [`docs/AAP-spec-ap2-binding.md`](../../docs/AAP-spec-ap2-binding.md).
+
+### Added
+
+- `mandate.ts` (new subpath `@agentagora/protocol/mandate`): `IntentMandateSchema`, `CartMandateSchema`, `PaymentMandateSchema`, `MandatesBlockSchema`, `VcProofSchema`, `AmountSchema`, `PaymentRequestSchema` — AP2 field names verbatim (W3C VC + Payment Request data model). Mandate proofs are verified independently of the EdDSA envelope signature.
+- `SettlementChannels.X402` (`"x402"`) — AP2 onchain stablecoin rail; escrow stays an AAP construct, x402 is the capture rail.
+- `Methods.Authorize` (`"aap.authorize"`) — optional method carrying a `PaymentMandate`.
+- `Ap2` constants — `ExtensionUri` (the `X-A2A-Extensions` value) and `MandateKeys` (the `ap2.mandates.<Type>` data-part keys).
+- `SUPPORTED_AAP_VERSIONS` (`["0.1", "0.2"]`) and `SupportedAapVersion`.
+
+### Changed
+
+- `AAP_VERSION` is now `"0.2"` (the version emitted on outbound envelopes).
+- `AapEnvelopeMetaSchema.version` accepts any value in `SUPPORTED_AAP_VERSIONS` (was `z.literal("0.1")`), so inbound v0.1 envelopes still validate. **Not breaking** — strictly widens the accepted set.
+
 ## [0.1.0] — 2026-05-24 — AAP v0.1 frozen
 
 First public npm release. AAP v0.1 spec frozen; this is the byte-for-byte surface that survived M4's RFC-style hardening pass — no protocol-surface changes since v0.1-rfc-draft (2026-05-07), just the `-rfc-draft` suffix dropped.

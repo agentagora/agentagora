@@ -56,3 +56,5 @@ export {
 } from "./stripe.js";
 export { UsdcBaseChannel } from "./usdc-base.js";
 export type { UsdcBaseChannelOptions } from "./usdc-base.js";
+export { X402Channel } from "./x402.js";
+export type { X402ChannelOptions } from "./x402.js";

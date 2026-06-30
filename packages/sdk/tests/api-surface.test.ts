@@ -49,6 +49,7 @@ describe("@agentagora/sdk public API surface", () => {
         "StripeChannel",
         "UnauthorizedError",
         "UsdcBaseChannel",
+        "X402Channel",
         "b64uDecode",
         "b64uEncode",
         "canonicalizeForSigning",

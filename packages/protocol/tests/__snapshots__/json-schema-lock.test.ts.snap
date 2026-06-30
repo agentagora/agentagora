@@ -50,7 +50,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > AapEnvelopeMetaSchem
           "type": "string",
         },
         "version": {
-          "const": "0.1",
+          "enum": [
+            "0.1",
+            "0.2",
+          ],
           "type": "string",
         },
       },
@@ -640,7 +643,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcErrorResponseEnve
               "type": "string",
             },
             "version": {
-              "const": "0.1",
+              "enum": [
+                "0.1",
+                "0.2",
+              ],
               "type": "string",
             },
           },
@@ -787,7 +793,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcRequestEnvelopeSc
               "type": "string",
             },
             "version": {
-              "const": "0.1",
+              "enum": [
+                "0.1",
+                "0.2",
+              ],
               "type": "string",
             },
           },
@@ -892,7 +901,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcResponseEnvelopeS
                   "type": "string",
                 },
                 "version": {
-                  "const": "0.1",
+                  "enum": [
+                    "0.1",
+                    "0.2",
+                  ],
                   "type": "string",
                 },
               },
@@ -981,7 +993,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcResponseEnvelopeS
                   "type": "string",
                 },
                 "version": {
-                  "const": "0.1",
+                  "enum": [
+                    "0.1",
+                    "0.2",
+                  ],
                   "type": "string",
                 },
               },
@@ -1101,7 +1116,10 @@ exports[`@agentagora/protocol JSON Schema wire-shape lock > RpcSuccessResponseEn
               "type": "string",
             },
             "version": {
-              "const": "0.1",
+              "enum": [
+                "0.1",
+                "0.2",
+              ],
               "type": "string",
             },
           },
