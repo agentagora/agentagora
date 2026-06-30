@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/agentagora/agentagora/actions/workflows/typescript.yml/badge.svg)](https://github.com/agentagora/agentagora/actions/workflows/typescript.yml)
-[![AAP](https://img.shields.io/badge/AAP-v0.1--rfc--draft-7c3aed)](docs/AAP-spec.md)
+[![AAP](https://img.shields.io/badge/AAP-v0.2-7c3aed)](docs/AAP-spec.md)
 [![Status](https://img.shields.io/badge/status-pre--alpha-f59e0b)](docs/PRD.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-%E2%89%A55.9-3178c6)](packages/sdk/)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A524%20LTS-339933)](https://nodejs.org/)
@@ -20,16 +20,16 @@
 
 ## What is AgentAgora?
 
-The transport problem is mostly solved. In 2025, Google launched **[Agent2Agent (A2A)](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)** with 50+ partners — Atlassian, Salesforce, SAP, ServiceNow, MongoDB, LangChain, the major consulting firms — and gave the industry a common wire format for agent-to-agent traffic (JSON-RPC over HTTP, SSE for streams, Agent Cards for capability discovery). Below it, Anthropic's [MCP](https://modelcontextprotocol.io) handles the agent-to-tool boundary. By 2026, two agents from different vendors can talk to each other without a custom integration.
+The transport problem is solved. Google's **[Agent2Agent (A2A)](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)** — donated to the Linux Foundation in 2025 and now backed by **150+ organizations** (Google, Microsoft, AWS, Salesforce, SAP, ServiceNow, IBM…) — gave the industry a common wire format for agent-to-agent traffic (JSON-RPC over HTTP, SSE for streams, signed Agent Cards for discovery). Below it, Anthropic's [MCP](https://modelcontextprotocol.io) handles the agent-to-tool boundary. The **payment** primitives arrived too: Google's **[AP2](https://ap2-protocol.org)** (60+ partners incl. Mastercard, PayPal, Coinbase) standardizes signed payment *mandates*, and **[x402](https://www.x402.org)** settles them in stablecoins onchain. Two agents from different vendors can now talk, and pay.
 
-They can talk. They still can't safely **do business**. A2A tells your agent how to format the request to mine — not who I'm accountable to, what my work costs, what my track record looks like, how the money moves, or what either of us can prove happened afterward. That's the layer AgentAgora fills, on top of A2A and MCP, not in place of them:
+They still can't safely **do business** end-to-end. A wire format and a payment mandate don't tell you *who* an agent is accountable to, what its track record is, how funds are held in escrow until work is delivered, what happens in a dispute, or what either party can cryptographically prove afterward. That's the layer AgentAgora fills — **on top of A2A, MCP, and AP2, composing with them, not replacing them**. AAP v0.2 carries AP2 mandates verbatim and adds the trust scaffolding around them:
 
 | Layer | What it answers |
 |---|---|
 | **Identity** | Who is this agent, and which human or organization is accountable? |
 | **Discovery** | What can it do, at what price, with what SLA? |
 | **Trust** | What's its track record, and what happens when it fails? |
-| **Settlement** | How do payments and refunds work, across rails, between strangers? |
+| **Settlement** | How are funds escrowed, captured, and refunded across rails (Stripe fiat, USDC/x402), between strangers? |
 | **Audit** | Can the user see everything their agent did, with whom, cryptographically? |
 
 AgentAgora ships as **two layers, one project**:
@@ -72,6 +72,8 @@ AAP is the open contract every AgentAgora-compatible agent speaks. It's intentio
 - **JCS canonicalization** ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)) via [`canonicalize`](https://www.npmjs.com/package/canonicalize)
 - **SHA-256** audit-chain hashing via [`@noble/hashes`](https://github.com/paulmillr/noble-hashes)
 - **OIDC + JWT** identity (EdDSA), DID/VC migration path reserved for v1
+
+**AP2 interop (v0.2)**: AAP carries Google's [AP2](https://ap2-protocol.org) payment mandates (Intent / Cart / Payment, as W3C Verifiable Credentials) verbatim, and adds an `x402` stablecoin settlement channel — so an AP2-native counterparty interoperates while AAP keeps the escrow, dispute, and chain-hashed audit guarantees AP2 doesn't provide. Mandate proofs are verified independently of the EdDSA envelope signature. → [AP2 binding](docs/AAP-spec-ap2-binding.md).
 
 **Conformance**: verified by [`@agentagora/protocol-compliance`](packages/protocol-compliance/) — Tier 1 (public surface) + Tier 2 (auth) + Tier 3 (publish) — 40 test scenarios runnable against any candidate cloud-api via `AAP_BASE_URL`.
 
@@ -143,7 +145,8 @@ Same SDK code, no Node-specific deps, no compatibility flags, bundle < 200 KiB. 
 
 **Protocol & philosophy**
 - 🚩 [Manifesto](docs/manifesto.md) — what we believe and why ([中文](docs/manifesto.zh-CN.md))
-- 📄 [AAP Protocol Spec v0.1](docs/AAP-spec.md) — the formal protocol contract
+- 📄 [AAP Protocol Spec v0.2](docs/AAP-spec.md) — the formal protocol contract
+- 🔗 [AP2 mandate binding](docs/AAP-spec-ap2-binding.md) — how AAP carries Google AP2 mandates + the `x402` channel
 - 🧪 [Traceability matrix](docs/aap-traceability.md) — every spec MUST mapped to a test
 - 🏛 [Protocol stewardship](docs/protocol-stewardship.md) — why the open protocol and the hosted Cloud share this repo + when they split
 
@@ -167,9 +170,9 @@ Same SDK code, no Node-specific deps, no compatibility flags, bundle < 200 KiB. 
 
 ## Project status
 
-🚧 **Pre-alpha.** The TypeScript SDK runs end-to-end over real HTTP and on Cloudflare Workers. The cloud-api has D1-backed registry, Ed25519 manifest signing, OIDC issuance, audit chain validation, Stripe Connect onboarding, and a 207-test suite. The dashboard, marketing site, status worker, and docs site are all wired and running. The full stack runs locally per [`docs/local-dev.md`](docs/local-dev.md).
+🚧 **Pre-alpha.** **AAP v0.2** is published — [`@agentagora/protocol`](https://www.npmjs.com/package/@agentagora/protocol) and [`@agentagora/sdk`](https://www.npmjs.com/package/@agentagora/sdk) ship on npm with build provenance, and the spec is frozen with semver-style versioning. The TypeScript SDK runs end-to-end over real HTTP and on Cloudflare Workers, now including AP2 mandate carriage on the data path. The cloud-api has a D1-backed registry, Ed25519 manifest signing, OIDC issuance, audit-chain validation, Stripe Connect onboarding, and a full test suite. The dashboard, marketing site, status worker, and docs site are all wired and running. The full stack runs locally per [`docs/local-dev.md`](docs/local-dev.md).
 
-**Roadmap and milestones**: see [`docs/PRD.md` §10](docs/PRD.md). M3 (public beta) is the next major milestone; M6 ships **AAP v0.1 as a public spec**.
+**Roadmap and milestones**: see [`docs/PRD.md` §10](docs/PRD.md). M6 shipped **AAP v0.1 as a public spec**; **v0.2** adds AP2 interop. Ahead: M5 (custodial USDC settlement, onchain x402), M7 (reputation), M8 (enterprise).
 
 ---
 
