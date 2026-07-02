@@ -24,9 +24,9 @@
  */
 
 import {
-  AAP_VERSION,
   AuditEventTypes,
   ErrorCodes,
+  type MandatesBlock,
   MandatesBlockSchema,
   Methods,
   type Privacy,
@@ -394,6 +394,9 @@ class AgentImpl implements Agent {
     // 4b. Validate AP2 mandates if carried (v0.2). Malformed mandates are a
     //     client error; their proofs (typically ES256) are verified separately
     //     from the EdDSA envelope signature — see AAP-spec §6.5.
+    //     IMPORTANT: validate against the schema but hash the ORIGINAL wire
+    //     object — Zod parsing re-shapes the copy, and both parties must bind
+    //     the same bytes the initiator hashed.
     let mandateHashData: Record<string, string> = {};
     if (params?.mandates !== undefined) {
       const parsed = MandatesBlockSchema.safeParse(params.mandates);
@@ -405,7 +408,17 @@ class AgentImpl implements Agent {
           { issues: parsed.error.issues },
         );
       }
-      mandateHashData = mandateHashes(parsed.data);
+      try {
+        mandateHashData = mandateHashes(params.mandates as MandatesBlock);
+      } catch (e) {
+        // Unhashable mandate content (e.g. unsupported value types) is a
+        // client error, not a server crash.
+        return await this.errorResponse(
+          envelope,
+          ErrorCodes.InputInvalid,
+          `mandates could not be canonicalized: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
 
     // Audit: invocation started. Bind any mandate hashes into the chain.
@@ -450,13 +463,14 @@ class AgentImpl implements Agent {
       data: { capability: capName },
     });
 
-    // 7. Build & sign success response.
+    // 7. Build & sign success response. Echo the requester's wire version so
+    //    a v0.1 peer never receives an envelope its validators reject.
     const response: RpcSuccessResponseEnvelope = {
       jsonrpc: "2.0",
       id: envelope.id,
       result: outputResult.data,
       aap: {
-        version: AAP_VERSION,
+        version: envelope.aap.version,
         conversation_id: envelope.aap.conversation_id,
         timestamp: makeTimestamp(),
         nonce: makeId(),
@@ -484,7 +498,8 @@ class AgentImpl implements Agent {
       id: request.id,
       error: data ? { code, message, data } : { code, message },
       aap: {
-        version: AAP_VERSION,
+        // Echo the requester's wire version (v0.1 peers reject "0.2").
+        version: request.aap.version,
         conversation_id: request.aap.conversation_id,
         timestamp: makeTimestamp(),
         nonce: makeId(),

@@ -87,10 +87,14 @@ single message is legible to both stacks:
 2. **Header parity.** When AAP runs over an A2A transport, implementations SHOULD also emit the
    `X-A2A-Extensions` AP2 header and the parallel `data` part, so AP2-only middleboxes see it.
 
-**Amounts are decimal strings.** Per the W3C Payment Request spec, `amount.value` is a decimal
-**string** (e.g. `"603.49"`), not a float. This matches AAP's "decimals as strings" convention and —
-critically — keeps mandates **float-free**, so a mandate rides unchanged inside a signed AAP envelope
-(whose JCS canonicalization rejects floats by policy to avoid cross-runtime precision drift).
+**Amounts: decimal strings preferred, numbers accepted.** The W3C Payment Request spec types
+`amount.value` as a decimal **string** (e.g. `"603.49"`), and that is what AAP-native agents SHOULD
+emit — it matches AAP's "decimals as strings" convention and keeps mandates float-free so they ride
+unchanged inside a signed AAP envelope (whose JCS canonicalization rejects floats by policy). But
+AP2's reference implementation serializes JSON *numbers*, so `AmountSchema` accepts both: rejecting
+numeric amounts would reject genuine AP2 traffic. `hashMandate` is float-tolerant (plain RFC 8785,
+no float guard) so hashing never crashes; float-bearing mandates simply cannot be carried inside an
+AAP-signed envelope and must be exchanged over an A2A-native transport instead.
 
 Mandate-to-method binding:
 
@@ -125,62 +129,65 @@ x402 has **no native escrow** — it is a pull on HTTP 402 challenge. To honor A
 
 ## 6. Audit integration
 
-Each mandate exchange emits an audit event (§8) whose payload includes the mandate's JCS hash, so the
-chain-hashed trail remains the single source of truth and a verifier can prove *which* mandate
-authorized *which* capture:
+Each mandate exchange emits an audit event (§8) whose payload includes the mandate's canonical hash
+(RFC 8785 over the **original wire object** — never a schema-parsed copy, so both parties and any
+later verifier bind the same bytes), keeping the chain-hashed trail the single source of truth:
 
 ```
-aap.handshake.accepted   → { intent_mandate_hash, cart_mandate_hash }
-aap.escrow.funded        → { payment_mandate_hash }
+# Initiator chain
+aap.conversation.opened  → { intent_mandate_hash?, cart_mandate_hash?, payment_mandate_hash? }
+aap.escrow.funded        → { payment_mandate_hash }          # when escrow is used
+# Responder chain
+aap.invocation.started   → { intent_mandate_hash?, cart_mandate_hash?, payment_mandate_hash? }
+# Both (future, once capture events carry it)
 aap.escrow.captured      → { payment_mandate_hash, settlement_tx }
 ```
 
-No new event *types* needed; the existing `AuditEventTypes` gain mandate-hash fields in their payloads.
+All hashes bind at conversation open / invocation start so a `PaymentMandate` sent **without**
+escrow (escrow-less settlement, §5) is still bound into both chains. Once `aap.handshake` lands in
+the SDK, intent/cart hashes move to `aap.handshake.accepted` as originally sketched. No new event
+*types* needed; the existing `AuditEventTypes` gain mandate-hash fields in their payloads.
 
 ## 7. Type sketch (for `packages/protocol/`, on acceptance)
 
-New file `packages/protocol/src/mandate.ts` (Zod, no runtime deps — boundary-test clean). AP2 field
-names verbatim so the wire is byte-compatible:
+Implemented in `packages/protocol/src/mandate.ts` (Zod, no runtime deps — boundary-test clean).
+Shapes mirror AP2's reference types (`ap2/types/mandate.py`); every object schema is
+`.passthrough()` so unmodeled AP2 fields (VC `proof`, `risk_data`, …) survive validation — and
+implementations hash the **original wire object**, never the parsed copy:
 
 ```ts
-// W3C VC envelope carrying an AP2 mandate; proof verified independently of the AAP envelope.
-export const VcProofSchema = z.object({
-  type: z.string(),            // e.g. "DataIntegrityProof"
-  cryptosuite: z.string(),     // e.g. "ecdsa-rdfc-2019"
-  created: z.string(),
-  verificationMethod: z.string(),
-  proofValue: z.string(),
-});
-
 export const IntentMandateSchema = z.object({
   user_cart_confirmation_required: z.boolean(),
   natural_language_description: z.string(),
-  merchants: z.array(z.string()),
-  skus: z.array(z.string()),
+  merchants: z.array(z.string()).nullable().optional(),  // null/omitted = unconstrained (AP2: list[str] | None)
+  skus: z.array(z.string()).nullable().optional(),
   requires_refundability: z.boolean(),
   intent_expiry: z.string(),   // ISO 8601
-});
+}).passthrough();
 
+// AP2's wire shape nests the cart body under `contents`:
 export const CartMandateSchema = z.object({
-  id: z.string(),
-  user_cart_confirmation_required: z.boolean(),
-  payment_request: PaymentRequestSchema, // W3C Payment Request API shape: method_data, details, options
-  cart_expiry: z.string(),
-  merchant_name: z.string(),
-  merchant_authorization: z.string(),    // merchant JWT/VC proof
-});
+  contents: z.object({
+    id: z.string(),
+    user_cart_confirmation_required: z.boolean(),
+    payment_request: PaymentRequestSchema, // W3C Payment Request: method_data, details, options
+    cart_expiry: z.string(),
+    merchant_name: z.string(),
+  }).passthrough(),
+  merchant_authorization: z.string().nullable().optional(), // merchant JWT/VC proof; null until signed
+}).passthrough();
 
 export const PaymentMandateSchema = z.object({
   payment_mandate_contents: z.object({
     payment_mandate_id: z.string(),
     payment_details_id: z.string(),
-    payment_details_total: AmountSchema,
+    payment_details_total: DisplayItemSchema,  // { label, amount, refund_period? }
     payment_response: z.unknown(),
     merchant_agent: z.string(),
     timestamp: z.string(),
-  }),
+  }).passthrough(),
   user_authorization: z.string(),        // cart-hash-bound user proof
-});
+}).passthrough();
 ```
 
 ## 8. Open questions

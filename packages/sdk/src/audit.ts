@@ -13,7 +13,7 @@
 
 import { Ap2, type AuditEvent, type MandatesBlock } from "@agentagora/protocol";
 import { sha256 } from "@noble/hashes/sha256";
-import { canonicalizeForSigning } from "./canonical.js";
+import { canonicalizeForSigning, canonicalizeJson } from "./canonical.js";
 
 /** Hash an event's canonical bytes (with signature.value cleared). */
 export function hashEvent(event: AuditEvent): string {
@@ -27,11 +27,14 @@ export function hashEvent(event: AuditEvent): string {
 /**
  * Hash an AP2 mandate's canonical bytes (v0.2). Recorded in audit events so
  * the tamper-evident chain proves which mandate authorized which step. Uses
- * the same JCS canonicalization as `hashEvent`, so a verifier can recompute
- * the hash from the mandate carried on the wire. See AAP-spec §6.5 / §9.6.
+ * RFC 8785 canonicalization WITHOUT the AAP float guard (mandates are opaque
+ * third-party payloads whose untyped fields may carry JSON numbers), so a
+ * verifier can always recompute the hash from the mandate carried on the
+ * wire. Always hash the ORIGINAL wire object, never a schema-parsed copy.
+ * See AAP-spec §6.5 / §9.6.
  */
 export function hashMandate(mandate: unknown): string {
-  const bytes = canonicalizeForSigning(mandate);
+  const bytes = canonicalizeJson(mandate);
   const digest = sha256(bytes);
   return `sha256:${toHex(digest)}`;
 }

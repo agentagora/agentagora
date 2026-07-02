@@ -14,16 +14,17 @@ Backward-compatible MINOR (`AAP_VERSION` `0.1` → `0.2`). Adds [AP2](https://ap
 
 ### Added
 
-- `mandate.ts` (new subpath `@agentagora/protocol/mandate`): `IntentMandateSchema`, `CartMandateSchema`, `PaymentMandateSchema`, `MandatesBlockSchema`, `VcProofSchema`, `AmountSchema`, `PaymentRequestSchema` — AP2 field names verbatim (W3C VC + Payment Request data model). Mandate proofs are verified independently of the EdDSA envelope signature.
+- `mandate.ts` (new subpath `@agentagora/protocol/mandate`): `IntentMandateSchema`, `CartMandateSchema` (+ `CartContentsSchema`), `PaymentMandateSchema`, `MandatesBlockSchema`, `VcProofSchema`, `AmountSchema`, `DisplayItemSchema`, `PaymentRequestSchema` — shapes mirror AP2's reference types (`ap2/types/mandate.py`): `CartMandate` nests the cart body under `contents` with a nullable `merchant_authorization`; `IntentMandate.merchants`/`skus` are nullable/omissible; `AmountSchema.value` accepts decimal strings (preferred) **and** JSON numbers (AP2 reference-impl parity). Every object schema is `.passthrough()` so unmodeled AP2 fields (VC `proof`, `risk_data`, …) survive validation. Mandate proofs are verified independently of the EdDSA envelope signature.
 - `SettlementChannels.X402` (`"x402"`) — AP2 onchain stablecoin rail; escrow stays an AAP construct, x402 is the capture rail.
-- `Methods.Authorize` (`"aap.authorize"`) — optional method carrying a `PaymentMandate`.
+- `Methods.Authorize` (`"aap.authorize"`) — optional method carrying a `PaymentMandate` (the reference SDK folds the mandate into `aap.invoke` params instead, which the spec permits).
 - `Ap2` constants — `ExtensionUri` (the `X-A2A-Extensions` value) and `MandateKeys` (the `ap2.mandates.<Type>` data-part keys).
 - `SUPPORTED_AAP_VERSIONS` (`["0.1", "0.2"]`) and `SupportedAapVersion`.
 
 ### Changed
 
-- `AAP_VERSION` is now `"0.2"` (the version emitted on outbound envelopes).
-- `AapEnvelopeMetaSchema.version` accepts any value in `SUPPORTED_AAP_VERSIONS` (was `z.literal("0.1")`), so inbound v0.1 envelopes still validate. **Not breaking** — strictly widens the accepted set.
+- `AAP_VERSION` is now `"0.2"` — the **highest** version this package speaks, not an unconditional stamp. Implementations SHOULD emit the lowest version an envelope's content requires (`"0.1"` for mandate-free traffic, so unupgraded v0.1 validators — which pin the version literal — keep accepting it) and SHOULD echo the requester's version on responses. The reference SDK does both.
+- `AapEnvelopeMetaSchema.version` accepts any value in `SUPPORTED_AAP_VERSIONS` (was `z.literal("0.1")`), so inbound v0.1 envelopes still validate.
+- **Compat note:** a v0.1 peer only sees `"0.2"` on envelopes that actually carry v0.2 features (mandates) — which it couldn't process anyway. All other cross-version traffic validates on both sides.
 
 ## [0.1.0] — 2026-05-24 — AAP v0.1 frozen
 

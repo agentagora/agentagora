@@ -28,6 +28,7 @@ describe("@agentagora/protocol public API surface", () => {
         "AuditEventSchema",
         "AuditEventTypes",
         "CapabilitySchema",
+        "CartContentsSchema",
         "CartMandateSchema",
         "ConversationStatuses",
         "DisplayItemSchema",

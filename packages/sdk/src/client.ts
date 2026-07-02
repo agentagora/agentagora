@@ -208,7 +208,10 @@ export class AgentAgoraClient {
     this.auditLogs.set(conversationId, log);
     const startedAt = new Date();
 
-    // Audit: conversation opened. Bind intent/cart mandate hashes if present.
+    // Audit: conversation opened. Bind ALL mandate hashes here so every
+    // mandate the initiator sends is bound into its chain regardless of
+    // whether escrow is used (a PaymentMandate without options.pay — e.g.
+    // escrow-less settlement — must still be provable/repudiable later).
     const hashes = mandateHashes(options.mandates);
     await writeEvent(log, {
       type: AuditEventTypes.ConversationOpened,
@@ -218,8 +221,7 @@ export class AgentAgoraClient {
       data: {
         responder: aid,
         capability: capabilityName,
-        ...(hashes.intent_mandate_hash ? { intent_mandate_hash: hashes.intent_mandate_hash } : {}),
-        ...(hashes.cart_mandate_hash ? { cart_mandate_hash: hashes.cart_mandate_hash } : {}),
+        ...hashes,
       },
     });
 
@@ -268,7 +270,11 @@ export class AgentAgoraClient {
           ...(options.mandates ? { mandates: options.mandates } : {}),
         },
         aap: {
-          version: AAP_VERSION,
+          // Emit the lowest wire version the message needs: plain invokes
+          // stay "0.1" so unupgraded peers (whose validators pin the version
+          // literal) keep accepting our traffic; only mandate-bearing
+          // requests are stamped with the v0.2 wire version they require.
+          version: options.mandates ? AAP_VERSION : "0.1",
           conversation_id: conversationId,
           timestamp: makeTimestamp(),
           nonce: makeId(),

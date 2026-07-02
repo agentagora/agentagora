@@ -12,15 +12,21 @@ Tracks `@agentagora/protocol@0.2.0`. Adds end-to-end AP2 mandate carriage on the
 
 ### Added
 
-- `AgentAgoraClient.call` / `callRich`: optional `options.mandates` (an AP2 `MandatesBlock`). Mandates are attached to `params.mandates` and their canonical hashes are bound into the initiator's audit chain — `intent_mandate_hash` / `cart_mandate_hash` on conversation open, `payment_mandate_hash` on escrow funding.
-- Responder: inbound `params.mandates` are validated against `MandatesBlockSchema` (malformed → `aap.input_invalid`) and the same hashes are bound into the responder's own audit chain, so both sides agree on which mandate authorized the call.
-- `hashMandate(mandate)` — canonical (RFC 8785) SHA-256 of a mandate, recomputable from the wire bytes by any verifier.
+- `AgentAgoraClient.call` / `callRich`: optional `options.mandates` (an AP2 `MandatesBlock`). Mandates are attached to `params.mandates` and **all** their canonical hashes are bound into the initiator's audit chain on conversation open (so a `PaymentMandate` without `options.pay` — escrow-less settlement — is still provable), with `payment_mandate_hash` additionally recorded on escrow funding.
+- Responder: inbound `params.mandates` are validated against `MandatesBlockSchema` (malformed or uncanonicalizable → `aap.input_invalid`, never a crash) and the same hashes are bound into the responder's own audit chain.
+- `hashMandate(mandate)` — SHA-256 over plain RFC 8785 canonical bytes (float-tolerant: mandates are opaque third-party payloads), always computed over the **original wire object** — never a schema-parsed copy — so both parties and any later verifier bind identical bytes even when a mandate carries fields the schemas don't model (VC `proof`, `risk_data`).
+- `mandateHashes(block)` — the shared hash-key convention (`intent_mandate_hash` / `cart_mandate_hash` / `payment_mandate_hash`), exported for verifiers.
 - `X402Channel` — AP2 x402 settlement-channel stub (escrow stays an AAP construct; x402 is the capture rail). Onchain impl lands with the M5 USDC work.
+- Re-exports from `@agentagora/protocol`: `Ap2`, the mandate schemas + types, and `SUPPORTED_AAP_VERSIONS`, so SDK users need only one import.
+
+### Changed
+
+- Wire-version emission: requests are stamped with the **lowest** version their content requires (`0.1` for mandate-free calls, `0.2` with mandates), and agent responses **echo the requester's version** — unupgraded v0.1 peers keep validating all traffic that doesn't use v0.2 features.
 
 ### Notes
 
 - Mandate proofs (typically ES256) are verified independently of the EdDSA AAP envelope signature — see AAP-spec §6.5.
-- AP2/W3C amounts are carried as decimal strings (e.g. `"603.49"`), keeping mandates float-free so they ride inside a signed AAP envelope.
+- AP2/W3C amounts SHOULD be decimal strings (e.g. `"603.49"`); numeric amounts validate (AP2 reference-impl parity) and hash fine, but non-integral numbers cannot ride inside a signed AAP envelope (envelope canonicalization rejects floats by policy).
 
 ## [0.1.0] — 2026-05-24 — M6 public release
 
