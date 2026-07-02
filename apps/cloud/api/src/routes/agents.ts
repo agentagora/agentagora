@@ -182,10 +182,33 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
     if (!record) {
       return c.json({ error: "not_found", message: `agent ${aid} not found` }, 404);
     }
+
+    // Reissue the identity certificate on every read. Certificates carry a
+    // short TTL (~1h), so the publish-time JWT stored with the record is
+    // expired for almost every resolve — reissuing gives verifiers a FRESH
+    // registry attestation of the pubkey↔AID binding on each lookup, which
+    // is what lets SDK resolvers enforce `exp` strictly (HttpRegistry
+    // `rejectExpired`). Falls back to the stored JWT when no OIDC issuer is
+    // configured (local dev without OIDC_SIGNING_KEY, some tests).
+    let identityJwt = record.identityJwt;
+    if (oidc) {
+      try {
+        identityJwt = await oidc.issue({
+          manifest: record.manifest,
+          ownerId: record.publishedBy,
+          publisherPubkey: record.pubkey,
+        });
+      } catch {
+        // Serve the stored (possibly expired) certificate rather than
+        // failing the read — resolution must not be less available than
+        // the record itself.
+      }
+    }
+
     return c.json({
       aid: record.manifest.aid,
       manifest: record.manifest,
-      identity_jwt: record.identityJwt,
+      identity_jwt: identityJwt,
       published_at: record.publishedAt,
       published_by: record.publishedBy,
       // The TOFU-pinned signing key. Advisory only — verifiers SHOULD

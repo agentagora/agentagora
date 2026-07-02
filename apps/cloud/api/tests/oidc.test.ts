@@ -210,6 +210,52 @@ describe("HTTP surface", () => {
     expect(ok).toBe(true);
   });
 
+  it("GET /v1/agents/:aid REISSUES a fresh identity certificate on every read", async () => {
+    // Certificates carry a ~1h TTL, so the publish-time JWT is expired for
+    // almost every real-world resolve. The read path must mint a fresh
+    // attestation — that's what lets SDK resolvers enforce `exp` strictly.
+    let now = 1_750_000_000;
+    const oidc = await OidcIssuer.create({
+      privateKey: issuerKey,
+      issuer: ISSUER,
+      now: () => now,
+    });
+    const ownerAuth = new StaticOwnerAuth({ "tok-alice": "alice" });
+    const storage = new InMemoryStorage();
+    const app = createApi({ storage, ownerAuth, oidc });
+
+    const signed = await signManifest(validManifest, aliceKey);
+    const pub = await app.request("/v1/agents", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer tok-alice",
+        "x-aap-pubkey": signed.pubkey,
+        "x-aap-signature": signed.signature,
+      },
+      body: JSON.stringify(validManifest),
+    });
+    expect(pub.status).toBe(201);
+    const publishJwt = ((await pub.json()) as { identity_jwt: string }).identity_jwt;
+
+    // Two days later, the stored publish-time certificate is long expired…
+    now += 2 * 24 * 3600;
+    const res = await app.request(`/v1/agents/${encodeURIComponent(validManifest.aid)}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { identity_jwt: string };
+
+    // …but the read returns a FRESH one: newly minted, valid now, same
+    // pinned pubkey, verifiable against the JWKS.
+    expect(body.identity_jwt).not.toBe(publishJwt);
+    const { payload, signingInput, signature } = decodeJwt(body.identity_jwt);
+    expect(payload.iat).toBe(now);
+    expect(payload.exp as number).toBeGreaterThan(now);
+    expect(payload.sub).toBe(validManifest.aid);
+    expect(payload["aap.pubkey"]).toBe(aliceKey.pubkeyB64u);
+    expect(payload["aap.owner"]).toBe("alice");
+    expect(await ed.verifyAsync(signature, signingInput, oidc.publicKeyBytes())).toBe(true);
+  });
+
   it("POST /v1/agents falls back to mock JWT when no issuer is configured", async () => {
     const ownerAuth = new StaticOwnerAuth({ "tok-alice": "alice" });
     const app = createApi({ ownerAuth });

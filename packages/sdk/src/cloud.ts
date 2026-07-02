@@ -53,12 +53,12 @@ export interface HttpRegistryOptions {
   /** How long a resolved agent stays cached. Default 5 minutes. */
   cacheTtlMs?: number;
   /**
-   * Reject identity certificates past their `exp`. Defaults to false:
-   * registries currently mint the certificate once at publish time with a
-   * short TTL, so almost every stored certificate is expired by read time.
-   * The signature still proves the registry vouched for the pubkey↔AID
-   * binding. Server-side reissue-on-read is the M3 follow-up that will let
-   * this default flip to true.
+   * Reject identity certificates past their `exp`. Defaults to TRUE: the
+   * reference registry reissues a fresh certificate on every read, so a
+   * conforming registry always serves a currently-valid attestation of the
+   * pubkey↔AID binding. Set false only against a legacy registry that
+   * still serves publish-time certificates (signature checks still apply;
+   * you merely lose freshness).
    */
   rejectExpired?: boolean;
 }
@@ -93,7 +93,7 @@ export class HttpRegistry implements RegistryResolver, EndpointResolver {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.fetchImpl = options.fetch ?? fetch;
     this.cacheTtlMs = options.cacheTtlMs ?? 300_000;
-    this.rejectExpired = options.rejectExpired ?? false;
+    this.rejectExpired = options.rejectExpired ?? true;
   }
 
   async resolveAgent(aid: string): Promise<ResolvedAgent> {
