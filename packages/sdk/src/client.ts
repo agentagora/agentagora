@@ -15,6 +15,7 @@ import {
   type ConversationStatus,
   ConversationStatuses,
   ErrorCodes,
+  type MandatesBlock,
   Methods,
   type RpcErrorResponseEnvelope,
   type RpcRequestEnvelope,
@@ -22,7 +23,7 @@ import {
 } from "@agentagora/protocol";
 import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
-import { AuditLog } from "./audit.js";
+import { AuditLog, mandateHashes } from "./audit.js";
 import type { ConversationSnapshot } from "./conversation.js";
 import { AAPError, CallRefundedError } from "./errors.js";
 import type { RegistryResolver } from "./registry.js";
@@ -81,6 +82,15 @@ export interface CallOptions {
     channel?: string;
   };
   onProgress?: (progress: { percent: number; message: string }) => void;
+  /**
+   * Optional AP2 mandates (v0.2) carried as the payment-authorization
+   * payload. Attached to `params.mandates`; their canonical hashes are
+   * recorded in the audit chain (intent/cart on conversation open, payment
+   * on escrow funding) so a verifier can prove which mandate authorized
+   * which step. The responder validates them and binds the hashes into its
+   * own audit log. See AAP-spec §6.5.
+   */
+  mandates?: MandatesBlock;
 }
 
 export class AgentAgoraClient {
@@ -198,13 +208,21 @@ export class AgentAgoraClient {
     this.auditLogs.set(conversationId, log);
     const startedAt = new Date();
 
-    // Audit: conversation opened.
+    // Audit: conversation opened. Bind ALL mandate hashes here so every
+    // mandate the initiator sends is bound into its chain regardless of
+    // whether escrow is used (a PaymentMandate without options.pay — e.g.
+    // escrow-less settlement — must still be provable/repudiable later).
+    const hashes = mandateHashes(options.mandates);
     await writeEvent(log, {
       type: AuditEventTypes.ConversationOpened,
       actorAid: fromAid,
       privateKey: signingKey,
       keyId: signingKeyId,
-      data: { responder: aid, capability: capabilityName },
+      data: {
+        responder: aid,
+        capability: capabilityName,
+        ...hashes,
+      },
     });
 
     // Optional escrow funding — happens before invoke.
@@ -227,6 +245,9 @@ export class AgentAgoraClient {
           escrowId: escrowHandle.escrowId,
           amount: options.pay.amount,
           currency: options.pay.currency,
+          ...(hashes.payment_mandate_hash
+            ? { payment_mandate_hash: hashes.payment_mandate_hash }
+            : {}),
         },
       });
     }
@@ -243,9 +264,17 @@ export class AgentAgoraClient {
         jsonrpc: "2.0",
         id: requestId,
         method: Methods.Invoke,
-        params: { capability: capabilityName, input },
+        params: {
+          capability: capabilityName,
+          input,
+          ...(options.mandates ? { mandates: options.mandates } : {}),
+        },
         aap: {
-          version: AAP_VERSION,
+          // Emit the lowest wire version the message needs: plain invokes
+          // stay "0.1" so unupgraded peers (whose validators pin the version
+          // literal) keep accepting our traffic; only mandate-bearing
+          // requests are stamped with the v0.2 wire version they require.
+          version: options.mandates ? AAP_VERSION : "0.1",
           conversation_id: conversationId,
           timestamp: makeTimestamp(),
           nonce: makeId(),

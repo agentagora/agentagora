@@ -330,8 +330,16 @@ MUST validate both the envelope signature and each contained mandate's proof.
   `X-A2A-Extensions: https://github.com/google-agentic-commerce/ap2/v1` header and the parallel
   `data` part, so AP2-only middleboxes see the mandate.
 - Binding: an `IntentMandate` rides `aap.handshake` (initiator); a responder-signed `CartMandate`
-  rides the handshake response, and its `details.total.amount` MUST equal the escrowed amount; a
-  `PaymentMandate` rides `aap.authorize`.
+  rides the handshake response, and its `contents.payment_request.details.total.amount` MUST equal
+  the escrowed amount; a `PaymentMandate` rides `aap.authorize` **or** `aap.invoke` params (the
+  reference SDK folds it into `aap.invoke`; `aap.authorize` remains OPTIONAL per §6.3).
+- Version emission: implementations SHOULD stamp each envelope with the **lowest** wire version its
+  content requires (`0.1` for mandate-free messages, `0.2` when mandates are carried) and SHOULD
+  echo the requester's version on responses, so unupgraded v0.1 validators keep accepting all
+  traffic that doesn't use v0.2 features.
+- Audit binding: implementations MUST record each carried mandate's canonical hash (computed over
+  the **original wire object**, never a schema-parsed copy) in the audit events of the state
+  transitions the mandate authorizes.
 
 A v0.1 implementation that does not understand mandates ignores the optional field and remains
 conforming. Full data model: [`AAP-spec-ap2-binding.md`](AAP-spec-ap2-binding.md).

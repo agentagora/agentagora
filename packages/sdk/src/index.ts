@@ -27,7 +27,7 @@ export {
   verifyAuditEvent,
   verifyEnvelope,
 } from "./signing.js";
-export { AuditLog, hashEvent } from "./audit.js";
+export { AuditLog, hashEvent, hashMandate, mandateHashes } from "./audit.js";
 export {
   AAPError,
   CallRefundedError,
@@ -97,9 +97,13 @@ export type {
   AidString,
   AuditEvent,
   Capability,
+  CartMandate,
   ConversationStatus,
+  IntentMandate,
+  MandatesBlock,
   Manifest,
   ParsedAid,
+  PaymentMandate,
   Pricing,
   Privacy,
   RpcRequestEnvelope,
@@ -109,12 +113,18 @@ export type {
 } from "@agentagora/protocol";
 export {
   AAP_VERSION,
+  Ap2,
   AuditEventTypes,
+  CartMandateSchema,
   ConversationStatuses,
   ErrorCodes,
+  IntentMandateSchema,
+  MandatesBlockSchema,
   ManifestSchema,
   Methods,
   parseAid,
   formatAid,
+  PaymentMandateSchema,
   SettlementChannels,
+  SUPPORTED_AAP_VERSIONS,
 } from "@agentagora/protocol";

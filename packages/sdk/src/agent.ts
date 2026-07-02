@@ -24,9 +24,10 @@
  */
 
 import {
-  AAP_VERSION,
   AuditEventTypes,
   ErrorCodes,
+  type MandatesBlock,
+  MandatesBlockSchema,
   Methods,
   type Privacy,
   type RpcErrorResponseEnvelope,
@@ -37,7 +38,7 @@ import {
 import type { z } from "zod";
 import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
-import { AuditLog } from "./audit.js";
+import { AuditLog, mandateHashes } from "./audit.js";
 import type { RegistryResolver } from "./registry.js";
 import { signEnvelope, verifyEnvelope } from "./signing.js";
 import type { MockTransport, Transport } from "./transport.js";
@@ -366,7 +367,9 @@ class AgentImpl implements Agent {
     }
 
     // 3. Locate capability.
-    const params = envelope.params as { capability?: string; input?: unknown } | undefined;
+    const params = envelope.params as
+      | { capability?: string; input?: unknown; mandates?: unknown }
+      | undefined;
     const capName = params?.capability;
     const cap = capName ? this.options.capabilities[capName] : undefined;
     if (!cap) {
@@ -388,14 +391,44 @@ class AgentImpl implements Agent {
       );
     }
 
-    // Audit: invocation started.
+    // 4b. Validate AP2 mandates if carried (v0.2). Malformed mandates are a
+    //     client error; their proofs (typically ES256) are verified separately
+    //     from the EdDSA envelope signature — see AAP-spec §6.5.
+    //     IMPORTANT: validate against the schema but hash the ORIGINAL wire
+    //     object — Zod parsing re-shapes the copy, and both parties must bind
+    //     the same bytes the initiator hashed.
+    let mandateHashData: Record<string, string> = {};
+    if (params?.mandates !== undefined) {
+      const parsed = MandatesBlockSchema.safeParse(params.mandates);
+      if (!parsed.success) {
+        return await this.errorResponse(
+          envelope,
+          ErrorCodes.InputInvalid,
+          "mandates failed schema validation",
+          { issues: parsed.error.issues },
+        );
+      }
+      try {
+        mandateHashData = mandateHashes(params.mandates as MandatesBlock);
+      } catch (e) {
+        // Unhashable mandate content (e.g. unsupported value types) is a
+        // client error, not a server crash.
+        return await this.errorResponse(
+          envelope,
+          ErrorCodes.InputInvalid,
+          `mandates could not be canonicalized: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
+    // Audit: invocation started. Bind any mandate hashes into the chain.
     const log = this.logFor(envelope.aap.conversation_id);
     await writeEvent(log, {
       type: AuditEventTypes.InvocationStarted,
       actorAid: this.aid,
       privateKey: signingKey,
       keyId: signingKeyId,
-      data: { capability: capName, from: envelope.aap.from },
+      data: { capability: capName, from: envelope.aap.from, ...mandateHashData },
     });
 
     // 5. Run handler.
@@ -430,13 +463,14 @@ class AgentImpl implements Agent {
       data: { capability: capName },
     });
 
-    // 7. Build & sign success response.
+    // 7. Build & sign success response. Echo the requester's wire version so
+    //    a v0.1 peer never receives an envelope its validators reject.
     const response: RpcSuccessResponseEnvelope = {
       jsonrpc: "2.0",
       id: envelope.id,
       result: outputResult.data,
       aap: {
-        version: AAP_VERSION,
+        version: envelope.aap.version,
         conversation_id: envelope.aap.conversation_id,
         timestamp: makeTimestamp(),
         nonce: makeId(),
@@ -464,7 +498,8 @@ class AgentImpl implements Agent {
       id: request.id,
       error: data ? { code, message, data } : { code, message },
       aap: {
-        version: AAP_VERSION,
+        // Echo the requester's wire version (v0.1 peers reject "0.2").
+        version: request.aap.version,
         conversation_id: request.aap.conversation_id,
         timestamp: makeTimestamp(),
         nonce: makeId(),

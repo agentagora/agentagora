@@ -18,6 +18,17 @@ import canonicalize from "canonicalize";
  */
 export function canonicalizeForSigning(value: unknown): Uint8Array {
   rejectFloats(value);
+  return canonicalizeJson(value);
+}
+
+/**
+ * RFC 8785 canonical bytes WITHOUT the AAP float guard. For hashing opaque
+ * third-party payloads — notably AP2 mandates, whose untyped fields
+ * (payment_response, method_data[].data, …) legitimately carry JSON numbers.
+ * RFC 8785 serializes numbers deterministically, so the hash is stable
+ * across runtimes; the float ban applies only to AAP's own signed envelopes.
+ */
+export function canonicalizeJson(value: unknown): Uint8Array {
   const text = canonicalize(value);
   if (text === undefined) {
     throw new TypeError("canonicalize returned undefined; input contains an unsupported value");
