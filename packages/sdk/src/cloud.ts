@@ -46,7 +46,7 @@ export interface ResolvedAgent {
 }
 
 export interface HttpRegistryOptions {
-  /** Registry base URL, e.g. "https://api.agentagora.dev" or "http://localhost:8787". */
+  /** Registry base URL, e.g. `https://api.agentagora.dev` or `http://localhost:8787`. */
   baseUrl: string;
   /** Optional fetch override for tests. Defaults to global fetch. */
   fetch?: typeof fetch;
