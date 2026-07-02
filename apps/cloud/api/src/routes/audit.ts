@@ -251,7 +251,7 @@ async function ingestOne(
     };
   }
 
-  const latest = await storage.getLatestAuditEvent(event.conversation_id);
+  const latest = await storage.getLatestAuditEvent(event.conversation_id, event.actor_aid);
   const expectedPrev = latest ? hashAuditEvent(latest) : null;
   if (event.previous_event_hash !== expectedPrev) {
     return {

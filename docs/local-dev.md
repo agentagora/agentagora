@@ -206,7 +206,42 @@ if you reached here, the SDK is working end-to-end over HTTP.
 
 The two-agents demo is **standalone** — it runs Alice and Bob in-process, signs every envelope with real Ed25519, and verifies both sides' audit chains. It does **not** hit cloud-api by default; it proves the SDK + protocol layer is correct independently of the cloud.
 
-To run a version that registers with cloud-api and produces audit events the dashboard can render, see `apps/examples/two-agents/src/server.ts` + `apps/examples/two-agents/src/client.ts`.
+### Step 7b — The golden-path demo (publish → discover → call → audit in the dashboard)
+
+The split server/client version exercises the full product loop against your
+local cloud-api — no `InMemoryRegistry`, no hardcoded keys or endpoints:
+
+```bash
+# Terminal A — Bob: publishes his manifest, serves over HTTP, pushes his
+# audit chains to the cloud every 2s
+export AGENTAGORA_TOKEN=<owner token from Step 3>
+pnpm --filter @agentagora/example-two-agents demo:server
+
+# Terminal B — Alice: publishes her identity, DISCOVERS Bob via the
+# registry (pubkey verified through the registry-signed identity
+# certificate), calls him, pushes her audit chain
+export AGENTAGORA_TOKEN=<owner token from Step 3>
+pnpm --filter @agentagora/example-two-agents demo:client
+```
+
+What just happened, in product terms:
+
+1. Both agents **published** signed manifests (`POST /v1/agents`, TOFU pubkey pin)
+2. Alice **discovered** Bob with `HttpRegistry` — endpoint from his manifest,
+   pubkey extracted from his JWKS-verified identity certificate
+3. Alice **called** Bob over real HTTP with signed envelopes
+4. Both sides **pushed audit chains** to `POST /v1/audit/ingest`
+5. Open the dashboard → **Conversations** to see the call from either owner's side
+
+Signing keys persist in gitignored `apps/examples/two-agents/.bob.key` /
+`.alice.key` — the registry pins each AID's key on first publish, so deleting
+a key file and re-running will be rejected with 403 (that's the TOFU pin
+working; reset the local D1 row to rotate).
+
+With `STRIPE_SECRET_KEY` exported (test mode), the client also calls Bob's
+**paid** `fortune` capability with `options.pay` — escrow → capture on
+Stripe, with `escrow.funded` / `escrow.captured` events in the audit chain.
+Without it, the paid call is skipped and the demo stays free-only.
 
 ## Step 8 — Start the marketing site (optional, for catalog rendering)
 

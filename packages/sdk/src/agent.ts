@@ -141,6 +141,11 @@ export interface Agent {
    */
   getAuditLog(conversationId: string): AuditLog | undefined;
   /**
+   * IDs of every conversation this agent has an audit log for — the
+   * enumeration a periodic audit sync (CloudAuditSink) iterates over.
+   */
+  listConversations(): string[];
+  /**
    * Returns a Web-standard fetch handler that this agent can be served
    * behind on any runtime that accepts one (Node via @hono/node-server,
    * Bun, Deno, Cloudflare Workers).
@@ -220,6 +225,10 @@ class AgentImpl implements Agent {
 
   getAuditLog(conversationId: string): AuditLog | undefined {
     return this.auditLogs.get(conversationId);
+  }
+
+  listConversations(): string[] {
+    return [...this.auditLogs.keys()];
   }
 
   private logFor(conversationId: string): AuditLog {

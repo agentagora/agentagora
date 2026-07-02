@@ -187,6 +187,12 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
       manifest: record.manifest,
       identity_jwt: record.identityJwt,
       published_at: record.publishedAt,
+      published_by: record.publishedBy,
+      // The TOFU-pinned signing key. Advisory only — verifiers SHOULD
+      // extract the pubkey from the identity_jwt (registry-signed) rather
+      // than trusting this raw field; it exists so the dashboard detail
+      // view can render the pin without JWT parsing.
+      pubkey: record.pubkey,
     });
   });
 

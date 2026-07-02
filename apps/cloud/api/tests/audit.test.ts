@@ -114,6 +114,54 @@ describe("POST /v1/audit/ingest — happy path", () => {
     expect(stored.map((e) => e.event_id)).toEqual([e1.event_id, e2.event_id, e3.event_id]);
   });
 
+  it("accepts BOTH parties' chains for one conversation (per-actor linkage)", async () => {
+    // Audit chains are per-party: the initiator and the responder each
+    // keep their own chain for the same conversation_id, both starting at
+    // previous_event_hash = null. Linkage must be validated against the
+    // actor's own chain — the responder's first event landing after the
+    // initiator's chain is NOT a broken chain. (Regression: the golden-path
+    // demo's responder sync was rejected before this.)
+    const { app, storage } = await setup();
+    const BOB_AID = "aid:agentagora:acme/echo";
+    const bobManifest = { ...validManifest, aid: BOB_AID };
+    const signed = await signManifest(bobManifest, bobKey);
+    const pub = await app.request("/v1/agents", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer tok-alice",
+        "x-aap-pubkey": signed.pubkey,
+        "x-aap-signature": signed.signature,
+      },
+      body: JSON.stringify(bobManifest),
+    });
+    expect(pub.status).toBe(201);
+
+    // Alice's chain ingests first…
+    const a1 = await signAuditEvent(draft({}, 0, null), aliceKey);
+    const a2 = await signAuditEvent(draft({}, 1, chainHash(a1)), aliceKey);
+    expect((await ingest(app, [a1, a2])).status).toBe(201);
+
+    // …then Bob's chain for the SAME conversation starts fresh at null.
+    const b1 = await signAuditEvent(
+      draft({ event_id: "evt-b-0000", actor_aid: BOB_AID }, 2, null),
+      bobKey,
+    );
+    const b2 = await signAuditEvent(
+      draft({ event_id: "evt-b-0001", actor_aid: BOB_AID }, 3, chainHash(b1)),
+      bobKey,
+    );
+    const res = await ingest(app, [b1, b2]);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { ingested: string[]; rejected: unknown[] };
+    expect(body.rejected).toEqual([]);
+    expect(body.ingested).toEqual([b1.event_id, b2.event_id]);
+
+    // The merged conversation view holds all four events.
+    const stored = await storage.getConversationEvents(CONVO);
+    expect(stored).toHaveLength(4);
+  });
+
   it("is idempotent — re-ingesting reports duplicate without poisoning", async () => {
     const { app, storage } = await setup();
     const event = await signAuditEvent(draft({}, 0, null), aliceKey);

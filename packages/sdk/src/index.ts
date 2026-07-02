@@ -53,6 +53,14 @@ export {
 } from "./transport.js";
 export type { RegistryResolver } from "./registry.js";
 export { InMemoryRegistry } from "./registry.js";
+export type {
+  CloudAuditSinkOptions,
+  HttpRegistryOptions,
+  PublishAgentOptions,
+  PublishAgentResult,
+  ResolvedAgent,
+} from "./cloud.js";
+export { CloudAuditSink, HttpRegistry, publishAgent } from "./cloud.js";
 export { AgentAgoraClient } from "./client.js";
 export type { AgentAgoraClientOptions, CallOptions, SpendCap } from "./client.js";
 export {

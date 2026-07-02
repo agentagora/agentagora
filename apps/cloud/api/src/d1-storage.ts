@@ -154,14 +154,19 @@ export class D1Storage implements Storage {
     return row !== null;
   }
 
-  async getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined> {
+  async getLatestAuditEvent(
+    conversationId: string,
+    actorAid: string,
+  ): Promise<AuditEvent | undefined> {
+    // Per-actor chain: initiator and responder each maintain their own
+    // hash chain for the same conversation (see Storage docs).
     const row = await this.db
       .prepare(
         `SELECT event_json FROM audit_events
-         WHERE conversation_id = ?
+         WHERE conversation_id = ? AND actor_aid = ?
          ORDER BY timestamp DESC LIMIT 1`,
       )
-      .bind(conversationId)
+      .bind(conversationId, actorAid)
       .first<{ event_json: string }>();
     return row ? (JSON.parse(row.event_json) as AuditEvent) : undefined;
   }
