@@ -6,6 +6,19 @@ The SDK is the canonical reference implementation of AAP for clients (agents cal
 
 ---
 
+## [0.3.0] — 2026-07-02 — Cloud connectivity (the MVP loop)
+
+No wire-protocol change (`@agentagora/protocol` stays 0.2.0). This release adds the connective tissue between a local agent and a registry/control plane, closing the "publish → discover → call → audit-in-the-dashboard" product loop that previously required mocks and hand-wired keys.
+
+### Added
+
+- `HttpRegistry` — the registry-backed resolver long promised by `registry.ts`. Implements **both** `RegistryResolver` and `EndpointResolver`: `GET /v1/agents/:aid`, then verifies the identity certificate (compact EdDSA JWT) against the registry's `/.well-known/jwks.json` and extracts `aap.pubkey` — trust anchors at the registry's JWKS, never a raw pubkey field. Per-AID cache with TTL + `invalidate()`. Expired certificates are tolerated by default (registries mint publish-time certs with 1h TTL; server-side reissue-on-read is the M3 follow-up) — opt into strictness with `rejectExpired: true`.
+- `publishAgent()` — sign a manifest (detached Ed25519 over RFC 8785 canonical bytes) and `POST /v1/agents` with the `x-aap-pubkey` / `x-aap-signature` headers the server verifies. Surfaces the registry's TOFU-pin errors verbatim.
+- `CloudAuditSink` — incremental push of a local `AuditLog` to `POST /v1/audit/ingest`, with a per-conversation cursor that only ever advances past server-ingested events (a partial rejection throws and the retry resumes cleanly).
+- `Agent.listConversations()` — enumeration for periodic audit sync loops.
+- `AgentAgoraClient.resolve(aid)` — implemented (was an M1-task stub): resolves via a lazily constructed `HttpRegistry` against `options.registry`.
+- Golden-path example: `apps/examples/two-agents/src/server.ts` + `client.ts` (the files `demo:server` / `demo:client` always pointed at) — publish → discover → call (+ optional paid call via Stripe) → audit sync, against a local cloud-api per `docs/local-dev.md` §7b.
+
 ## [0.2.0] — 2026-06-30 — AAP v0.2 (AP2 interop)
 
 Tracks `@agentagora/protocol@0.2.0`. Adds end-to-end AP2 mandate carriage on the data path — backward-compatible, every addition opt-in.

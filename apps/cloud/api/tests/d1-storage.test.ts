@@ -210,8 +210,16 @@ describe("D1Storage", () => {
       const events = await storage.getConversationEvents("convo-x");
       expect(events.map((e) => e.event_id)).toEqual(["e1", "e2"]);
 
-      const latest = await storage.getLatestAuditEvent("convo-x");
+      const latest = await storage.getLatestAuditEvent(
+        "convo-x",
+        "aid:agentagora:acme/code-review",
+      );
       expect(latest?.event_id).toBe("e2");
+
+      // Per-actor chains: another actor in the same conversation has no
+      // "latest" — its chain starts fresh at previous_event_hash = null.
+      const otherActor = await storage.getLatestAuditEvent("convo-x", "aid:agentagora:other/agent");
+      expect(otherActor).toBeUndefined();
     });
 
     it("hasAuditEvent reports presence", async () => {

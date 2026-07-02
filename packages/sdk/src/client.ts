@@ -24,6 +24,7 @@ import {
 import { writeEvent } from "./_internal/audit-events.js";
 import { makeId, makeTimestamp } from "./_internal/ids.js";
 import { AuditLog, mandateHashes } from "./audit.js";
+import { HttpRegistry, type ResolvedAgent } from "./cloud.js";
 import type { ConversationSnapshot } from "./conversation.js";
 import { AAPError, CallRefundedError } from "./errors.js";
 import type { RegistryResolver } from "./registry.js";
@@ -96,6 +97,7 @@ export interface CallOptions {
 export class AgentAgoraClient {
   private readonly options: AgentAgoraClientOptions;
   private readonly auditLogs = new Map<string, AuditLog>();
+  private httpRegistry: HttpRegistry | undefined;
 
   constructor(options: AgentAgoraClientOptions) {
     if (!options.token) {
@@ -412,8 +414,16 @@ export class AgentAgoraClient {
 
   // ----- Discovery -----
 
-  async resolve(_aid: string): Promise<unknown> {
-    throw new Error("AgentAgoraClient.resolve — implemented in M1 task #7");
+  /**
+   * Resolve an AID against the configured registry (`options.registry`):
+   * verified pubkey, RPC endpoint, and full manifest. Uses a lazily
+   * constructed `HttpRegistry` (JWKS-verified identity certificates).
+   */
+  async resolve(aid: string): Promise<ResolvedAgent> {
+    if (!this.httpRegistry) {
+      this.httpRegistry = new HttpRegistry({ baseUrl: this.registry });
+    }
+    return this.httpRegistry.resolveAgent(aid);
   }
 
   // ----- Owner-facing -----

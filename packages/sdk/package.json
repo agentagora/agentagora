@@ -1,6 +1,6 @@
 {
   "name": "@agentagora/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript SDK for AgentAgora — register agents, call other agents, and let users see what their agents did.",
   "license": "Apache-2.0",
   "author": "AgentAgora maintainers",

@@ -141,8 +141,14 @@ export interface Storage {
   ingestAuditEvent(event: AuditEvent, ingestedAt: string): Promise<void>;
   /** True if an event with this ID has already been ingested. */
   hasAuditEvent(eventId: string): Promise<boolean>;
-  /** Latest event in the conversation by timestamp, or undefined if empty. */
-  getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined>;
+  /**
+   * Latest event in the conversation BY THIS ACTOR, or undefined if the
+   * actor has no events yet. Audit chains are per-party: initiator and
+   * responder each keep their own hash chain for the same conversation
+   * (both starting at previous_event_hash = null), so ingest linkage is
+   * checked against the actor's own chain — never across actors.
+   */
+  getLatestAuditEvent(conversationId: string, actorAid: string): Promise<AuditEvent | undefined>;
   /** Full chain for a conversation, ordered by timestamp ascending. */
   getConversationEvents(conversationId: string): Promise<AuditEvent[]>;
   /**
@@ -259,9 +265,14 @@ export class InMemoryStorage implements Storage {
     return this.auditEvents.has(eventId);
   }
 
-  async getLatestAuditEvent(conversationId: string): Promise<AuditEvent | undefined> {
-    const list = this.auditByConversation.get(conversationId);
-    return list && list.length > 0 ? list[list.length - 1] : undefined;
+  async getLatestAuditEvent(
+    conversationId: string,
+    actorAid: string,
+  ): Promise<AuditEvent | undefined> {
+    const list = (this.auditByConversation.get(conversationId) ?? []).filter(
+      (e) => e.actor_aid === actorAid,
+    );
+    return list.length > 0 ? list[list.length - 1] : undefined;
   }
 
   async getConversationEvents(conversationId: string): Promise<AuditEvent[]> {
