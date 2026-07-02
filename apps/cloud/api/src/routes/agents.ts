@@ -175,6 +175,33 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
     );
   });
 
+  // Raw feedback evidence for an agent (M7-lite). Public read, like the
+  // conversation chain view: these are signed audit events, and disputes /
+  // hiring decisions should be able to inspect them without credentials.
+  // No aggregation or trust score here — that's the M7 reputation engine.
+  router.get("/:aid/feedback", async (c) => {
+    const aid = decodeURIComponent(c.req.param("aid"));
+    const record = await storage.getAgent(aid);
+    if (!record) {
+      return c.json({ error: "not_found", message: `agent ${aid} not found` }, 404);
+    }
+    const events = await storage.listFeedbackForAgent(aid);
+    return c.json({
+      aid,
+      total: events.length,
+      feedback: events.map((ev) => ({
+        event_id: ev.event_id,
+        conversation_id: ev.conversation_id,
+        actor_aid: ev.actor_aid,
+        timestamp: ev.timestamp,
+        score: ev.data.score,
+        capability: ev.data.capability,
+        tags: ev.data.tags,
+        comment: ev.data.comment,
+      })),
+    });
+  });
+
   // Resolve one AID.
   router.get("/:aid", async (c) => {
     const aid = decodeURIComponent(c.req.param("aid"));
@@ -182,10 +209,33 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
     if (!record) {
       return c.json({ error: "not_found", message: `agent ${aid} not found` }, 404);
     }
+
+    // Reissue the identity certificate on every read. Certificates carry a
+    // short TTL (~1h), so the publish-time JWT stored with the record is
+    // expired for almost every resolve — reissuing gives verifiers a FRESH
+    // registry attestation of the pubkey↔AID binding on each lookup, which
+    // is what lets SDK resolvers enforce `exp` strictly (HttpRegistry
+    // `rejectExpired`). Falls back to the stored JWT when no OIDC issuer is
+    // configured (local dev without OIDC_SIGNING_KEY, some tests).
+    let identityJwt = record.identityJwt;
+    if (oidc) {
+      try {
+        identityJwt = await oidc.issue({
+          manifest: record.manifest,
+          ownerId: record.publishedBy,
+          publisherPubkey: record.pubkey,
+        });
+      } catch {
+        // Serve the stored (possibly expired) certificate rather than
+        // failing the read — resolution must not be less available than
+        // the record itself.
+      }
+    }
+
     return c.json({
       aid: record.manifest.aid,
       manifest: record.manifest,
-      identity_jwt: record.identityJwt,
+      identity_jwt: identityJwt,
       published_at: record.publishedAt,
       published_by: record.publishedBy,
       // The TOFU-pinned signing key. Advisory only — verifiers SHOULD

@@ -1,6 +1,6 @@
 {
   "name": "@agentagora/protocol",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Wire types and Zod schemas for the AgentAgora Protocol (AAP). Single source of truth for protocol-level definitions.",
   "license": "Apache-2.0",
   "author": "AgentAgora maintainers",

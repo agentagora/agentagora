@@ -183,6 +183,21 @@ export class D1Storage implements Storage {
     return results.map((r) => JSON.parse(r.event_json) as AuditEvent);
   }
 
+  async listFeedbackForAgent(subjectAid: string): Promise<AuditEvent[]> {
+    // json_extract scan — fine at M7-lite (closed alpha) volumes; add a
+    // generated/indexed `type` column when feedback reads get hot.
+    const rows = await this.db
+      .prepare(
+        `SELECT event_json FROM audit_events
+         WHERE json_extract(event_json, '$.type') = 'aap.feedback.recorded'
+           AND json_extract(event_json, '$.data.subject_aid') = ?
+         ORDER BY timestamp DESC LIMIT 200`,
+      )
+      .bind(subjectAid)
+      .all<{ event_json: string }>();
+    return (rows.results ?? []).map((r) => JSON.parse(r.event_json) as AuditEvent);
+  }
+
   async listConversationsByActor(actorAid: string): Promise<ConversationSummary[]> {
     // Closed-alpha approximation: pull every event the actor signed,
     // group + roll up in app code. Cheaper than the equivalent SQL

@@ -27,7 +27,7 @@ async function mintIdentityJwt(options: {
   const header = b64uEncode(
     enc.encode(JSON.stringify({ alg: "EdDSA", typ: "JWT", kid: options.kid })),
   );
-  const now = Math.floor(1_750_000_000);
+  const now = Math.floor(Date.now() / 1000);
   const payload = b64uEncode(
     enc.encode(
       JSON.stringify({
@@ -134,7 +134,7 @@ describe("HttpRegistry", () => {
     await expect(reg.resolveAgent(BOB_AID)).rejects.toThrow(/signature .* invalid/);
   });
 
-  it("tolerates expired certificates by default, rejects with rejectExpired", async () => {
+  it("rejects expired certificates by default, tolerates with rejectExpired:false", async () => {
     const registryKey = generatePrivateKey();
     const registryPub = await publicKeyFrom(registryKey);
     const bobPub = await publicKeyFrom(generatePrivateKey());
@@ -164,15 +164,17 @@ describe("HttpRegistry", () => {
       });
     }) as typeof fetch;
 
-    const lenient = new HttpRegistry({ baseUrl: "http://r.test", fetch: fakeFetch });
-    await expect(lenient.resolveAgent(BOB_AID)).resolves.toBeDefined();
+    // Default is strict: the reference registry reissues fresh certs on
+    // read, so an expired cert means a stale or non-conforming registry.
+    const strict = new HttpRegistry({ baseUrl: "http://r.test", fetch: fakeFetch });
+    await expect(strict.resolveAgent(BOB_AID)).rejects.toThrow(/expired/);
 
-    const strict = new HttpRegistry({
+    const lenient = new HttpRegistry({
       baseUrl: "http://r.test",
       fetch: fakeFetch,
-      rejectExpired: true,
+      rejectExpired: false,
     });
-    await expect(strict.resolveAgent(BOB_AID)).rejects.toThrow(/expired/);
+    await expect(lenient.resolveAgent(BOB_AID)).resolves.toBeDefined();
   });
 });
 

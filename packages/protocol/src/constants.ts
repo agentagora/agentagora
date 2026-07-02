@@ -90,6 +90,15 @@ export const AuditEventTypes = {
   DisputeOpened: "aap.dispute.opened",
   DisputeResolved: "aap.dispute.resolved",
   ConversationArchived: "aap.conversation.archived",
+  /**
+   * Post-settlement outcome feedback (OPTIONAL) — the initiator scores the
+   * responder's delivery (integer 0–100 + optional tags/comment) into its
+   * own audit chain. This is the raw, evidence-backed data layer for
+   * reputation (M7): no scoring semantics at the protocol level, and event
+   * `type` is an open string at the wire level, so v0.1 verifiers remain
+   * compatible.
+   */
+  FeedbackRecorded: "aap.feedback.recorded",
 } as const;
 
 export type AuditEventType = (typeof AuditEventTypes)[keyof typeof AuditEventTypes];

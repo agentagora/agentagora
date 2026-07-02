@@ -428,6 +428,65 @@ export class AgentAgoraClient {
 
   // ----- Owner-facing -----
 
+  /**
+   * Record post-settlement outcome feedback (`aap.feedback.recorded`) into
+   * the initiator's audit chain for a conversation this client ran.
+   *
+   * This is M7-lite: the raw, evidence-backed data layer for reputation.
+   * The event carries an integer `score` (0–100) plus optional tags and a
+   * comment, is signed like every other audit event, and syncs to the
+   * cloud via CloudAuditSink like the rest of the chain. No scoring
+   * semantics here — aggregation/weighting is the M7 reputation engine's
+   * job. `subjectAid`/`capability` default to the conversation's responder
+   * and called capability, extracted from the chain's opening event.
+   */
+  async recordFeedback(
+    conversationId: string,
+    feedback: {
+      /** Integer 0–100: how well the responder delivered. */
+      score: number;
+      /** Override the subject (defaults to the conversation's responder). */
+      subjectAid?: string;
+      /** Override the capability (defaults to the one called). */
+      capability?: string;
+      tags?: string[];
+      comment?: string;
+    },
+  ): Promise<void> {
+    const { signingKey, signingKeyId, fromAid } = this.options;
+    if (!signingKey || !signingKeyId || !fromAid) {
+      throw new Error("AgentAgoraClient.recordFeedback: signing identity is required");
+    }
+    if (!Number.isInteger(feedback.score) || feedback.score < 0 || feedback.score > 100) {
+      throw new Error("AgentAgoraClient.recordFeedback: score must be an integer 0–100");
+    }
+    const log = this.auditLogs.get(conversationId);
+    if (!log) {
+      throw new Error(`AgentAgoraClient.recordFeedback: unknown conversation ${conversationId}`);
+    }
+    const opened = log.events.find((e) => e.type === AuditEventTypes.ConversationOpened);
+    const subjectAid = feedback.subjectAid ?? (opened?.data.responder as string | undefined);
+    const capability = feedback.capability ?? (opened?.data.capability as string | undefined);
+    if (!subjectAid) {
+      throw new Error(
+        "AgentAgoraClient.recordFeedback: subjectAid not provided and not derivable from the chain",
+      );
+    }
+    await writeEvent(log, {
+      type: AuditEventTypes.FeedbackRecorded,
+      actorAid: fromAid,
+      privateKey: signingKey,
+      keyId: signingKeyId,
+      data: {
+        subject_aid: subjectAid,
+        score: feedback.score,
+        ...(capability ? { capability } : {}),
+        ...(feedback.tags?.length ? { tags: feedback.tags } : {}),
+        ...(feedback.comment ? { comment: feedback.comment } : {}),
+      },
+    });
+  }
+
   conversations(_filter?: {
     since?: Date;
     status?: ConversationStatus;
