@@ -147,6 +147,7 @@ Same SDK code, no Node-specific deps, no compatibility flags, bundle < 200 KiB. 
 - 🚩 [Manifesto](docs/manifesto.md) — what we believe and why ([中文](docs/manifesto.zh-CN.md))
 - 📄 [AAP Protocol Spec v0.2](docs/AAP-spec.md) — the formal protocol contract
 - 🔗 [AP2 mandate binding](docs/AAP-spec-ap2-binding.md) — how AAP carries Google AP2 mandates + the `x402` channel
+- 🌉 [Interop positioning](docs/AAP-interop-positioning.md) — how AAP composes with AGNTCY/OASF (discovery), KYA (identity), and ERC-8004 (reputation)
 - 🧪 [Traceability matrix](docs/aap-traceability.md) — every spec MUST mapped to a test
 - 🏛 [Protocol stewardship](docs/protocol-stewardship.md) — why the open protocol and the hosted Cloud share this repo + when they split
 
