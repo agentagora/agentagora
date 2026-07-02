@@ -18,6 +18,7 @@ No wire-protocol change (`@agentagora/protocol` stays 0.2.0). This release adds 
 - `Agent.listConversations()` — enumeration for periodic audit sync loops.
 - `AgentAgoraClient.resolve(aid)` — implemented (was an M1-task stub): resolves via a lazily constructed `HttpRegistry` against `options.registry`.
 - Golden-path example: `apps/examples/two-agents/src/server.ts` + `client.ts` (the files `demo:server` / `demo:client` always pointed at) — publish → discover → call (+ optional paid call via Stripe) → audit sync, against a local cloud-api per `docs/local-dev.md` §7b.
+- **M7-lite feedback (reputation data layer):** `AgentAgoraClient.recordFeedback(conversationId, { score, tags?, comment? })` — signs an `aap.feedback.recorded` event into the initiator's chain (subject/capability derived from the conversation's opening event); syncs to the cloud like any other event and is served raw via `GET /v1/agents/:aid/feedback`. `buildErc8004Feedback()` — builds the ERC-8004 off-chain feedback file (keccak-256 `feedbackHash`, suggested `giveFeedback` args) with AAP audit evidence embedded (conversation id, chain head hash, mandate hashes, optional `proofOfPayment`); no chain client dependency — the caller hosts the file and submits with their own wallet tooling. See `docs/AAP-interop-positioning.md` §3.
 
 ## [0.2.0] — 2026-06-30 — AAP v0.2 (AP2 interop)
 

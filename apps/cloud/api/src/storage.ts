@@ -152,6 +152,12 @@ export interface Storage {
   /** Full chain for a conversation, ordered by timestamp ascending. */
   getConversationEvents(conversationId: string): Promise<AuditEvent[]>;
   /**
+   * Feedback events (`aap.feedback.recorded`) whose `data.subject_aid`
+   * is this agent, newest first. Raw evidence only — aggregation and
+   * scoring are the M7 reputation engine's job (this is M7-lite).
+   */
+  listFeedbackForAgent(subjectAid: string): Promise<AuditEvent[]>;
+  /**
    * Distinct conversations the actor has signed an event in, with
    * roll-up metadata. Ordered by lastSeenAt DESC so the dashboard's
    * inbox shows the freshest activity first.
@@ -277,6 +283,18 @@ export class InMemoryStorage implements Storage {
 
   async getConversationEvents(conversationId: string): Promise<AuditEvent[]> {
     return [...(this.auditByConversation.get(conversationId) ?? [])];
+  }
+
+  async listFeedbackForAgent(subjectAid: string): Promise<AuditEvent[]> {
+    const out: AuditEvent[] = [];
+    for (const list of this.auditByConversation.values()) {
+      for (const ev of list) {
+        if (ev.type === "aap.feedback.recorded" && ev.data.subject_aid === subjectAid) {
+          out.push(ev);
+        }
+      }
+    }
+    return out.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
   }
 
   async listConversationsByActor(actorAid: string): Promise<ConversationSummary[]> {

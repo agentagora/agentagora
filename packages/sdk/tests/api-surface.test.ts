@@ -60,6 +60,7 @@ describe("@agentagora/sdk public API surface", () => {
         "X402Channel",
         "b64uDecode",
         "b64uEncode",
+        "buildErc8004Feedback",
         "canonicalizeForSigning",
         "capability",
         "cloudPayeeAccountResolver",

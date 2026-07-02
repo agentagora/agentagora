@@ -496,6 +496,7 @@ Every state transition MUST produce a signed audit event. Events form an append-
 | `aap.dispute.opened` | Either | Dispute raised |
 | `aap.dispute.resolved` | Council | Outcome determined |
 | `aap.conversation.archived` | System | Final state |
+| `aap.feedback.recorded` | Initiator | (v0.2-additive, OPTIONAL) Post-settlement outcome feedback — an integer `score` 0–100 plus optional tags/comment about the responder's delivery, signed into the initiator's own chain. The raw evidence layer for reputation (M7); no scoring semantics are defined at the protocol level. Wire-compatible with v0.1 verifiers (event `type` is an open string). |
 
 ### 8.3 Storage and retrieval
 

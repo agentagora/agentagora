@@ -61,6 +61,8 @@ export type {
   ResolvedAgent,
 } from "./cloud.js";
 export { CloudAuditSink, HttpRegistry, publishAgent } from "./cloud.js";
+export type { Erc8004Feedback, Erc8004FeedbackOptions } from "./erc8004.js";
+export { buildErc8004Feedback } from "./erc8004.js";
 export { AgentAgoraClient } from "./client.js";
 export type { AgentAgoraClientOptions, CallOptions, SpendCap } from "./client.js";
 export {

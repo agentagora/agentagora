@@ -162,6 +162,39 @@ describe("POST /v1/audit/ingest — happy path", () => {
     expect(stored).toHaveLength(4);
   });
 
+  it("serves ingested feedback via GET /v1/agents/:aid/feedback (M7-lite)", async () => {
+    const { app } = await setup();
+    // Alice records feedback about herself-as-subject? No — subject is the
+    // published agent (validManifest.aid); the actor is also alice here
+    // because the test rig only pins her key. Shape is what matters.
+    const fb = await signAuditEvent(
+      draft(
+        {
+          type: "aap.feedback.recorded",
+          data: { subject_aid: validManifest.aid, score: 91, capability: "review_pull_request" },
+        },
+        0,
+        null,
+      ),
+      aliceKey,
+    );
+    expect((await ingest(app, [fb])).status).toBe(201);
+
+    const res = await app.request(`/v1/agents/${encodeURIComponent(validManifest.aid)}/feedback`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      total: number;
+      feedback: Array<{ score: number; capability: string; actor_aid: string }>;
+    };
+    expect(body.total).toBe(1);
+    expect(body.feedback[0]?.score).toBe(91);
+    expect(body.feedback[0]?.capability).toBe("review_pull_request");
+
+    // Unknown agent → 404; agent with no feedback → empty list is fine.
+    const missing = await app.request("/v1/agents/aid%3Aagentagora%3Anobody%2Fnothing/feedback");
+    expect(missing.status).toBe(404);
+  });
+
   it("is idempotent — re-ingesting reports duplicate without poisoning", async () => {
     const { app, storage } = await setup();
     const event = await signAuditEvent(draft({}, 0, null), aliceKey);

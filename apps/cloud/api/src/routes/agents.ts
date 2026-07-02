@@ -175,6 +175,33 @@ export function createAgentsRouter({ storage, ownerAuth, oidc, rateLimiter }: Ro
     );
   });
 
+  // Raw feedback evidence for an agent (M7-lite). Public read, like the
+  // conversation chain view: these are signed audit events, and disputes /
+  // hiring decisions should be able to inspect them without credentials.
+  // No aggregation or trust score here — that's the M7 reputation engine.
+  router.get("/:aid/feedback", async (c) => {
+    const aid = decodeURIComponent(c.req.param("aid"));
+    const record = await storage.getAgent(aid);
+    if (!record) {
+      return c.json({ error: "not_found", message: `agent ${aid} not found` }, 404);
+    }
+    const events = await storage.listFeedbackForAgent(aid);
+    return c.json({
+      aid,
+      total: events.length,
+      feedback: events.map((ev) => ({
+        event_id: ev.event_id,
+        conversation_id: ev.conversation_id,
+        actor_aid: ev.actor_aid,
+        timestamp: ev.timestamp,
+        score: ev.data.score,
+        capability: ev.data.capability,
+        tags: ev.data.tags,
+        comment: ev.data.comment,
+      })),
+    });
+  });
+
   // Resolve one AID.
   router.get("/:aid", async (c) => {
     const aid = decodeURIComponent(c.req.param("aid"));

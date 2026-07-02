@@ -8,6 +8,14 @@ The wire-protocol version (`AAP_VERSION` in `src/constants.ts`) and the package'
 
 ---
 
+## [0.3.0] — 2026-07-02 — M7-lite feedback event
+
+**`AAP_VERSION` stays `"0.2"`** — audit event `type` is an open string at the wire level, so this is a registry-of-constants addition, not a wire change. (First divergence of package version from `AAP_VERSION`; entries are tagged per the policy note above.)
+
+### Added
+
+- `AuditEventTypes.FeedbackRecorded` (`"aap.feedback.recorded"`) — OPTIONAL post-settlement outcome feedback: the initiator signs an integer `score` 0–100 (+ optional `tags`/`comment`, `subject_aid`, `capability`) into its own audit chain. The raw, evidence-backed data layer for the M7 reputation engine; no scoring semantics at the protocol level. Spec §8.2 row added.
+
 ## [0.2.0] — 2026-06-30 — AAP v0.2 (AP2 interop)
 
 Backward-compatible MINOR (`AAP_VERSION` `0.1` → `0.2`). Adds [AP2](https://ap2-protocol.org) mandate carriage so AAP interoperates with the Agent Payments Protocol ecosystem. v0.1 implementations remain conforming — every addition is optional. Full binding: [`docs/AAP-spec-ap2-binding.md`](../../docs/AAP-spec-ap2-binding.md).
