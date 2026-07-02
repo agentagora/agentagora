@@ -501,6 +501,14 @@ Every state transition MUST produce a signed audit event. Events form an append-
 ### 8.3 Storage and retrieval
 
 - Each party MUST persist its own audit log locally for at least 90 days.
+- Parties subject to statutory record-keeping obligations MUST retain for the
+  mandated period instead where it is longer. In particular, the EU AI Act
+  (Article 12) requires high-risk AI systems to keep automatically generated,
+  tamper-evident logs for **at least six months** (24 months for certain
+  Annex III categories) — and in multi-agent chains every agent performing a
+  high-risk function is in scope (Recitals 99–100), with the *deployer*
+  accountable for retention. Implementations SHOULD make the retention period
+  configurable so a deployment can satisfy its jurisdiction's floor.
 - AgentAgora Cloud (when used) provides indefinite storage and indexed retrieval as a paid feature.
 - Audit logs are end-to-end verifiable: a third party can validate the chain without trusting any storage backend.
 
@@ -754,6 +762,7 @@ These are tracked in PRD §15. Highlights affecting the protocol surface:
 | v0.1-draft | 2026-04-30 | AgentAgora maintainers | Initial draft. Internal only. |
 | v0.1-rfc-draft | 2026-05-07 | AgentAgora maintainers | M4 Phase 3 hardening pass — RFC 2119 conventions confirmed, IANA Considerations + Acknowledgements added, §13 Conformance now points at the compliance suite + traceability matrix, all normative clauses cross-referenced in `docs/aap-traceability.md`. No protocol-surface changes. |
 | **v0.1** | **2026-05-24** | **AgentAgora maintainers** | **M6 public release. The `-rfc-draft` suffix is dropped — the bytes are identical to v0.1-rfc-draft.** No protocol-surface changes since the M4 hardening pass; this version stamps the freeze. Going forward, versioning follows semver semantics on the spec itself (G.1 maintainer decision): PATCH for editorial fixes, MINOR for backward-compatible additions, MAJOR for breaking changes. Every change appends a row here. |
+| v0.2 (amended) | 2026-07-03 | AgentAgora maintainers | PATCH-level clarification to §8.3 retention: statutory record-keeping floors override the 90-day baseline — notably EU AI Act Art. 12 (≥6 months, tamper-evident, deployer-accountable; multi-agent chains in scope per Recitals 99–100). Retention SHOULD be configurable. No wire or surface change. |
 | **v0.2** | **2026-06-30** | **AgentAgora maintainers** | **MINOR — backward-compatible additions for AP2 interop.** Adds §6.5 AP2 mandate carriage (Intent/Cart/Payment Mandates as W3C VCs in optional `params.mandates`, proofs verified independently of the EdDSA envelope), the optional `aap.authorize` method (§6.3), and the `x402` settlement channel (§9.6). Envelopes now accept `version` ∈ {`0.1`, `0.2`} inbound and emit `0.2`. v0.1 implementations remain conforming — they ignore the optional mandate field. Full binding in [`AAP-spec-ap2-binding.md`](AAP-spec-ap2-binding.md). |
 
 ---
